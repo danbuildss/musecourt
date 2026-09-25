@@ -19,6 +19,10 @@ interface CredentialRow {
 export class PostgresCredentialStore implements CredentialStore {
   constructor(private readonly pool: Pool) {}
 
+  async delete(keyId: string): Promise<void> {
+    await this.pool.query("DELETE FROM musecourt.agent_credentials WHERE key_id = $1", [keyId]);
+  }
+
   async insert(record: Omit<CredentialRecord, "firstUsedAt" | "revokedAt">): Promise<void> {
     await this.pool.query(
       "INSERT INTO musecourt.agent_credentials (key_id, agent_id, secret_hash, created_at) VALUES ($1, $2, $3, $4)",

@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "db:migrate": "tsx scripts/migrate.ts",
     "check": "npm run lint && npm run format && npm run typecheck && npm run test",
-    "serve": "tsx scripts/serve.ts"
+    "serve": "tsx scripts/serve.ts",
+    "build:vercel": "tsx scripts/build-vercel.ts"
   },
   "dependencies": {
     "pg": "^8.23.0",
@@ -26,6 +27,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.4",
     "@types/pg": "^8.23.1",
+    "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "prettier": "^3.9.9",
     "tsx": "^4.23.15",

@@ -7,6 +7,9 @@ import { isCourtError, type CourtErrorCode } from "@/core/errors";
 import type { LicenceType } from "@/core/events";
 import type { DeadlinePolicy, Stage } from "@/core/procedure";
 import { Court } from "@/court/court";
+import { CourtClock } from "@/court/court-clock";
+import { HouseJudgeService } from "@/court/house-judge-service";
+import type { CourtModel } from "@/core/ports";
 import { createMemoryBackend, type Backend } from "@/infra/backends";
 import { FOUNDING_LAWS } from "@/seed/laws";
 import { FakeClock } from "@/testing/fake-clock";
@@ -71,7 +74,31 @@ export async function createTestCourt(options: TestCourtOptions = {}) {
   const act = (caseId: string, agentId: string, command: CaseCommand) =>
     court.act(caseId, as(agentId), command);
 
-  return { court, backend, store, readModels, clock, ids, world, admin, agents, register, as, act };
+  /** A court clock over this court; pass a model to let Solon rule. */
+  const courtClock = (options: { model?: CourtModel; lease?: boolean } = {}) =>
+    new CourtClock({
+      court,
+      readModels,
+      clock,
+      houseJudge: options.model ? new HouseJudgeService(court, options.model, readModels) : undefined,
+      lease: options.lease === false ? undefined : backend.clockLease,
+    });
+
+  return {
+    court,
+    backend,
+    store,
+    readModels,
+    clock,
+    ids,
+    world,
+    admin,
+    agents,
+    register,
+    as,
+    act,
+    courtClock,
+  };
 }
 
 export type TestCourt = Awaited<ReturnType<typeof createTestCourt>>;

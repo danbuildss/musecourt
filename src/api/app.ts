@@ -1,7 +1,8 @@
 import type { Clock } from "@/core/clock";
 import type { Court } from "@/court/court";
 import type { ReadModels } from "@/court/read-models/types";
-import { authenticateAdmin, authenticateAgent, type Principal } from "./auth";
+import type { CourtClock } from "@/court/court-clock";
+import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
 import { ApiError, ERROR_CATALOGUE, toErrorBody, type ApiErrorCode } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFingerprint } from "./http";
 import type { RateLimiter } from "./rate-limit";
@@ -15,6 +16,10 @@ export interface ApiDeps {
   idempotency: IdempotencyStore;
   clock: Clock;
   rebuildReadModels: () => Promise<void>;
+  /** The court clock, run by the internal cron route and the admin tick. */
+  courtClock: CourtClock;
+  /** Secret for the internal cron route only (≥ 32 chars). Never the admin token. */
+  cronSecret?: string;
   /** Secret for admin endpoints (≥ 32 chars). Admin routes are disabled without it. */
   adminToken?: string;
   /** Applied to public registration, keyed by client IP. */
@@ -128,8 +133,13 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
         const clientIp = clientIpOf(request, info);
 
         let principal: Principal | null = null;
-        if (route.auth === "agent") principal = await authenticateAgent(request, deps.credentials, now);
+        if (route.auth === "agent") {
+          principal = await authenticateAgent(request, deps.credentials, now, async (agentId) =>
+            Boolean(await deps.readModels.getAgent(agentId)),
+          );
+        }
         if (route.auth === "admin") principal = authenticateAdmin(request, deps.adminToken);
+        if (route.auth === "cron") principal = authenticateCron(request, deps.cronSecret);
 
         if (
           route.rateLimited &&
@@ -139,10 +149,12 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
           throw new ApiError("RATE_LIMITED", "Too many registrations from this address. Retry later.");
         }
 
-        const body = route.method === "POST" ? await readJsonBody(request, maxBodyBytes) : undefined;
+        const body =
+          route.method === "POST" && !route.bodyless ? await readJsonBody(request, maxBodyBytes) : undefined;
         const ctx = { request, url, params, body, principal, deps, now, clientIp };
 
-        if (route.method !== "POST") return toResponse(await route.handle(ctx));
+        // Reads, and the self-idempotent clock, skip the Idempotency-Key machinery.
+        if (route.method !== "POST" || route.selfIdempotent) return toResponse(await route.handle(ctx));
 
         // ---- Idempotent write ----
         const key = request.headers.get("idempotency-key");

@@ -3,3 +3,5 @@ package-lock.json
 coverage
 notes.md
 PLAN.md
+.vercel
+dist

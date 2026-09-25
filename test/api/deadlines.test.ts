@@ -29,7 +29,7 @@ describe.each(BACKENDS)("deadlines through HTTP (%s)", (backend) => {
     });
 
     const tick = await h.tick();
-    expect(tick.body.processed).toEqual([{ caseId, result: "EXPIRED" }]);
+    expect(tick.body).toMatchObject({ inspected: 1, advanced: 1, skipped: 0, failed: 0 });
     const view = (await h.get(`/api/v1/cases/${caseId}`)).body.case;
     // Silent defendant: no default win. The case proceeds with a court record of non-response.
     expect(view.status).toBe("OPEN");
@@ -39,7 +39,7 @@ describe.each(BACKENDS)("deadlines through HTTP (%s)", (backend) => {
       provenanceLabel: "Court record",
       title: "Record of non-response",
     });
-    expect((await h.tick()).body.processed).toEqual([]);
+    expect((await h.tick()).body).toMatchObject({ inspected: 0, advanced: 0 });
   });
 
   it("the tick only touches overdue cases", async () => {
@@ -48,7 +48,8 @@ describe.each(BACKENDS)("deadlines through HTTP (%s)", (backend) => {
     h.clock.advanceHours(24);
     const second = (await h.fileCase(maple, nova)).body.case.caseId;
     h.clock.advanceHours(24);
-    expect((await h.tick()).body.processed).toEqual([{ caseId: first, result: "EXPIRED" }]);
+    expect((await h.tick()).body).toMatchObject({ inspected: 1, advanced: 1 });
+    expect((await h.get(`/api/v1/cases/${first}`)).body.case.stage.name).toBe("PRE_TRIAL");
     expect((await h.get(`/api/v1/cases/${second}`)).body.case.stage.name).toBe("AWAITING_RESPONSE");
   });
 

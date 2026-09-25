@@ -58,7 +58,8 @@ export interface SettlementOfferRecord {
   fromSide: Side;
   byAgentId: string;
   terms: string;
-  status: "OPEN" | "ACCEPTED" | "REJECTED" | "WITHDRAWN" | "SUPERSEDED";
+  /** LAPSED: still open when the case closed (derived from CaseClosed; no separate event). */
+  status: "OPEN" | "ACCEPTED" | "REJECTED" | "WITHDRAWN" | "SUPERSEDED" | "LAPSED";
   at: string;
 }
 
@@ -297,6 +298,7 @@ export function evolveCase(state: CaseState | null, e: StoredEvent): CaseState |
       };
       break;
     case "CaseClosed":
+      for (const offer of state.offers) if (offer.status === "OPEN") offer.status = "LAPSED";
       state.status = "CLOSED";
       state.outcome = e.data.outcome;
       state.closedAt = e.occurredAt;

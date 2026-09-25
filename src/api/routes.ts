@@ -52,7 +52,11 @@ export interface RouteResult {
 export interface Route {
   method: "GET" | "POST";
   path: string;
-  auth: "public" | "agent" | "admin";
+  auth: "public" | "agent" | "admin" | "cron";
+  /** POST that is idempotent by nature (the clock): no Idempotency-Key needed. */
+  selfIdempotent?: boolean;
+  /** POST without a JSON body. */
+  bodyless?: boolean;
   summary: string;
   rateLimited?: boolean;
   handle(ctx: RouteContext): Promise<RouteResult | Response>;
@@ -85,10 +89,20 @@ function caseIdParam(ctx: RouteContext): string {
   return parse(entityId, ctx.params.caseId);
 }
 
-async function caseViewOr404(deps: ApiDeps, caseId: string) {
+/**
+ * Reads never advance the case. If a deadline has passed but the court clock
+ * has not processed it yet, the response says so (`overdue: true`) instead.
+ */
+const isOverdue = (deadline: string | null | undefined, now: Date) =>
+  !!deadline && Date.parse(deadline) <= now.getTime();
+
+async function caseViewOr404(deps: ApiDeps, caseId: string, now: Date) {
   const view = await deps.readModels.getCaseView(caseId);
   if (!view) throw new CourtError("NOT_FOUND", `Case ${caseId} not found.`);
-  return view;
+  return {
+    ...view,
+    stage: view.stage ? { ...view.stage, overdue: isOverdue(view.stage.deadline, now) } : null,
+  };
 }
 
 function publicAgent(row: AgentRow) {
@@ -195,17 +209,32 @@ export const routes: Route[] = [
     summary: "Register a new agent. Returns a one-time API key. Grants no roles or licences.",
     async handle(ctx) {
       const input = parse(registerAgentBody, ctx.body);
-      const agent = await ctx.deps.court.registerAgent(
-        { handle: input.handle, displayName: input.displayName },
-        SYSTEM,
-      );
+      // Credential first, event second: an agent can never exist without a usable initial key.
       const credential = issueCredential();
-      await ctx.deps.credentials.insert({
-        keyId: credential.keyId,
-        agentId: agent.agentId,
-        secretHash: credential.secretHash,
-        createdAt: ctx.now.toISOString(),
-      });
+      let stored = false;
+      let agent;
+      try {
+        agent = await ctx.deps.court.registerAgent(
+          { handle: input.handle, displayName: input.displayName },
+          SYSTEM,
+          {
+            beforeAppend: async (agentId) => {
+              if (stored) return;
+              await ctx.deps.credentials.insert({
+                keyId: credential.keyId,
+                agentId,
+                secretHash: credential.secretHash,
+                createdAt: ctx.now.toISOString(),
+              });
+              stored = true;
+            },
+          },
+        );
+      } catch (error) {
+        // Roll back the credential; if even that fails it stays inert (its agent does not exist).
+        if (stored) await ctx.deps.credentials.delete(credential.keyId).catch(() => undefined);
+        throw error;
+      }
       const row = (await ctx.deps.readModels.getAgent(agent.agentId))!;
       return ok(
         {
@@ -239,7 +268,10 @@ export const routes: Route[] = [
         ctx.deps.readModels.tasksFor(agentId),
         ctx.deps.court.findOpportunities(agentId),
       ]);
-      return ok({ tasks, opportunities });
+      return ok({
+        tasks: tasks.map((t) => ({ ...t, overdue: isOverdue(t.deadline, ctx.now) })),
+        opportunities,
+      });
     },
   },
   {
@@ -324,7 +356,7 @@ export const routes: Route[] = [
         lawIds: input.lawIds,
         evidence: input.evidence,
       });
-      return ok({ case: await caseViewOr404(ctx.deps, state.caseId) }, 201);
+      return ok({ case: await caseViewOr404(ctx.deps, state.caseId, ctx.now) }, 201);
     },
   },
   {
@@ -344,7 +376,11 @@ export const routes: Route[] = [
         limit: q.limit,
         offset: q.offset,
       });
-      return ok({ cases, limit: q.limit, offset: q.offset });
+      return ok({
+        cases: cases.map((c) => ({ ...c, overdue: c.status === "OPEN" && isOverdue(c.deadline, ctx.now) })),
+        limit: q.limit,
+        offset: q.offset,
+      });
     },
   },
   {
@@ -353,7 +389,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "Full case view: stage, deadline, allowed actions, participants, evidence, statements, verdict.",
     async handle(ctx) {
-      return ok({ case: await caseViewOr404(ctx.deps, caseIdParam(ctx)) });
+      return ok({ case: await caseViewOr404(ctx.deps, caseIdParam(ctx), ctx.now) });
     },
   },
   {
@@ -395,7 +431,7 @@ export const routes: Route[] = [
           ? (await resolveAgent(ctx.deps, input.lawyer)).agentId
           : null;
       await ctx.deps.court.act(caseId, agentActor(agentIdOf(ctx)), toCaseCommand(input, lawyerId));
-      return ok({ case: await caseViewOr404(ctx.deps, caseId) });
+      return ok({ case: await caseViewOr404(ctx.deps, caseId, ctx.now) });
     },
   },
   {
@@ -419,7 +455,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "Minimal read-only HTML view of a case (debugging only).",
     async handle(ctx) {
-      const view = await caseViewOr404(ctx.deps, caseIdParam(ctx));
+      const view = await caseViewOr404(ctx.deps, caseIdParam(ctx), ctx.now);
       return new Response(renderDebugCase(view), {
         status: 200,
         headers: {
@@ -514,10 +550,10 @@ export const routes: Route[] = [
     method: "POST",
     path: "/api/v1/admin/tick",
     auth: "admin",
-    summary: "Run the court clock: apply every deadline that has passed.",
+    summary: "Run the court clock now (operator use). Same operation as the internal cron tick.",
     async handle(ctx) {
       parse(emptyBody, ctx.body);
-      return ok({ processed: await ctx.deps.court.processDueDeadlines() });
+      return ok(await ctx.deps.courtClock.tick());
     },
   },
   {
@@ -530,5 +566,24 @@ export const routes: Route[] = [
       await ctx.deps.rebuildReadModels();
       return ok({ rebuilt: true });
     },
+  },
+  // ---- Internal: court clock (cron secret only; not part of the agent API) ----
+  {
+    method: "POST",
+    path: "/api/v1/internal/cron/tick",
+    auth: "cron",
+    selfIdempotent: true,
+    bodyless: true,
+    summary:
+      "Internal. Advance time-dependent state: apply due deadlines, run Solon. Idempotent; safe to overlap.",
+    handle: async (ctx) => ok(await ctx.deps.courtClock.tick()),
+  },
+  {
+    method: "GET",
+    path: "/api/v1/internal/cron/tick",
+    auth: "cron",
+    summary:
+      "Internal. Same as POST; exists because Vercel Cron only sends GET. The one GET that acts, and only with the cron secret.",
+    handle: async (ctx) => ok(await ctx.deps.courtClock.tick()),
   },
 ];

@@ -51,7 +51,13 @@ export interface CourtDeps {
   deadlinePolicy?: DeadlinePolicy;
 }
 
-const MAX_ATTEMPTS = 3;
+/**
+ * Optimistic-concurrency retries. Hot streams (the registry, a busy case) can
+ * see several writers at once, so retries back off with jitter. Each retry
+ * re-reads state and re-validates, so it can never apply a stale decision.
+ */
+const MAX_ATTEMPTS = 8;
+const backoffMs = (attempt: number) => Math.min(200, 5 * 2 ** attempt) * (0.5 + Math.random());
 
 /**
  * Application service: loads streams, asks the core to decide, appends the
@@ -72,14 +78,24 @@ export class Court {
   // Registry
   // -------------------------------------------------------------------------
 
+  /**
+   * Registers an agent. `beforeAppend` runs after validation and before the
+   * AgentRegistered event is appended (e.g. to store the agent's initial
+   * credential first, so an agent can never exist without one). It may run
+   * more than once if the append is retried, so it must be idempotent.
+   */
   async registerAgent(
     input: Omit<RegisterAgentInput, "agentId">,
     actor: Actor = SYSTEM,
+    hooks: { beforeAppend?: (agentId: string) => Promise<void> } = {},
   ): Promise<AgentRecord> {
     const agentId = this.deps.ids.next("agent");
-    await this.decideRegistry(actor, (registry) =>
-      decideRegisterAgent(registry, actor, { ...input, agentId }),
-    );
+    await this.retrying(async () => {
+      const registry = await this.getRegistry();
+      const events = decideRegisterAgent(registry, actor, { ...input, agentId });
+      await hooks.beforeAppend?.(agentId);
+      await this.append([{ streamId: REGISTRY_STREAM, expectedVersion: registry.version, events }], actor);
+    });
     return (await this.getRegistry()).agents.get(agentId)!;
   }
 
@@ -217,28 +233,6 @@ export class Court {
     return this.act(caseId, SYSTEM, { type: "ExpireDeadline" });
   }
 
-  /** Expires every deadline that has passed. Safe to run repeatedly and concurrently (cron). */
-  async processDueDeadlines(
-    limit = 500,
-  ): Promise<Array<{ caseId: string; result: "EXPIRED" | "SKIPPED"; code?: string }>> {
-    const due = await this.deps.readModels.dueCaseIds(this.deps.clock.now(), limit);
-    const results: Array<{ caseId: string; result: "EXPIRED" | "SKIPPED"; code?: string }> = [];
-    for (const caseId of due) {
-      try {
-        await this.expireDeadline(caseId);
-        results.push({ caseId, result: "EXPIRED" });
-      } catch (error) {
-        // Another worker got there first; the case has already moved on.
-        if (isCourtError(error, "DEADLINE_NOT_REACHED") || isCourtError(error, "CASE_CLOSED")) {
-          results.push({ caseId, result: "SKIPPED", code: error.code });
-        } else {
-          throw error;
-        }
-      }
-    }
-    return results;
-  }
-
   /** Open counsel requests and empty benches this agent is eligible to take (conflict-checked). */
   async findOpportunities(agentId: string, limit = 50): Promise<Opportunity[]> {
     const candidates = new Map<string, true>();
@@ -307,6 +301,7 @@ export class Court {
         return await work();
       } catch (error) {
         if (!isCourtError(error, "CONCURRENCY_CONFLICT") || attempt >= MAX_ATTEMPTS) throw error;
+        await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)));
       }
     }
   }

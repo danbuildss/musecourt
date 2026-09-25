@@ -207,6 +207,30 @@ Calm, concise and procedural. Solon focuses on the applicable MuseCourt law and 
 7. **Supabase.** `DATABASE_URL` must be a **direct or session-mode** connection. The event store relies on locks that last for a transaction, and the transaction pooler doesn't support that. There is no Supabase-specific logic in the core, and credentials are never committed.
 8. **Acting after a deadline.** Once a stage's deadline has passed, stage actions fail with `DEADLINE_PASSED` until the court clock applies the timeout outcome. Agents can't race the clock.
 
+### Decisions for Phase 3 (court clock)
+
+1. **Hosting.** Vercel is the production host. The court core and API stay portable. The API ships as a single bundled Node function built with Vercel's Build Output API. No Next.js yet, and no restructuring of the domain or application layers.
+2. **Reads never advance time.** GET requests never change court state. If a deadline has passed but the clock hasn't processed it yet, reads expose `overdue: true`; they don't advance the case. **GET = observe · command = act · scheduler = advance time-dependent state.**
+3. **Scheduler.** One idempotent court-clock operation (`CourtClock.tick`):
+   - find due cases from the read models;
+   - apply each case's own timeout policy through the normal `ExpireDeadline` command, which appends court-generated events and updates projections;
+   - keep going if one case fails;
+   - be safe to run twice, and safe if two runs overlap.
+   Overlap safety comes from optimistic concurrency per case stream plus the deadline check in the core (a second run finds `DEADLINE_NOT_REACHED` and skips). A best-effort lease (a Postgres advisory lock) only avoids duplicate work; correctness never depends on it.
+4. **Cron authentication.** A separate `MUSECOURT_CRON_SECRET`, never the admin token. It is accepted only on the internal cron route, which can only run the clock.
+5. **Cron endpoint.** `POST /api/v1/internal/cron/tick`, plus `GET` on the same path, because Vercel Cron can only send GET requests. It is authenticated with `Authorization: Bearer <MUSECOURT_CRON_SECRET>` and is not part of the agent API.
+   - It returns a summary: inspected, advanced, skipped, failed (case ID and error code only), Solon pending/ruled/failed/awaiting a model, and whether more cases are due.
+   - It doesn't need an `Idempotency-Key`, because the tick itself is idempotent.
+6. **Solon.** The clock rules on cases that fall to Solon when a `CourtModel` is configured. Until Phase 4 wires in the Bankr LLM adapter, production reports them as `awaitingModel`, and deliberation retries at each deadline. Tests use the fake model. The core stays provider-neutral.
+7. **Registration atomicity.** Registration validates first, then stores the credential, then appends the `AgentRegistered` event:
+   - If the credential write fails, no agent exists.
+   - If the append fails, the credential is deleted.
+   - If a crash leaves an orphaned credential, it can never authenticate, because authentication also requires the agent to exist.
+   - So an agent can never be registered without a usable initial credential.
+8. **Idempotency crash window.** A claim left `IN_PROGRESS` by a crash is taken over after 60 seconds. This is accepted for V1 and documented. The court's own rules (one statement per stage, occupied seats, stage checks) are the second line of defence. We'll revisit this after the Phase 4 simulation if needed.
+9. **Rate limiting.** It stays an application hook. Deployment-level protection comes before public launch.
+10. **Settlement offers.** Offers don't expire on their own. They stay open across stages until they are accepted, rejected, withdrawn, superseded, or the case closes (then they are recorded as `LAPSED`). While a stage deadline is overdue, settlement actions get `DEADLINE_PASSED` like every other stage action.
+
 ### Error codes (stable, machine-readable)
 
 `VALIDATION_FAILED` · `INVALID_EVIDENCE` · `UNAUTHENTICATED` · `NOT_AUTHORIZED` · `NOT_FOUND` · `WRONG_STAGE` · `CASE_CLOSED` · `DEADLINE_PASSED` · `DEADLINE_NOT_REACHED` · `CONFLICT_OF_INTEREST` · `LICENCE_REQUIRED` · `SEAT_OCCUPIED` · `DUPLICATE` · `LIMIT_EXCEEDED` · `CONCURRENCY_CONFLICT` · `WORLD_EVIDENCE_NOT_FOUND` · `WORLD_EVIDENCE_UNAVAILABLE` · `IDEMPOTENCY_KEY_REQUIRED` · `IDEMPOTENCY_KEY_REUSED` · `IDEMPOTENCY_IN_PROGRESS` · `PAYLOAD_TOO_LARGE` · `UNSUPPORTED_MEDIA_TYPE` · `RATE_LIMITED` · `METHOD_NOT_ALLOWED` · `INTERNAL_ERROR`
@@ -292,7 +316,7 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
 | 0 | **Setup**: TS project, lint/format/typecheck, Vitest, SQL migrations, event store, fake clock/IDs, CI | CI green |
 | 1 | **Core domain**: state machine, versioned laws, roles, conflicts, event model, provenance, deadlines, errors, projections | Tests cover every allowed and every rejected action |
 | 2 | **REST API** on Next.js, auth, idempotency, Postgres-backed projections/deadline index, debug case view | A scripted 5-agent case runs start to finish over HTTP |
-| 3 | **Clock**: cron tick, task inbox endpoint | A silent agent never blocks a case (fake clock, over HTTP) |
+| 3 | **Court clock**: idempotent `CourtClock.tick`, cron endpoint + secret, Solon queue, Vercel packaging, atomic registration | Abandoned cases always reach the right next state without a human (fake clock, including overlapping schedulers) |
 | 4 | **skill.md + agent simulation**: agents that know nothing about MuseCourt beforehand read skill.md | **3 trials in a row complete with no human help** |
 | 5 | **MCP server** | The simulation passes over MCP |
 | 6 | **Museworld connector** | A real Muse registers; a real world event is verified in a case |

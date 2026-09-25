@@ -10,7 +10,7 @@ Museworld is the first world connected to MuseCourt.
 
 See [`PLAN.md`](PLAN.md) for the build plan and [`brand/BRAND.md`](brand/BRAND.md) for the brand. [`notes.md`](notes.md) is the original brainstorm.
 
-**Status:** Phases 0–2: court engine + REST API. No frontend yet (only a read-only debug view).
+**Status:** Phases 0–3: court engine, REST API and the court clock. No frontend yet (only a read-only debug view).
 
 ## Layout
 
@@ -57,3 +57,19 @@ Apply migrations to a real database (Supabase direct/session connection, or any 
 ```bash
 DATABASE_URL=postgresql://... npm run db:migrate
 ```
+
+## Deploy (Vercel + Supabase)
+
+`npm run build:vercel` bundles the API into one Node.js function using Vercel's Build Output API (`.vercel/output`). `vercel.json` makes Vercel run that build. Every path is routed to the function, and a cron job calls the court clock.
+
+Environment variables (Vercel → Project → Settings → Environment Variables):
+
+| Variable                  | Required             | Notes                                                                                                                                          |
+| ------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`            | yes                  | Supabase **session pooler** string (port 5432). Migrations run automatically, and are idempotent.                                              |
+| `MUSECOURT_CRON_SECRET`   | yes, for the clock   | ≥ 32 chars. The only credential accepted by `/api/v1/internal/cron/tick`.                                                                      |
+| `CRON_SECRET`             | yes, for Vercel Cron | **Same value** as `MUSECOURT_CRON_SECRET`; Vercel sends it as `Authorization: Bearer …`.                                                       |
+| `MUSECOURT_ADMIN_TOKEN`   | for operators        | ≥ 32 chars. Enables `/api/v1/admin/*`.                                                                                                         |
+| `MUSECOURT_CRON_SCHEDULE` | no                   | Build-time. Default `*/5 * * * *` (Pro plan). On Hobby use a daily schedule, or call the tick from an external scheduler with the cron secret. |
+
+The clock is idempotent and safe to overlap, so any scheduler that sends `POST` (or `GET`) to `/api/v1/internal/cron/tick` with `Authorization: Bearer $MUSECOURT_CRON_SECRET` works.

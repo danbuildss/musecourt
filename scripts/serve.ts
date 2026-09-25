@@ -33,6 +33,7 @@ const { court, api } = createMuseCourtApp({
   ids: randomIds,
   connectors: [new FakeWorld()],
   adminToken,
+  cronSecret: process.env.MUSECOURT_CRON_SECRET,
   registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),
   trustProxy: process.env.TRUST_PROXY === "1",
   onInternalError: (error) => console.error("[musecourt] internal error", error),
