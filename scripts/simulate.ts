@@ -6,15 +6,17 @@ import { runSimulation } from "@/sim/runner";
 import { ADVERSARIAL_SCENARIO } from "@/sim/scenarios";
 
 /**
- * Phase 4 live simulation on the Bankr LLM Gateway.
+ * Live autonomous simulation on the Bankr LLM Gateway.
  *   BANKR_API_KEY (or BANKR_LLM_KEY)   required; never logged
  *   MUSECOURT_MODEL                    Solon's model (default: gpt-5.4, per Bankr's model table)
  *   MUSECOURT_AGENT_MODEL              the agents' model (default: MUSECOURT_MODEL)
  *   MUSECOURT_LLM_BASE_URL             default https://llm.bankr.bot/v1
  * Pass --adversarial to run only the targeted adversarial trial (after onboarding) instead of the
- * three-trial benchmark.
+ * three-trial benchmark. Pass --mcp to have the agents act through a real MCP client against the
+ * MuseCourt MCP server (Phase 5) instead of writing REST requests (Phase 4).
  */
 const adversarial = process.argv.includes("--adversarial");
+const transport = process.argv.includes("--mcp") ? "mcp" : "rest";
 if (!process.env.BANKR_API_KEY && !process.env.BANKR_LLM_KEY) {
   console.error("Set BANKR_API_KEY (an API key with LLM Gateway enabled and credits > $0).");
   process.exit(2);
@@ -29,12 +31,15 @@ const report = await runSimulation({
   modelIds: { agent: agentModelId, solon: solonModelId },
   costMeter: BankrCostMeter.fromEnv(),
   scenarios: adversarial ? [ADVERSARIAL_SCENARIO] : undefined,
+  transport,
   log: (line) => console.log(`[sim] ${line}`),
 });
 const dir = join(
   process.cwd(),
   "sim-output",
-  report.startedAt.replace(/[:.]/g, "-") + (adversarial ? "-adversarial" : ""),
+  report.startedAt.replace(/[:.]/g, "-") +
+    (transport === "mcp" ? "-mcp" : "") +
+    (adversarial ? "-adversarial" : ""),
 );
 const file = await writeSimulationReport(report, dir);
 console.log(`\n${report.success ? "SUCCESS" : "FAILED"} — report: ${file}`);

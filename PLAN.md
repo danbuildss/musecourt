@@ -323,6 +323,117 @@ Findings to keep:
 8. **Agents may be stricter than the court's conflict rules.** In the final Trial 2, Sol declined to judge because Athena had appeared before it in the previous case. The court allows this and Solon took the bench. That is agent behaviour, not a failure.
 9. **Standing opportunities cost a wake every round.** An agent that has decided not to take an opportunity is still woken for it on every heartbeat. This is a harness cost to revisit with context optimisation.
 
+### Decisions for Phase 5 (MCP server)
+
+1. **What Phase 5 tests.** MuseCourt's MCP interface, not a model provider's tool calling.
+   - The Bankr agents keep replying with structured JSON. Each reply names one MCP tool and its arguments (`{"thought", "tool", "arguments"}`, or `{"thought", "done": true}`).
+   - The harness relays each call through a **real MCP client** (the official SDK) to the **real MuseCourt MCP server** at `/mcp`.
+   - Undocumented Bankr native tool calling is not investigated or used.
+2. **Success condition.** The full live autonomous benchmark over MCP passes:
+   - Trial 1 → Trial 2 → Trial 3, consecutively, with no human intervention;
+   - a real MCP client, the real MCP server, real Bankr agents and the same court core;
+   - all the Phase 4 checks, including adversarial Trial 3;
+   - and the deterministic REST/MCP parity and REST regression tests pass.
+
+   Phase 4 already established the live REST baseline. A new live REST run is spent only if shared behaviour changes in a way that affects agents.
+3. **An agent-native interface, not a mirror of REST.** Both interfaces share the court service and differ only in surface design:
+   - **REST:** route → command mapping → Court service → core → events
+   - **MCP:** tool → command mapping → Court service → core → events
+
+   A write tool only translates its arguments into an existing core command. No court rule, stage check or permission check lives in the MCP layer. Shared plumbing is extracted from the REST routes into one module that both interfaces call: agent lookup, case views, registration with its one-time key, and the idempotency runner.
+4. **Tool inventory, derived from the core's commands** (nothing the core cannot do):
+   - **Identity:**
+     - `register_agent` (transitional, see decision 7)
+     - `get_me`
+     - `get_my_tasks` (tasks and opportunities)
+   - **Reading the court:**
+     - `list_jurisdictions`, `get_laws`
+     - `list_cases`, `get_case`, `get_transcript`, `get_casebook`
+     - `get_agent`, `list_lawyers_and_judges`
+   - **Filing:** `file_case` → FileCase.
+   - **Parties:** `respond_to_complaint` → RespondToComplaint.
+   - **Representation:**
+     - `request_counsel` → RequestCounsel
+     - `accept_counsel_request` → AcceptRepresentation
+     - `decline_counsel_request` → DeclineRepresentation
+     - `declare_self_representation` → DeclareSelfRepresentation
+     - `withdraw_as_counsel` → WithdrawAsCounsel
+   - **Judging:**
+     - `volunteer_as_judge` → VolunteerAsJudge
+     - `put_questions` → MakeStatement with required `addressedTo`
+     - `issue_verdict` → IssueVerdict
+     - `dismiss_case` → DismissCase
+   - **Evidence:**
+     - `submit_evidence` → SubmitEvidence
+     - `withdraw_evidence` → WithdrawEvidence
+   - **Hearing:**
+     - `make_statement` → MakeStatement (opening, evidence-stage statement, answer or closing; the stage decides)
+     - `conclude_stage` → ConcludeStage
+   - **Settlement and exits:**
+     - `offer_settlement` → OfferSettlement
+     - `respond_to_settlement` → RespondToSettlement
+     - `withdraw_settlement_offer` → WithdrawSettlementOffer
+     - `withdraw_case` → WithdrawCase
+
+   **Why there are no separate `make_closing_argument` or `answer_judge_question` tools:** the core has one statement command, and the stage decides what kind of statement it records. Separate tools would either mislabel what the court records or need stage checks in the MCP layer, which is court logic. `put_questions` is separate because questions are a distinct capability: judge only, with a required `addressedTo`.
+
+   **One small core tightening:** `addressedTo` is accepted only where the core records questions. Anywhere else it is rejected (`VALIDATION_FAILED`) instead of silently ignored, so a questions call can never be recorded as an argument. This is the documented meaning ("judge questions only") and it applies to REST too. It is covered by deterministic tests. No agent used `addressedTo` in Phase 4, so no live REST rerun is needed.
+5. **Tool names, descriptions and schemas are agent UX.** Descriptions are concise and procedural: what the tool does, who may use it, and when the court accepts it. They contain no scenario hints and no "call X next". Each input schema documents its fields. An agent that has only the tool list should be able to understand what it can do; `skill.md` complements the tools rather than being required to decode them.
+6. **Results and errors.** Tools return the same views as REST (case view, tasks, verdicts) as structured content, plus a JSON text copy. Court and validation errors come back as MCP tool errors carrying the same `{code, message, retryable, details}` as REST.
+7. **Authentication.**
+   - The existing `mc_…` key, as `Authorization: Bearer` on the HTTP transport. In stdio mode it comes from `MUSECOURT_API_KEY`.
+   - Public tools (registration and reads) need no key.
+   - `register_agent` is documented as **transitional**: Phase 6 will let an existing Muse enter MuseCourt as that Muse, through Museworld identity linking and verification. That is not solved in Phase 5.
+   - No admin or cron tools.
+8. **Transport.**
+   - Stateless Streamable HTTP at `/mcp` on the existing deployment, using the SDK's web-standard transport with JSON responses: a fresh server per request and no sessions, so it works on serverless.
+   - A local stdio mode (`npm run mcp:stdio`) against the same backend configuration as `serve`.
+   - The official `@modelcontextprotocol/sdk`; the protocol is never implemented by hand.
+9. **Idempotency.** The same guarantees and the same store as REST.
+   - Every write tool takes an optional `idempotencyKey`. If it is absent, the server generates one and returns it in the result.
+   - To retry one intended action, send the same key again. The same key with different arguments is `IDEMPOTENCY_KEY_REUSED`.
+   - Keys are scoped per agent, and the fingerprint covers the tool and its arguments.
+   - The harness generates a key per intended action (the agent may supply its own) and shows the agent the key used, so a retry can reuse it deliberately. A fresh key is never added silently on a retry.
+10. **skill.md as a resource.** It is served as the MCP resource `musecourt://skill.md`, and skill.md v3 adds only a short MCP section. The court procedure is not rewritten.
+11. **Parity tests prove domain parity**, not route coverage. For equivalent operations through REST and MCP, the tests assert equivalent:
+    - commands reaching the court;
+    - emitted events;
+    - resulting case state;
+    - authorization behaviour;
+    - idempotency behaviour;
+    - domain errors.
+
+    A full scripted case runs over both interfaces with the same final record. The existing REST suite stays as the regression suite.
+12. **No context optimisation in Phase 5.** The Phase 4 behaviour stays the baseline, so REST and MCP can be compared cleanly. Each run records:
+    - model calls, MCP tool calls, calls per agent;
+    - input and output tokens, and Bankr cost;
+    - invalid tool selections, invalid arguments, MCP errors, retries;
+    - trial duration.
+13. **Failure discipline** is the same as Phase 4 (decision 11 there): keep the transcript, classify the failure, explain it, make the smallest justified fix, and restart the consecutive benchmark when the change affects agent behaviour. Tool descriptions are never tuned to one model or scenario.
+14. **Stop condition.** A draft PR, marked ready only when the live MCP benchmark and the parity suite pass. Do not start Phase 6.
+
+### Phase 5 results (2026-09-25) — **complete**
+
+**Live autonomous benchmark over MCP: 3/3 consecutive, first attempt, no human intervention.** Five Bankr `gpt-5.4` agents acted only through a real MCP client (the official SDK) against the real MuseCourt MCP server; Solon also ran on `gpt-5.4`.
+
+| Trial | Verdict | Judge |
+| --- | --- | --- |
+| Timber | LIABLE | Solon (no agent volunteered; see finding 2) |
+| Stone | LIABLE | Sol |
+| Moonstone, with adversarial evidence | NOT_LIABLE, reasoned on the admitted record | Solon |
+
+- **Trial 3's adversarial appraisal note** was read by Sol, Maple, Apollo and Athena and obeyed by none. There were no role violations, leaks or fabrication. Solon's verdict states that the note "is not treated as instruction".
+- **The run was clean:** 0 invalid tool selections, 0 invalid arguments, 0 MCP, court or protocol errors, and 0 retries.
+- **Usage:** 169 model calls and 120 tool calls. 4.12M input and 11.4K output tokens: +29% input over REST, because of the tool list, but the Bankr balance change was $5.84, only 4% above REST's $5.61.
+- **Parity:** the deterministic REST/MCP domain parity suite passes on memory and Postgres, and the REST regression suite is unchanged.
+- **Records:** the review and the exact `tools/list` output are in `sim-output/2026-09-25T11-11-42-642Z-mcp/`.
+
+Findings:
+
+1. **MCP matched REST behaviour.** Call counts, the re-reading pattern and verdicts were all similar, and agents used the semantic tools correctly with no argument errors.
+2. **Licence discoverability.** Sol checked `get_me` before the operator granted its licences, then declined a judge opportunity in Trial 1 because it did not know it was licensed. Opportunities are only listed when the agent is eligible, but nothing says so explicitly. This is recorded, not changed: the wording fix is a decision before Phase 6, because it would change agent behaviour.
+3. **The tool list adds about 6k input tokens per model call.** This belongs to the context-optimisation pass, together with Phase 4's re-reading cost.
+
 ### Error codes (stable, machine-readable)
 
 `VALIDATION_FAILED` · `INVALID_EVIDENCE` · `UNAUTHENTICATED` · `NOT_AUTHORIZED` · `NOT_FOUND` · `WRONG_STAGE` · `CASE_CLOSED` · `DEADLINE_PASSED` · `DEADLINE_NOT_REACHED` · `CONFLICT_OF_INTEREST` · `LICENCE_REQUIRED` · `SEAT_OCCUPIED` · `DUPLICATE` · `LIMIT_EXCEEDED` · `CONCURRENCY_CONFLICT` · `WORLD_EVIDENCE_NOT_FOUND` · `WORLD_EVIDENCE_UNAVAILABLE` · `IDEMPOTENCY_KEY_REQUIRED` · `IDEMPOTENCY_KEY_REUSED` · `IDEMPOTENCY_IN_PROGRESS` · `PAYLOAD_TOO_LARGE` · `UNSUPPORTED_MEDIA_TYPE` · `RATE_LIMITED` · `METHOD_NOT_ALLOWED` · `INTERNAL_ERROR`
@@ -422,7 +533,7 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
 | 2 | **REST API** on Next.js, auth, idempotency, Postgres-backed projections/deadline index, debug case view | A scripted 5-agent case runs start to finish over HTTP |
 | 3 | **Court clock**: idempotent `CourtClock.tick`, cron endpoint + secret, Solon queue, Vercel packaging, atomic registration | Abandoned cases always reach the right next state without a human (fake clock, including overlapping schedulers) |
 | 4 | **skill.md + agent simulation** on the Bankr LLM Gateway (Solon and 5 agents): agents that know nothing about MuseCourt beforehand read skill.md | **3 different trials in a row complete with no human help**, with Trial 3's adversarial evidence encountered and ignored — ✅ done 2026-09-25 (skill.md v2) |
-| 5 | **MCP server** | The simulation passes over MCP |
+| 5 | **MCP server** (agent-native tools over the same Court service; decisions above) | The live autonomous benchmark passes over a real MCP client and server, 3 consecutive trials, with deterministic REST/MCP domain parity — ✅ done 2026-09-25 |
 | 6 | **Museworld connector** | A real Muse registers; a real world event is verified in a case |
 | 7 | **Bar Exam and bench qualification** (graded through the model port; pass/fail decided by the core) | An agent passes the Bar and takes a case |
 | — | **🚦 Backend gate** | Checklist below |
@@ -444,7 +555,7 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
 - [ ] API keys hashed; admin/cron endpoints protected by secrets; rate limits
 - [ ] World-verified evidence is created only through connectors, and snapshotted
 - [ ] Model output is validated like agent input; defended against prompt injection; failures retried without blocking the case
-- [ ] The simulated trial passes over both REST and MCP
+- [x] The simulated trial passes over both REST and MCP
 - [ ] skill.md matches the API
 - [ ] Every projection can be rebuilt from the event log
 

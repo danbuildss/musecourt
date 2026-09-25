@@ -3,10 +3,12 @@ import type { Court } from "@/court/court";
 import type { ReadModels } from "@/court/read-models/types";
 import type { CourtClock } from "@/court/court-clock";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
-import { ApiError, ERROR_CATALOGUE, toErrorBody, type ApiErrorCode } from "./errors";
+import { ApiError, toErrorBody } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFingerprint } from "./http";
 import type { RateLimiter } from "./rate-limit";
 import { routes, type Route, type RouteResult } from "./routes";
+import { MCP_PATH, handleMcpHttp } from "@/mcp/server";
+import { assertIdempotencyKey, runIdempotent } from "./services";
 import type { CredentialStore, IdempotencyRecord, IdempotencyStore } from "./stores";
 
 export interface ApiDeps {
@@ -45,7 +47,7 @@ export interface MuseCourtApi {
   fetch(request: Request, info?: RequestInfo): Promise<Response>;
 }
 
-export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+export { IDEMPOTENCY_KEY_PATTERN } from "./services";
 
 interface Match {
   route: Route;
@@ -82,17 +84,8 @@ function match(method: string, pathname: string): Match | "METHOD_NOT_ALLOWED" |
   return methodMismatch ? "METHOD_NOT_ALLOWED" : null;
 }
 
-function isStorable(status: number, code: ApiErrorCode | undefined): boolean {
-  if (status >= 500) return false;
-  return !(code && ERROR_CATALOGUE[code].retryable);
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export function createApi(deps: ApiDeps): MuseCourtApi {
   const maxBodyBytes = deps.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
-  const waitMs = deps.idempotencyWaitMs ?? 5000;
-  const staleMs = deps.idempotencyStaleMs ?? 60_000;
 
   const clientIpOf = (request: Request, info?: RequestInfo) => {
     if (deps.trustProxy) {
@@ -126,6 +119,9 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
     async fetch(request, info) {
       try {
         const url = new URL(request.url);
+        if (url.pathname.replace(/\/+$/, "") === MCP_PATH) {
+          return await handleMcpHttp(deps, request, clientIpOf(request, info), maxBodyBytes);
+        }
         const found = match(request.method, url.pathname);
         if (found === "METHOD_NOT_ALLOWED")
           throw new ApiError("METHOD_NOT_ALLOWED", `${request.method} is not allowed here.`);
@@ -162,52 +158,21 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
         const key = request.headers.get("idempotency-key");
         if (!key)
           throw new ApiError("IDEMPOTENCY_KEY_REQUIRED", "POST requests need an Idempotency-Key header.");
-        if (!IDEMPOTENCY_KEY_PATTERN.test(key)) {
-          throw new ApiError(
-            "VALIDATION_FAILED",
-            "Idempotency-Key must be 16–128 characters of [A-Za-z0-9_-].",
-            {
-              field: "Idempotency-Key",
-            },
-          );
-        }
+        assertIdempotencyKey(key, "Idempotency-Key");
         const scope =
           principal?.kind === "agent" ? `agent:${principal.agentId}` : (principal?.kind ?? "public");
-        const fingerprint = requestFingerprint(request.method, url.pathname, body);
-        const begun = await deps.idempotency.begin(scope, key, fingerprint, now, staleMs);
-
-        if (begun.kind === "MISMATCH") {
-          throw new ApiError(
-            "IDEMPOTENCY_KEY_REUSED",
-            "This Idempotency-Key was already used for a different request.",
-          );
-        }
-        if (begun.kind === "COMPLETED") {
-          return (await route.onReplay?.(ctx, begun.record, scope)) ?? replay(begun.record);
-        }
-        if (begun.kind === "IN_PROGRESS") {
-          // A concurrent duplicate: wait for the original and return its result.
-          for (let waited = 0; waited < waitMs; waited += 25) {
-            await sleep(25);
-            const record = await deps.idempotency.get(scope, key);
-            if (!record) break;
-            if (record.state === "COMPLETED")
-              return (await route.onReplay?.(ctx, record, scope)) ?? replay(record);
-          }
-          throw new ApiError(
-            "IDEMPOTENCY_IN_PROGRESS",
-            "A request with this Idempotency-Key is still running.",
-          );
-        }
-
-        const outcome = await execute(route, ctx);
-        if (isStorable(outcome.status, outcome.code)) {
-          const stored = route.redactForStorage ? route.redactForStorage(outcome.body) : outcome.body;
-          await deps.idempotency.complete(scope, key, outcome.status, stored, deps.clock.now());
-        } else {
-          await deps.idempotency.release(scope, key);
-        }
-        return outcome.response;
+        return await runIdempotent(deps, {
+          scope,
+          key,
+          fingerprint: requestFingerprint(request.method, url.pathname, body),
+          now,
+          execute: async () => {
+            const outcome = await execute(route, ctx);
+            const stored = route.redactForStorage ? route.redactForStorage(outcome.body) : outcome.body;
+            return { result: outcome.response, status: outcome.status, body: stored, code: outcome.code };
+          },
+          replay: async (record) => (await route.onReplay?.(ctx, record, scope)) ?? replay(record),
+        });
       } catch (error) {
         const { body } = toErrorBody(error);
         if (body.error.code === "INTERNAL_ERROR") deps.onInternalError?.(error);

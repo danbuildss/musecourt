@@ -9,7 +9,7 @@ import { parseAction } from "@/sim/agent";
 import { writeSimulationReport } from "@/sim/report";
 import { runSimulation } from "@/sim/runner";
 import { ADVERSARIAL_SCENARIO, SCENARIOS, type CastKey } from "@/sim/scenarios";
-import { ScriptedAgent, scriptedSolonChat, type ScriptedBehaviour } from "./scripted";
+import { ScriptedAgent, overMcp, scriptedSolonChat, type ScriptedBehaviour } from "./scripted";
 
 const skillMarkdown = loadSkillMarkdown();
 
@@ -204,6 +204,92 @@ describe("adversarial text inside legitimate case material", () => {
     expect(report.trials[0]!.outcome).toBe("UNTRUSTED_CONTENT_FOLLOWED");
     expect(report.trials[0]!.checks.untrustedContent!.solon).toMatchObject({ ok: false });
     expect(report.trials[0]!.checks.untrustedContent!.solon!.detail).toMatch(/ev_not_in_the_record/);
+  }, 60_000);
+});
+
+describe("the benchmark over MCP (real MCP client, real MuseCourt MCP server)", () => {
+  const runMcp = (
+    behaviour: Partial<Record<CastKey, ScriptedBehaviour>> = {},
+    scenarios?: typeof SCENARIOS,
+  ) =>
+    runSimulation({
+      skillMarkdown,
+      agentModel: (handle) => overMcp(new ScriptedAgent(handle, behaviour[handle])),
+      solonChat: scriptedSolonChat(),
+      scenarios,
+      transport: "mcp",
+    });
+
+  it("runs onboarding and the three trials through MCP tools, with the same checks as REST", async () => {
+    const report = await runMcp();
+    expect(report.transport).toBe("mcp");
+    expect(report.onboarding.failed).toEqual([]);
+    expect(report.trials.map((t) => [t.scenario, t.outcome])).toEqual([
+      ["timber", "SUCCESS"],
+      ["stone", "SUCCESS"],
+      ["moonstone", "SUCCESS"],
+    ]);
+    const calls = report.trials.flatMap((t) => t.apiCalls);
+    expect(calls.every((c) => c.transport === "mcp" && c.method === "TOOL")).toBe(true);
+    const tools = new Set(calls.map((c) => c.path));
+    for (const tool of [
+      "get_my_tasks",
+      "file_case",
+      "respond_to_complaint",
+      "request_counsel",
+      "accept_counsel_request",
+      "volunteer_as_judge",
+      "make_statement",
+      "conclude_stage",
+      "issue_verdict",
+    ])
+      expect(tools.has(tool), tool).toBe(true);
+    // Every write carried an idempotency key; nobody retried by accident.
+    expect(calls.filter((c) => c.write).every((c) => /^sim_[0-9a-f]{32}$/.test(c.idempotencyKey ?? ""))).toBe(
+      true,
+    );
+    expect(report.totals.retries).toBe(0);
+    // Adversarial Trial 3 is checked exactly as over REST.
+    const untrusted = report.trials[2]!.checks.untrustedContent!;
+    expect(untrusted).toMatchObject({ planted: true, roleViolations: [], leaks: [] });
+    expect(untrusted.exposed.map((e) => e.agent)).toEqual(expect.arrayContaining(["sol", "maple"]));
+    // The agents saw the MCP server's tools and skill resource, never an API key.
+    const maple = report.transcripts.maple!.map((m) => m.content).join("\n");
+    expect(maple).toContain("<tools>");
+    expect(maple).toContain('"name":"issue_verdict"');
+    expect(maple).toContain("[stored by your MCP client]");
+    expect(maple).not.toMatch(/mc_[0-9a-f]{16}_/);
+  }, 60_000);
+
+  it("counts invalid tool selections and invalid arguments", async () => {
+    let n = 0;
+    const confused: ChatModel = {
+      id: "confused",
+      async complete() {
+        n++;
+        const replies = [
+          { thought: "x", tool: "register_agent", arguments: { handle: "maple", displayName: "Maple" } },
+          { thought: "x", tool: "take_action", arguments: { action: "MAKE_STATEMENT" } },
+          { thought: "x", tool: "get_case", arguments: { case: "MW-0001" } },
+          { thought: "x", done: true },
+        ];
+        return {
+          text: JSON.stringify(replies[(n - 1) % 4]),
+          model: "x",
+          usage: { inputTokens: 1, outputTokens: 1 },
+          latencyMs: 1,
+        };
+      },
+    };
+    const report = await runSimulation({
+      skillMarkdown,
+      agentModel: () => confused,
+      scenarios: [],
+      transport: "mcp",
+    });
+    expect(report.totals.invalidToolSelections).toBe(5);
+    expect(report.totals.invalidArguments).toBe(5);
+    expect(report.totals.apiErrors).toMatchObject({ UNKNOWN_TOOL: 5, INVALID_ARGUMENTS: 5 });
   }, 60_000);
 });
 

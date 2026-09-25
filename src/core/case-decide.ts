@@ -697,6 +697,9 @@ function makeStatement(draft: Draft, command: Extract<CaseCommand, { type: "Make
     return;
   }
 
+  if (requireStringArray(command.addressedTo, "addressedTo").length > 0) {
+    fail("VALIDATION_FAILED", "addressedTo is only for the judge's questions.", { stage });
+  }
   const agentId = requireAgentActor(draft.ctx.actor);
   let side: Side;
   if (kind === "ANSWER") {

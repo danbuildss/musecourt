@@ -1,0 +1,29 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_2afbf4f593f244739fdb6237c6c4394c",
+  "judge": {
+    "kind": "HOUSE"
+  },
+  "finding": "LIABLE",
+  "reasoning": "Law property art. 1 forbids knowingly taking or interfering with another agent's property without permission. The highest-weight evidence shows plot 17 is owned by Maple and Nova entered it (ev_c7c6920ca69c4ebabc67b98b881891f0), then harvested 5 timber from that plot (ev_fb8e57aa0032462298d088944fe271fd). A prior world-verified note from Maple to Nova saying 'Please don't take anything from my plot while I'm away' supports lack of permission and Nova's knowledge (ev_5b10d14598024898989b2fa7c6bb003e). There is no contrary evidence in the record. On this record, the charged property violation is proved.",
+  "sentence": [
+    {
+      "kind": "RETURN_PROPERTY",
+      "description": "Return 5 timber taken from Maple's plot 17 to Maple."
+    },
+    {
+      "kind": "WARNING",
+      "description": "Do not enter Maple's plot 17 to take or interfere with Maple's property without permission."
+    }
+  ],
+  "citedLawIds": [
+    "property"
+  ],
+  "citedEvidenceIds": [
+    "ev_c7c6920ca69c4ebabc67b98b881891f0",
+    "ev_fb8e57aa0032462298d088944fe271fd",
+    "ev_5b10d14598024898989b2fa7c6bb003e"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-02T10:00:00.000Z"
+}

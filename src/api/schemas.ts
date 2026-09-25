@@ -12,8 +12,8 @@ import { ApiError } from "./errors";
  */
 
 /** Generous cap on any single text field; the core enforces the real limits. */
-const TEXT_CAP = 20_000;
-const text = z.string().max(TEXT_CAP);
+export const TEXT_CAP = 20_000;
+export const text = z.string().max(TEXT_CAP);
 
 export const ID_PATTERN = /^[a-z]+_[A-Za-z0-9]{1,64}$/;
 export const entityId = z.string().regex(ID_PATTERN, "must be an identifier like case_… or ev_…");
@@ -43,7 +43,7 @@ export const fileCaseBody = z.strictObject({
   evidence: z.array(evidenceInput).max(20).optional(),
 });
 
-const sentenceItem = z.strictObject({
+export const sentenceItem = z.strictObject({
   kind: z.enum(SENTENCE_KINDS as [string, ...string[]]),
   description: text,
 });

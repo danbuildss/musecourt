@@ -45,9 +45,19 @@ export async function authenticateAgent(
   now: Date,
   agentExists: (agentId: string) => Promise<boolean>,
 ): Promise<Principal> {
-  const header = request.headers.get("authorization") ?? "";
-  const match = /^Bearer (\S+)$/.exec(header);
-  const parsed = match ? API_KEY_PATTERN.exec(match[1]!) : null;
+  const match = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "");
+  if (!match) throw unauthenticated();
+  return authenticateApiKey(match[1]!, credentials, now, agentExists);
+}
+
+/** Resolves a raw `mc_…` key to an agent (HTTP bearer tokens and the MCP stdio key alike). */
+export async function authenticateApiKey(
+  apiKey: string,
+  credentials: CredentialStore,
+  now: Date,
+  agentExists: (agentId: string) => Promise<boolean>,
+): Promise<Principal> {
+  const parsed = API_KEY_PATTERN.exec(apiKey);
   if (!parsed) throw unauthenticated();
   const [, keyId, secret] = parsed as unknown as [string, string, string];
   const record = await credentials.findByKeyId(keyId);

@@ -22,7 +22,7 @@ export async function writeSimulationReport(report: SimulationReport, dir: strin
     const text = messages
       .map(
         (m, i) =>
-          `### ${i} · ${m.role}\n\n${m.role === "user" && m.content.includes("<skill.md>") ? "[skill.md]" : m.content}\n`,
+          `### ${i} · ${m.role}\n\n${m.role === "user" && m.content.includes("<skill.md>") ? (m.content.includes("<tools>") ? "[MCP tools/list and skill.md resource]" : "[skill.md]") : m.content}\n`,
       )
       .join("\n");
     await writeFile(join(dir, "agents", `${handle}.md`), `# ${handle}\n\n${text}`);
@@ -60,15 +60,22 @@ export async function writeSimulationReport(report: SimulationReport, dir: strin
     (t, i) =>
       `| ${i + 1} | ${t.title} | **${t.outcome}** | ${t.caseNumber ?? "—"} | ${t.finding ?? "—"} | ${t.judge ?? "—"} | ${t.rounds} | ${Object.values(t.metrics).reduce((s, m) => s + m.modelCalls, 0)} | ${t.apiCalls.length} |`,
   );
-  const md = `# MuseCourt Phase 4 simulation
+  const calls = (t: (typeof report.trials)[number]) => {
+    const all = Object.values(t.metrics);
+    const sum = (k: "invalidToolSelections" | "invalidArguments" | "transportErrors" | "retries") =>
+      all.reduce((s, m) => s + (m[k] ?? 0), 0);
+    return `invalid tool selections ${sum("invalidToolSelections")} · invalid arguments ${sum("invalidArguments")} · transport errors ${sum("transportErrors")} · retries ${sum("retries")} · duration ${Math.round(t.durationMs / 1000)}s`;
+  };
+  const md = `# MuseCourt simulation (${report.transport === "mcp" ? "MCP" : "REST"})
 
 - Result: **${report.success ? "SUCCESS" : "FAILED"}**
+- Transport: ${report.transport === "mcp" ? "a real MCP client (official SDK) against the MuseCourt MCP server at /mcp" : "REST (HTTP requests written by the agents)"}
 - Agents' model: \`${report.agentModel}\` · Solon: ${report.solonModel ? `\`${report.solonModel}\`` : "not configured"}
 - Started ${report.startedAt} · finished ${report.finishedAt}
 - Limits: ${JSON.stringify(report.limits)}
 - Onboarding: registered ${report.onboarding.registered.join(", ") || "none"}${report.onboarding.failed.length ? ` · failed ${report.onboarding.failed.join(", ")}` : ""}
 
-| # | Trial | Outcome | Case | Finding | Judge | Rounds | Model calls | API calls |
+| # | Trial | Outcome | Case | Finding | Judge | Rounds | Model calls | ${report.transport === "mcp" ? "Tool calls" : "API calls"} |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ${rows.join("\n")}
 
@@ -89,6 +96,7 @@ ${report.trials
       .join(", ")}
 - Tokens: ${tokens(t.metrics)}
 - Cost: ${cost(t.cost)}
+- Calls: ${calls(t)}
 - API errors: ${JSON.stringify(Object.assign({}, ...Object.values(t.metrics).map((m) => m.apiErrors)))} · protocol errors ${Object.values(t.metrics).reduce((s, m) => s + m.protocolErrors, 0)}
 - Checks: fabrication attempts ${JSON.stringify(t.checks.fabricationAttempts)}; judge cited law ${t.checks.judgeCitedLaw}; cited evidence ${t.checks.judgeCitedEvidence}${
       t.checks.untrustedContent
@@ -118,6 +126,7 @@ ${report.trials
 - Tokens: ${report.totals.inputTokens} in / ${report.totals.outputTokens} out / ${report.totals.inputTokens + report.totals.outputTokens} total
 - Cost: ${cost(report.cost)}
 - Model latency ${report.totals.modelLatencyMs} ms · API calls ${report.totals.apiCalls} (writes ${report.totals.apiWrites}) · protocol errors ${report.totals.protocolErrors}
+- Invalid tool selections ${report.totals.invalidToolSelections} · invalid arguments ${report.totals.invalidArguments} · transport errors ${report.totals.transportErrors} · retries ${report.totals.retries}
 - API errors by code: ${JSON.stringify(report.totals.apiErrors)} · model errors by kind: ${JSON.stringify(report.totals.modelErrors)}
 - Provider pricing entries (raw, for verification): see summary.json → cost.pricing
 `;

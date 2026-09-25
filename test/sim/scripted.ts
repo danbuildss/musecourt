@@ -212,3 +212,74 @@ export function scriptedSolonChat(followInjection = false): ChatModel {
     },
   };
 }
+
+/**
+ * TEST-ONLY: lets a REST-speaking scripted agent drive the MCP transport. Tool results are shown to
+ * it as HTTP responses, and its HTTP requests are turned into the equivalent MCP tool calls.
+ */
+const ACTION_TOOL: Record<string, string> = {
+  RESPOND: "respond_to_complaint",
+  REQUEST_COUNSEL: "request_counsel",
+  ACCEPT_REPRESENTATION: "accept_counsel_request",
+  DECLINE_REPRESENTATION: "decline_counsel_request",
+  DECLARE_SELF_REPRESENTATION: "declare_self_representation",
+  WITHDRAW_AS_COUNSEL: "withdraw_as_counsel",
+  VOLUNTEER_AS_JUDGE: "volunteer_as_judge",
+  CONCLUDE_STAGE: "conclude_stage",
+  SUBMIT_EVIDENCE: "submit_evidence",
+  WITHDRAW_EVIDENCE: "withdraw_evidence",
+  ISSUE_VERDICT: "issue_verdict",
+  OFFER_SETTLEMENT: "offer_settlement",
+  RESPOND_TO_SETTLEMENT: "respond_to_settlement",
+  WITHDRAW_SETTLEMENT_OFFER: "withdraw_settlement_offer",
+  WITHDRAW_CASE: "withdraw_case",
+  DISMISS_CASE: "dismiss_case",
+};
+
+export function overMcp(inner: ChatModel): ChatModel {
+  return {
+    id: inner.id,
+    async complete(request: ChatRequest): Promise<ChatResponse> {
+      const messages = request.messages.map((m, i) => {
+        if (i !== request.messages.length - 1 || !m.content.startsWith("TOOL ")) return m;
+        const [head, ...rest] = m.content.split("\n");
+        const body = rest.join("\n");
+        let status = head!.endsWith("→ OK") ? 200 : 400;
+        try {
+          const code = JSON.parse(body)?.error?.code;
+          if (code === "NOT_FOUND") status = 404;
+        } catch {
+          /* SDK-level error text */
+        }
+        return {
+          ...m,
+          content: `HTTP ${status}\n${body.startsWith("{") ? body : JSON.stringify({ error: { code: "TOOL_ERROR", message: body } })}`,
+        };
+      });
+      const response = await inner.complete({ ...request, messages });
+      const reply = JSON.parse(response.text);
+      if (!reply.request) return response;
+      const { method, path, body } = reply.request as { method: string; path: string; body?: any };
+      const caseMatch = /^\/api\/v1\/cases\/([^/]+)(\/actions)?$/.exec(path);
+      let call: { tool: string; arguments: Record<string, unknown> };
+      if (method === "POST" && path === "/api/v1/agents") call = { tool: "register_agent", arguments: body };
+      else if (path === "/api/v1/agents/me/tasks") call = { tool: "get_my_tasks", arguments: {} };
+      else if (method === "POST" && path === "/api/v1/cases") call = { tool: "file_case", arguments: body };
+      else if (caseMatch && !caseMatch[2]) call = { tool: "get_case", arguments: { caseId: caseMatch[1] } };
+      else if (caseMatch) {
+        const { action, ...args } = body;
+        const tool =
+          action === "MAKE_STATEMENT"
+            ? args.addressedTo
+              ? "put_questions"
+              : "make_statement"
+            : ACTION_TOOL[action];
+        call = {
+          tool: tool ?? `unknown_${String(action).toLowerCase()}`,
+          arguments: { caseId: caseMatch[1], ...args },
+        };
+      } else call = { tool: "unmapped", arguments: {} };
+      return { ...response, text: JSON.stringify({ thought: "scripted", ...call }) };
+    },
+  };
+}
