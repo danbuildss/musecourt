@@ -2,9 +2,10 @@ import { ModelError, type ChatModel, type ChatRequest, type ChatResponse } from 
 
 /**
  * Bankr LLM Gateway adapter. Implemented strictly against Bankr's documented
- * interface (BankrBot/skills, bankr/references/llm-gateway.md):
- *  - base URL https://llm.bankr.bot/v1, OpenAI-compatible POST /chat/completions
- *  - auth: Authorization: Bearer <key>; key from BANKR_LLM_KEY, else BANKR_API_KEY
+ * interface (LLM Gateway overview + quick start; BankrBot/skills llm-gateway.md):
+ *  - base URL https://llm.bankr.bot, OpenAI-compatible POST /v1/chat/completions
+ *  - auth: X-API-Key: <key> (as in the official quick start); key from BANKR_LLM_KEY, else BANKR_API_KEY
+ *  - the key needs "LLM Gateway" enabled; new accounts have $0 credits (402 until topped up)
  *  - errors: 401 auth, 402 credits/daily budget, 410 retired model, 422, 429
  * Tool calling and response_format are not documented there, so they are not used.
  */
@@ -67,7 +68,7 @@ export class BankrChatModel implements ChatModel {
     try {
       res = await doFetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
-        headers: { authorization: `Bearer ${this.options.apiKey}`, "content-type": "application/json" },
+        headers: { "x-api-key": this.options.apiKey, "content-type": "application/json" },
         body: JSON.stringify({
           model: this.options.model,
           messages: request.messages,

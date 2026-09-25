@@ -24,7 +24,7 @@ const ok = {
 };
 
 describe("Bankr LLM Gateway adapter (documented interface)", () => {
-  it("sends an OpenAI-compatible chat completion to the documented endpoint with Bearer auth", async () => {
+  it("sends an OpenAI-compatible chat completion to the documented endpoint with the X-API-Key header", async () => {
     const { fn, calls } = mockFetch([ok]);
     const model = new BankrChatModel({ apiKey: KEY, model: "gpt-5.4", fetch: fn });
     const res = await model.complete({
@@ -34,7 +34,8 @@ describe("Bankr LLM Gateway adapter (documented interface)", () => {
     });
     expect(calls[0]!.url).toBe("https://llm.bankr.bot/v1/chat/completions");
     const headers = calls[0]!.init.headers as Record<string, string>;
-    expect(headers.authorization).toBe(`Bearer ${KEY}`);
+    expect(headers["x-api-key"]).toBe(KEY);
+    expect(headers.authorization).toBeUndefined();
     expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
       model: "gpt-5.4",
       messages: [{ role: "user", content: "Hello" }],

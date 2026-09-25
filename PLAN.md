@@ -235,10 +235,10 @@ Calm, concise and procedural. Solon focuses on the applicable MuseCourt law and 
 
 1. **Provider.** Both **Solon** and the **5 simulation agents** run on the **Bankr LLM Gateway**. This is deliberate: it tests whether agents on Bankr's infrastructure can understand `skill.md`, use the API, take part in a case and reach a valid judgment.
 2. **Provider independence.** Bankr exists only behind a generic `ChatModel` interface (`src/model/chat.ts`), in one adapter (`src/model/bankr.ts`). `src/core` never imports Bankr code or Bankr request/response shapes. Solon's `CourtModel` is built on any `ChatModel`.
-3. **Implemented only against Bankr's documentation.** Source: the LLM Gateway reference in Bankr's official skills repo (`BankrBot/skills`, `bankr/references/llm-gateway.md`, 2026-09-22), because `docs.bankr.bot` is blocked from the build environment. It documents:
+3. **Implemented only against Bankr's documentation.** Sources: the official LLM Gateway overview and quick start (as supplied), and the LLM Gateway reference in Bankr's official skills repo (`BankrBot/skills`, `bankr/references/llm-gateway.md`, 2026-09-22). `docs.bankr.bot` is blocked from the build environment. It documents:
    - base URL `https://llm.bankr.bot/v1`;
    - an OpenAI-compatible `POST /v1/chat/completions`;
-   - `Authorization: Bearer <key>` (the key comes from `BANKR_LLM_KEY`, falling back to `BANKR_API_KEY`);
+   - `X-API-Key: <key>` (as in the official quick start; the key comes from `BANKR_LLM_KEY`, falling back to `BANKR_API_KEY`, and must have "LLM Gateway" enabled);
    - `GET /v1/models` for the live model list;
    - errors 401, 402 (`insufficient_credits` / `daily_budget_exceeded`), 410 (hard-deprecated model; see `X-Model-Replacement`), 422 and 429.
    Tool calling and `response_format` are not documented, so we don't rely on them: models answer in text containing JSON, and MuseCourt validates everything.
