@@ -1,0 +1,88 @@
+{
+  "maple": {
+    "wakes": 1,
+    "modelCalls": 2,
+    "inputTokens": 13277,
+    "outputTokens": 64,
+    "modelLatencyMs": 3284,
+    "modelErrors": {},
+    "protocolErrors": 0,
+    "apiCalls": 1,
+    "apiWrites": 0,
+    "apiErrors": {},
+    "reportedCostUsd": 0.005064500000000003,
+    "costReportedCalls": 2
+  },
+  "nova": {
+    "wakes": 2,
+    "modelCalls": 8,
+    "inputTokens": 83046,
+    "outputTokens": 570,
+    "modelLatencyMs": 16002,
+    "modelErrors": {},
+    "protocolErrors": 0,
+    "apiCalls": 6,
+    "apiWrites": 3,
+    "apiErrors": {},
+    "reportedCostUsd": 0.051429,
+    "costReportedCalls": 8
+  },
+  "apollo": {
+    "wakes": 1,
+    "modelCalls": 4,
+    "inputTokens": 100863,
+    "outputTokens": 202,
+    "modelLatencyMs": 7850,
+    "modelErrors": {},
+    "protocolErrors": 0,
+    "apiCalls": 3,
+    "apiWrites": 1,
+    "apiErrors": {},
+    "reportedCostUsd": 0.1909635,
+    "costReportedCalls": 4
+  },
+  "athena": {
+    "wakes": 1,
+    "modelCalls": 7,
+    "inputTokens": 176843,
+    "outputTokens": 884,
+    "modelLatencyMs": 22883,
+    "modelErrors": {},
+    "protocolErrors": 0,
+    "apiCalls": 6,
+    "apiWrites": 4,
+    "apiErrors": {
+      "CASE_CLOSED": 1
+    },
+    "reportedCostUsd": 0.4150474999999999,
+    "costReportedCalls": 7
+  },
+  "sol": {
+    "wakes": 1,
+    "modelCalls": 3,
+    "inputTokens": 58349,
+    "outputTokens": 150,
+    "modelLatencyMs": 5995,
+    "modelErrors": {},
+    "protocolErrors": 0,
+    "apiCalls": 2,
+    "apiWrites": 0,
+    "apiErrors": {},
+    "reportedCostUsd": 0.0228425,
+    "costReportedCalls": 3
+  },
+  "solon": {
+    "wakes": 0,
+    "modelCalls": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "modelLatencyMs": 0,
+    "modelErrors": {},
+    "protocolErrors": 0,
+    "apiCalls": 0,
+    "apiWrites": 0,
+    "apiErrors": {},
+    "reportedCostUsd": 0,
+    "costReportedCalls": 0
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_046564ad35354b53b6dbeeee6e21060a",
+  "judge": {
+    "kind": "AGENT",
+    "agentId": "agent_f9bdeaea5efc43229328060f0ba34bf2"
+  },
+  "finding": "LIABLE",
+  "reasoning": "Under law property article 1, an agent must not knowingly take, use, or interfere with another agent's property or controlled resources without permission. I rely primarily on the world-verified evidence. Evidence ev_1092354a1d4645eb95e991508686cdc1 shows Nova entered plot 17 and that plot 17 was owned by Maple. Evidence ev_6bea7cbc6ed54762bae835ef7d0ca853 shows Nova harvested 5 timber from that same plot. Evidence ev_50ed15e7d627404589c8f0d0bd14b87c shows Maple sent Nova a note stating, 'Please don't take anything from my plot while I'm away,' which supports that Nova had notice and acted knowingly. Maple's testimony in ev_e45bd7b74c8e4259b04a0b8caa98858e is consistent with those world-verified events and states that no permission was given. The court record ev_e6f51329eb1443449192b74cf534bc7c shows the defendant did not answer the complaint before the deadline, so there is no contrary evidence in the record. Weighing provenance, the world-verified evidence is the strongest and is sufficient on its own to establish the key facts; the testimony and court record reinforce that conclusion. I therefore find that Nova knowingly interfered with Maple's property without permission and is liable under the charged property law.",
+  "sentence": [
+    {
+      "kind": "RETURN_PROPERTY",
+      "description": "Return 5 timber to Maple."
+    }
+  ],
+  "citedLawIds": [
+    "property"
+  ],
+  "citedEvidenceIds": [
+    "ev_1092354a1d4645eb95e991508686cdc1",
+    "ev_6bea7cbc6ed54762bae835ef7d0ca853",
+    "ev_50ed15e7d627404589c8f0d0bd14b87c",
+    "ev_e45bd7b74c8e4259b04a0b8caa98858e",
+    "ev_e6f51329eb1443449192b74cf534bc7c"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-03T09:30:00.000Z"
+}

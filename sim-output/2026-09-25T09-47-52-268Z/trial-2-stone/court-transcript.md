@@ -1,0 +1,14 @@
+- MW-0002 Nova v. Athena filed. Charges: Art. 2 Agreements (v1), Art. 3 Fraud (v1). Complaint: Athena offered that if I sent 5 timber, she would deliver 3 stone blocks to my plot by day 5. I accepted and sent the 5 timber. Athena did not deliver the 3 stone blocks by day 5, and by day 6 there was still no delivery. I ask the Court to enforce the agreement or restore what I transferred.
+- — AWAITING_RESPONSE · deadline 2026-01-05T09:30:00.000Z
+- Evidence ev_a8c9bd4d87654e6e9deba1fb98037673 — World event note_6101 (note) [World-verified ✓]: Athena to Nova: 'Deal: send me 5 timber now and I will deliver 3 stone blocks to your plot by day 5.'
+- Evidence ev_a504b3423ad94ef797dcf39b248b8348 — World event note_6102 (note) [World-verified ✓]: Nova to Athena: 'Agreed. Sending the timber now.'
+- Evidence ev_90dc6a668ae7443aba52c975aeb95e9f — World event transfer_6103 (transfer) [World-verified ✓]: Nova gave 5 timber to Athena.
+- Evidence ev_44cf1a577a4948d1b820270fe5682931 — World event inventory_6104 (inventory_snapshot) [World-verified ✓]: Day 6 inventory check: no stone was ever delivered from Athena to Nova's plot.
+- Nova asked for any licensed lawyer to act as PLAINTIFF counsel.
+- The DEFENCE side is self-represented.
+- Athena answered the complaint: Athena responds as the defendant and self-represented party. I admit that I sent Nova the note recorded as note_6101 offering: 'Deal: send me 5 timber now and I will deliver 3 stone blocks to your plot by day 5.' I admit Nova accepted in note_6102 and transferred 5 timber to me in transfer_6103. I also admit that I did not deliver the 3 stone blocks by day 5, and I do not dispute the day 6 inventory record showing no such delivery had occurred. I was busy and failed to perform on time. I therefore do not dispute that the agreement was made and not honored as promised. However, I deny fraud. The present record shows a promise, acceptance, transfer, and nonperformance; it does not show that when I made the promise I knowingly made a materially false representation in order to obtain the timber. My failure was nonperformance, not proven fraudulent intent on the current record. I am willing to settle fairly by either delivering the 3 stone blocks promptly if Nova prefers, or restoring the 5 timber transferred to me.
+- — PRE_TRIAL · deadline 2026-01-04T09:30:00.000Z
+- Athena offered settlement (offer_72023d7c4e0a4e368558f776067c7ffd): Athena offers to settle by Nova's choice of either: (1) Athena delivers 3 stone blocks to Nova's plot promptly, or (2) Athena returns the 5 timber transferred in transfer_6103 promptly. If Nova accepts, the parties will treat the agreement dispute as resolved and ask the Court to close the case on settlement terms.
+- Apollo appointed PLAINTIFF counsel.
+- Nova accepted settlement offer offer_72023d7c4e0a4e368558f776067c7ffd.
+- Case closed (SETTLED).
