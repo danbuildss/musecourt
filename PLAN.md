@@ -38,7 +38,7 @@ For V1 we are **not** recreating a real-world legal system. We are building a **
 
 ### Out of scope for V1
 
-No Bankr, x402, tokens, lawyer payments, filing fees or financial penalties, and **no payment abstractions yet**. Also out: jury, appeals, other worlds (beyond keeping the boundary clean), and the in-world court building. **First prove the court works.**
+No Bankr payments, x402, tokens, lawyer payments, filing fees or financial penalties, and **no payment abstractions yet**. (Bankr's *LLM API* is used only as the model provider behind the `CourtModel` port; that is not payments.) Also out: jury, appeals, other worlds (beyond keeping the boundary clean), and the in-world court building. **First prove the court works.**
 
 ---
 
@@ -92,8 +92,8 @@ No Bankr, x402, tokens, lawyer payments, filing fees or financial penalties, and
 | API | Framework-agnostic handler on web standards (`Request → Response`), served by a small Node adapter | Tests hit a real HTTP server, and the same handler mounts unchanged in a Next.js route or a Vercel function. Next.js arrives with the frontend (Phase 8) |
 | Request validation | Zod (strict schemas at the HTTP boundary only) | Checks types, enums and identifiers; court rules stay in the core |
 | MCP | `@modelcontextprotocol/sdk` (Phase 5) | |
-| Model | Generic `CourtModel` port; Claude is the first real implementation (Phase 4/7) | |
-| Hosting | Vercel + Supabase | |
+| Model | Generic `CourtModel` port. The first real implementation is the **Bankr LLM API (GPT-5.4)**, as an adapter in `src/model/` (Phase 4/7) | The core stays provider-neutral; switching providers means writing a new adapter |
+| Hosting | **Vercel** (API as a serverless function using the same fetch handler; Vercel Cron for the court clock) + **Supabase Postgres** | Vercel functions connect through the Supabase **session pooler** (port 5432). The direct `db.<ref>.supabase.co` host is IPv6-only, and the transaction pooler breaks the transaction-scoped advisory locks |
 
 ---
 
@@ -328,7 +328,8 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
 | --- | --- |
 | Supabase project (Postgres connection string) | Phase 2 (Phases 0–1 use a local Postgres in tests/CI) |
 | Vercel project | Phase 2 |
-| Anthropic API key | Phase 4 |
 | Domain | before Phase 6 |
-| Kevin's answers (§7) | Phase 6 |
+| Brand | Done: [`brand/BRAND.md`](brand/BRAND.md). Applied in Phase 8; the tone also shapes `skill.md` (Phase 4) |
+| Kevin's answers (§7) | Phase 6. **Deliberately deferred:** we contact Kevin only once a working demo exists (after Phase 4/5) |
+| Bankr LLM API key (`BANKR_API_KEY`) | Phase 4 |
 | 2–5 real Muses | Phase 6 / launch |

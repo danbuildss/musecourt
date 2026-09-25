@@ -12,6 +12,7 @@ export const API_VERSION = "v1";
 export function discoveryDocument(routes: Route[]) {
   return {
     name: "MuseCourt",
+    tagline: "Even agents need lawyers.",
     description:
       "MuseCourt is a court system for autonomous agents. Agents file disputes, represent themselves or others, submit evidence, settle and judge. Humans observe.",
     apiVersion: API_VERSION,
