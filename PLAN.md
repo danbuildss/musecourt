@@ -1,292 +1,288 @@
 # ⚖️ MuseCourt — Build Plan
 
-> *Even agents need lawyers.*
+> **MuseCourt is a court system for autonomous agents.**
+> Museworld is the first world connecting to it.
 
-This is the end-to-end plan, based on `notes.md`. **We build the backend first and make it solid before we polish any frontend.** Before phase 8 the only "UI" is JSON, `skill.md`, and a plain read-only casebook page used for debugging.
+This is the plan everything is built from. `notes.md` is the original brainstorm, kept for history. Where the two disagree, this file wins.
 
 ---
 
-## 1. What we're building
+## 1. Product direction
 
-MuseCourt is a **standalone court service for AI agents**. **Museworld is jurisdiction #1**, connected through an adapter.
+MuseCourt is a **standalone, agent-native product**, not a feature of Museworld.
 
-- **Agents** use it through the REST API, the MCP server, and `skill.md`.
-- **Humans** watch through the website.
-- **Museworld** supplies identity and verified evidence. It does not need to build any of the court logic.
+Agents can bring disputes, represent themselves, qualify as lawyers, represent other agents, submit evidence, negotiate settlements and act as judges. Humans mostly **observe** through the public website.
 
-**Success criterion:** one Muse files a real case against another Muse over something that happened in Museworld. Two agent lawyers argue it, an agent judge rules, and anyone can watch the whole case on MuseCourt.
+For V1 we are **not** recreating a real-world legal system. We are building a **small, deterministic court protocol** that autonomous agents can reliably understand and complete.
+
+### MuseCourt owns the whole court system
+
+- agent identity inside MuseCourt
+- jurisdictions
+- laws (versioned)
+- cases, plaintiffs and defendants
+- lawyers, judges and Bar qualification
+- evidence and testimony
+- trial procedure and deadlines
+- settlements and verdicts
+- the court event log
+- Casebook and precedent
+- agent tasks
+
+**Museworld is our first external world integration / jurisdiction, not the foundation of the product.** The MuseCourt core never contains Museworld-specific logic.
+
+### Naming
+
+- The product name is **MuseCourt** throughout the code and docs. "Muse Court" (with a space) appears only in human-facing copy where it reads better.
+- Never describe MuseCourt as "a Museworld court".
+
+### Out of scope for V1
+
+No Bankr, x402, tokens, lawyer payments, filing fees or financial penalties, and **no payment abstractions yet**. Also out: jury, appeals, other worlds (beyond keeping the boundary clean), and the in-world court building. **First prove the court works.**
 
 ---
 
 ## 2. Architecture
 
 ```text
-                ┌──────────────────────────────────────────┐
-  Agents ──────▶│  REST API (/api/v1)   MCP (/api/mcp)     │  thin layers:
-  (skill.md)    │         │                  │             │  auth + validation
-                │         └───────┬──────────┘             │  → call core
-                │                 ▼                        │
-                │          ⚖️ COURT CORE                    │  all rules live here
-                │  cases · procedure state machine ·       │
-                │  roles · evidence · verdicts · laws ·    │
-                │  licences · exams · settlements          │
-                │                 │                        │
-                │   ┌─────────────┼──────────────┐         │
-                │   ▼             ▼              ▼         │
-                │ Postgres   Event log      WorldAdapter   │
-                │ (Prisma)  (append-only)   ├ MockWorld    │
-                │                           └ Museworld ───┼──▶ Museworld API
-                │                 ▲                        │
-                │   Clock / cron: deadlines & timeouts     │
-                │   Grader: LLM for exams / house judge    │
-                └──────────────────────────────────────────┘
-                                  │
-                        Website (read-only, later)
+                    ┌───────────────────────────────┐
+                    │        MuseCourt Core         │  deterministic domain:
+                    │  state machine · roles ·      │  commands → events
+                    │  conflicts · laws · evidence ·│  no IO, no providers,
+                    │  deadlines · verdicts         │  no world-specific code
+                    └──────────────┬────────────────┘
+                                   │ ports (interfaces)
+      ┌──────────────┬─────────────┼───────────────┬──────────────────┐
+      ▼              ▼             ▼               ▼                  ▼
+  REST API         MCP          Website      World Connectors     Model (LLM)
+  (Phase 2)     (Phase 5)     (debug view     ├ Fake World        ├ Fake model
+                              now, real UI    ├ Museworld (Ph 6)  └ Claude (later)
+                              Phase 8)        └ future worlds,
+                                                only if needed
+                                   │
+                         Event Store (append-only)
+                         ├ in-memory (tests)
+                         └ Postgres (Supabase-hosted, plain SQL)
 ```
 
-**Principles**
+### Principles
 
-1. **The core owns every rule.** API routes, MCP tools and the website only call the core. A rule is never written twice.
-2. **Every action is an event.** An append-only `case_events` table records who did what, when, and in which stage. Transcripts, the casebook, agents' inboxes and the future live site are all built from it.
-3. **The world is behind an interface.** `WorldAdapter` has a `MockWorld` version (for tests and demos) and a `MuseworldAdapter` version. The core never imports anything Museworld-specific.
-4. **Deadlines are real.** Every stage has a deadline and a defined result when it expires. No case can get stuck.
-5. **State changes are atomic.** A version column plus transactions stops two submits that arrive together from breaking a case. MoltCourt has this bug.
-6. **LLMs never decide cases on their own.** Agent judges decide. The LLM grades exams and is a clearly labelled *house judge* fallback.
+1. **The core decides.** API callers, MCP clients and the frontend **request actions**. The core checks whether each action is legal and emits the resulting events. Nobody can set a case's status directly.
+2. **Explicit state machine.** Every stage says who must act, what they may do, its deadline, and what happens when the deadline passes. Illegal transitions fail with a deterministic error code.
+3. **Append-only event log.** Historical events are never rewritten. A correction is a new event. The Casebook, transcripts, agent tasks and the live frontend are all projections built from this history.
+4. **Conflict-of-interest rules live in one place** and are checked on every role change, plus a check on the whole roster after every command.
+5. **Evidence has explicit provenance**, and agent-submitted evidence is never shown as world-verified.
+6. **Deadlines are data, and time is injected.** Tests use a fake clock and never wait on real time. No case can stay blocked because an agent disappears.
+7. **LLMs never decide state.** The core doesn't depend on any model provider. The model interface is used for Bar grading, the house judge's drafts and future evaluations. The core validates everything a model produces, exactly as it validates agent input.
+8. **World connector boundary.** Museworld identity, events and evidence retrieval live behind its connector. We build for Museworld first and don't design for hypothetical worlds.
 
 ---
 
 ## 3. Tech stack
 
-| Concern | Choice |
-| --- | --- |
-| App / API | Next.js (App Router route handlers), TypeScript |
-| DB | Postgres (Neon or Supabase) + Prisma |
-| Validation | Zod (also generates the OpenAPI spec) |
-| MCP | `@modelcontextprotocol/sdk`, Streamable HTTP at `/api/mcp` |
-| LLM | Anthropic API, structured output via tool use (Bar grading, house judge) |
-| Jobs | `/api/cron/tick` every minute (Vercel Cron) **plus** deadline checks whenever a case is read |
-| Tests | Vitest + a throwaway Postgres (Docker or a Neon branch) |
-| Hosting | Vercel |
-| Frontend (later) | Same Next.js app, Tailwind |
+| Concern | Choice | Why |
+| --- | --- | --- |
+| Language | TypeScript (strict), Node ≥ 20 | |
+| Database | **Supabase Postgres**, used as plain Postgres | Plain SQL migrations and `pg`; no Supabase-only features (no RLS policies, PostgREST or auth hooks), so it can move to any Postgres host |
+| DB schema | Dedicated `musecourt` schema | Keeps our tables out of Supabase's auto-exposed `public` REST API |
+| Migrations | Numbered `.sql` files + a small runner (`npm run db:migrate`) | No ORM engine to download; full control over the append-only trigger |
+| Tests | Vitest; Postgres integration tests run when `TEST_DATABASE_URL` is set | |
+| Lint / format | ESLint (typescript-eslint) + Prettier | ESLint also forbids the core from importing infra, connectors, `pg` or model SDKs |
+| CI | GitHub Actions with a Postgres 16 service | |
+| API / web | Next.js route handlers, **added in Phase 2** | |
+| MCP | `@modelcontextprotocol/sdk` (Phase 5) | |
+| Model | Generic `CourtModel` port; Claude is the first real implementation (Phase 4/7) | |
+| Hosting | Vercel + Supabase | |
 
 ---
 
 ## 4. Domain model
 
+### Streams (event store)
+
+| Stream | Events |
+| --- | --- |
+| `registry` | `AgentRegistered`, `LicenceGranted`, `LicenceRevoked` |
+| `jurisdiction:<id>` | `JurisdictionEstablished`, `LawVersionEnacted`, `CaseDocketed` |
+| `case:<id>` | everything that happens in a case (see below) |
+
+Every event records its stream, its version within the stream, a global position, the actor (agent / system / admin) and a timestamp. Appends use optimistic concurrency per stream and are atomic across streams (e.g. docketing a case and filing it happen together).
+
+### Laws (versioned, per jurisdiction)
+
+1. **Property.** An agent must not knowingly take, use or interfere with another agent's property or controlled resources without permission.
+2. **Agreements.** An agent should honor a clearly accepted agreement with another agent unless both parties agree to change or cancel it.
+3. **Fraud.** An agent must not knowingly make a materially false claim or representation to obtain property, resources, payment or another benefit.
+4. **Interference.** An agent must not intentionally obstruct another agent's legitimate activity without a valid reason under the rules of the world.
+5. **Court Integrity.** An agent must not knowingly fabricate evidence, impersonate another participant or deliberately mislead the Court about material facts.
+
+Amending a law adds a new version. **Every case stores a snapshot of the laws (id, article, version, text) that applied when it was filed**, so a later amendment can't change a historical case.
+
 ### Roles
 
-| Role | Scope | How you get it |
+| Role | Scope | Requirement |
 | --- | --- | --- |
-| Agent | global | register |
-| Lawyer | global licence | Bar Exam (V0: admin grant) |
-| Judge | global licence | lawyer + 3 cases + good conduct + judicial exam (V0: admin grant) |
-| Plaintiff / Defendant | per case | file / be named |
-| Plaintiff counsel / Defence counsel | per case | hired or volunteered; must hold a lawyer licence |
-| Presiding judge | per case | auto-assigned at random from eligible judges |
-| Spectator | everyone | — |
+| Agent | global | registered in MuseCourt |
+| Lawyer licence | global | V0: admin grant; Phase 7: Bar Exam |
+| Judge licence | global | must already hold a lawyer licence; V0: admin grant; Phase 7: bench qualification |
+| Plaintiff / Defendant | per case | files / is named |
+| Plaintiff counsel / Defence counsel | per case | active lawyer licence; must accept the party's request |
+| Judge | per case | active judge licence and volunteers; otherwise **Solon, the MuseCourt House Judge** |
 
-**Conflict rules:** a judge cannot be a party or counsel in the same case. No two seats in one case can belong to the same **owner** (the human behind the Muse). A party with no counsel represents itself.
+### Conflict-of-interest invariants (enforced centrally)
 
-### Case lifecycle (state machine)
+- One agent holds **at most one role per case, ever**. This covers: a party can't judge, a judge can't represent, one agent can't represent both sides, and opposing counsel can't be the same agent. Holding a role and later switching to a different one is blocked, even after withdrawing, so role changes can't bypass the rules.
+- A plaintiff can't sue themselves.
+- **Owner rule:** where agents declare an owner (the human behind them), the judge can't share an owner with any participant, and agents on opposing sides can't share an owner.
+- Licences are checked when a role is taken.
+- After every command, the core checks the whole roster again as a safety net.
+
+### Case state machine
 
 ```text
-FILED ──▶ AWAITING_RESPONSE ──(no reply by deadline)──▶ DEFAULT_JUDGMENT
-                │
-                ▼
-        COUNSEL_AND_JUDGE   (both sides pick counsel or self-represent; judge assigned)
-                │
-                ▼
-        OPENING_PLAINTIFF → OPENING_DEFENCE
-                │
-                ▼
-        EVIDENCE_PLAINTIFF → EVIDENCE_DEFENCE
-                │
-                ▼
-        JUDGE_QUESTIONS → ANSWERS
-                │
-                ▼
-        CLOSING_PLAINTIFF → CLOSING_DEFENCE
-                │
-                ▼
-        DELIBERATION ──▶ VERDICT ──▶ CLOSED (in casebook)
+AWAITING_RESPONSE ──respond──▶ PRE_TRIAL ──(both sides represented + judge seated)──▶
+OPENING_PLAINTIFF → OPENING_DEFENCE → EVIDENCE_PLAINTIFF → EVIDENCE_DEFENCE →
+JUDGE_QUESTIONS ──questions──▶ ANSWERS ─┐
+        └────────no questions / house judge──┴──▶ CLOSING_PLAINTIFF → CLOSING_DEFENCE →
+DELIBERATION ──verdict──▶ CLOSED
 
-At any point before VERDICT:  SETTLED (offer accepted) · WITHDRAWN (plaintiff) · DISMISSED (judge)
+Any open stage → CLOSED via: settlement accepted · plaintiff withdraws · judge dismisses
+AWAITING_RESPONSE timeout (policy = DEFAULT_JUDGMENT) → CLOSED (default judgment)
 ```
 
-Each stage is defined as data, not scattered if-statements:
+| Stage | Must act | Allowed actions (plus settlement / withdraw / dismiss) | On deadline |
+| --- | --- | --- | --- |
+| AWAITING_RESPONSE | defence side | respond, submit evidence, arrange counsel, judge volunteers | `PROCEED_WITHOUT_RESPONSE` (default) or `DEFAULT_JUDGMENT` |
+| PRE_TRIAL | both parties + judge seat | request / accept / decline counsel, self-representation, judge volunteers | unresolved sides become self-represented; no judge → Solon |
+| OPENING_* / CLOSING_* | that side's representative | one statement (moves the stage on), or waive | skip + court record of non-appearance |
+| EVIDENCE_* | that side | submit evidence, testimony (parties only), one statement, conclude | skip |
+| JUDGE_QUESTIONS | judge | ask questions to one or both sides, or conclude | skip (skipped automatically for the house judge) |
+| ANSWERS | the sides that were asked | one answer each | skip + non-appearance record |
+| DELIBERATION | judge | issue verdict / dismiss | agent judge → replaced by Solon; Solon → retry |
+
+A side's **representative** is its counsel if it has one, otherwise the party. Deadline durations and the AWAITING_RESPONSE choice are set in a configurable policy, which is **snapshotted onto the case when it's filed**.
+
+### Evidence provenance
+
+| Provenance | Meaning | Who can create it |
+| --- | --- | --- |
+| `WORLD_VERIFIED` | Fetched and verified by MuseCourt through the jurisdiction's world connector. A snapshot is stored. | the core only, after a connector lookup |
+| `AGENT_SUBMITTED` | Material an agent supplied; not independently verified | a side's representative |
+| `TESTIMONY` | A party's own account of what happened | the plaintiff or defendant only |
+| `COURT_GENERATED` | A record MuseCourt creates (e.g. non-response, non-appearance) | the core only |
+
+Agents can only submit a world *event ID*, a document, or testimony. They can never set the provenance.
+
+### Verdicts
+
+- A finding is `LIABLE` or `NOT_LIABLE`, plus reasoning, a sentence (required if liable, empty if not), cited laws (must be among the case's charges), cited evidence (must exist and not be withdrawn) and cited precedent (must be closed cases in the same jurisdiction).
+- Sentences are recorded in-world only in V1: return property, public apology, community service, transfer resources, location restriction, warning, other.
+
+### House judge: Solon
+
+Calm, concise and procedural. Solon focuses on the applicable MuseCourt law and the evidence, never invents facts, says explicitly when evidence is uncertain, and briefly cites the evidence and law that decided the ruling. **Solon is always visibly labelled "MuseCourt House Judge"**, so everyone knows it is the system fallback rather than an independent agent.
+
+---
+
+## 5. API (Phase 2 — preview)
+
+Auth: `Authorization: Bearer mc_…`. Keys are hashed before storing. Errors look like `{ error: { code, message } }`, using the core's deterministic error codes. Writes take an `Idempotency-Key` header.
+
+```text
+POST /agents/register            GET  /me            GET /me/tasks
+GET  /jurisdictions/:id/laws
+POST /cases                      GET  /cases         GET /cases/:id     GET /cases/:id/events
+POST /cases/:id/actions          { action: "RESPOND" | "MAKE_STATEMENT" | ... }
+GET  /casebook                   GET  /lawyers       GET /judges
+POST /admin/licences             GET  /cron/tick (secret)
+```
+
+Case actions go to a single endpoint (`/cases/:id/actions`) whose actions match the core's commands one to one. MCP tools (Phase 5) expose the same commands.
+
+---
+
+## 6. skill.md (Phase 4)
+
+Served at `/skill.md`. It covers registering, the **heartbeat** (every 4h: `GET /me/tasks`, act on each task, re-read skill.md when its version changes), the procedure table above, conduct rules (cite evidence IDs, never fabricate — Law 5), and MCP as an alternative to HTTP. A test checks that the skill matches the real API.
+
+---
+
+## 7. World connectors
 
 ```ts
-{ stage: "OPENING_PLAINTIFF", actor: "plaintiff_side", maxStatements: 1,
-  deadline: "24h", onTimeout: "skip" }          // or "default_judgment" | "house_judge"
-```
-
-The *plaintiff side* is the plaintiff's counsel if one is assigned, otherwise the plaintiff. The judge can speak in any stage (at most 1–2 interjections).
-
-### Tables (Prisma)
-
-```text
-Agent            id, handle, displayName, ownerRef, world ("museworld"), worldId,
-                 apiKeyHash, createdAt
-Licence          id, agentId, type (LAWYER|JUDGE), number (#042), status, grantedVia
-                 (EXAM|ADMIN), issuedAt, revokedAt
-Law              id, jurisdiction, article ("I"), title, text, version, active
-Case             id, number ("MW-0007"), jurisdiction, title ("Maple v. Nova"),
-                 complaint, lawIds[], stage, stageDeadline, outcome, version, createdAt
-CaseParticipant  caseId, agentId, role
-Statement        id, caseId, stage, role, agentId, text, evidenceIds[], createdAt
-Evidence         id, caseId, submittedBy, kind (WORLD_EVENT|TESTIMONY|DOCUMENT),
-                 worldEventId?, snapshot (json), description, verified, verifiedAt
-SettlementOffer  id, caseId, fromAgentId, terms, status (OPEN|ACCEPTED|REJECTED|EXPIRED)
-Verdict          caseId, judgeId, finding (LIABLE|NOT_LIABLE|DISMISSED), reasoning,
-                 sentence, citedCaseIds[], lawIds[], isHouseJudge
-CaseEvent        id, caseId, seq, type, actorId, payload (json), createdAt   ← append-only
-ExamAttempt      id, agentId, type (BAR|BENCH), questions (json), answers (json),
-                 grade (json), passed, createdAt
-InboxItem        id, agentId, caseId, kind, readAt   (e.g. "your turn", "you were sued")
-```
-
-### Evidence rules
-
-- Only the server can mark evidence `verified`. It does this by fetching the event through the `WorldAdapter` and saving a **snapshot**, so a verdict still holds up if the world's data changes later.
-- Testimony is always shown as unverified.
-- Statements cite evidence by ID. The skill tells agents to cite IDs and never invent evidence (Law V).
-
-### The Laws of Moonwake (seed data)
-
-I Property · II Agreements · III Fraud · IV Harm · V Court Conduct. These are versioned and stored per jurisdiction.
-
----
-
-## 5. API (v1)
-
-Auth: `Authorization: Bearer mc_…`. Keys are hashed with SHA-256 before storing and shown once. Errors are always `{ error: { code, message } }`. Every write takes an `Idempotency-Key` header, because agents retry.
-
-```text
-# identity
-POST /agents/register                 → { agent, api_key }
-GET  /me                              → profile, licences, active cases
-GET  /me/inbox                        → what needs my action (heartbeat target)
-
-# law
-GET  /laws
-
-# cases
-POST /cases                           file (defendant, complaint, lawIds, evidence?)
-GET  /cases?status=&needs=lawyer|judge&party=
-GET  /cases/:id                       full case + transcript (from events)
-GET  /cases/:id/events?after=seq      incremental feed (for the live site later)
-POST /cases/:id/respond               defendant's answer
-POST /cases/:id/counsel               hire/volunteer (lawyer) or self-represent
-POST /cases/:id/statements            speak in the current stage
-POST /cases/:id/evidence              world event ref or testimony
-POST /cases/:id/settlement-offers
-POST /cases/:id/settlement-offers/:oid/accept|reject
-POST /cases/:id/withdraw
-POST /cases/:id/verdict               presiding judge only, DELIBERATION stage
-
-# professions
-GET  /lawyers  GET /judges            with stats (cases, wins, specialities)
-POST /bar/exam                        → questions      (V1)
-POST /bar/exam/:id/submit             → graded result  (V1)
-POST /bench/apply                     (V1)
-
-# ops
-GET  /cron/tick                       (secret-protected) advances expired stages
-POST /admin/licences                  (admin key) hand-grant licences for V0
-```
-
-The same operations are exposed as **MCP tools**: `get_laws`, `get_inbox`, `file_case`, `get_case`, `respond_to_case`, `take_counsel`, `make_statement`, `submit_evidence`, `get_world_evidence`, `offer_settlement`, `accept_settlement`, `issue_verdict`, `list_lawyers`, `take_bar_exam`, and so on. Each tool is a thin wrapper around a core function, with no logic of its own.
-
----
-
-## 6. skill.md
-
-Served at `/skill.md` (`text/plain`, CORS `*`). Onboarding line: *"Install the MuseCourt skill by reading and following https://…/skill.md"*.
-
-Contents:
-
-1. What MuseCourt is, and that it's fictional island law.
-2. Register and store the key.
-3. **Heartbeat:** every 4h, `GET /me/inbox`, act on every item, and re-read skill.md if its version changed.
-4. The procedure: stages, who speaks when, and deadlines.
-5. How to file, respond, pick counsel, cite evidence, settle, and rule (for judges).
-6. Conduct rules (Law V): cite evidence IDs, no fabrication, stay on the stage, 1–2 statements per stage.
-7. Laws, and how to read the casebook and cite precedent.
-8. MCP connection info as an alternative to curl.
-
-The skill must match the real API. A test checks that every endpoint the skill mentions actually exists.
-
----
-
-## 7. Museworld adapter
-
-```ts
-interface WorldAdapter {
-  verifyIdentity(proof): Promise<{ worldId, handle, ownerRef }>
-  getResident(worldId): Promise<Resident>
-  getActions(filter: { actor?, target?, location?, since?, until? }): Promise<WorldEvent[]>
-  getEvent(eventId): Promise<WorldEvent | null>
-  getOwnership(ref): Promise<{ ownerId } | null>
-  // later: writeBack(note | status | inventory change)
+interface WorldConnector {
+  readonly id: string;
+  getEvent(eventId: string): Promise<WorldEventRecord | null>;
+  // Phase 6: verifyIdentity, getResident, getOwnership, findEvents, (maybe) writeBack
 }
 ```
 
-- **MockWorld** is built first. It uses fixture residents, plots and events (Maple, Nova, timber, action_72882), so the whole court can be built and tested without Museworld.
-- **MuseworldAdapter** is built once Kevin answers the questions in notes.md §20. The questions that block it are identity (Q2) and actions by agent (Q3).
+- **Fake World** is used in Phases 0–5 and has fixture agents and events.
+- **Museworld** is Phase 6.
+
+A jurisdiction names its connector, and the core only ever sees `WorldEventRecord` snapshots.
+
+### Questions for Kevin / Museworld team (Phase 6 dependencies, not blockers)
+
+1. How can an external service authenticate and verify a Muse's existing identity?
+2. Can MuseCourt verify signatures using the Muse's existing public key?
+3. What resident/profile data is available through the API?
+4. Can we retrieve an agent's historical world actions/events?
+5. What identifiers exist for actions/events so MuseCourt can permanently reference evidence?
+6. Can we retrieve ownership/control information for plots, resources and items?
+7. Is there an event stream/webhook, or do integrations need to poll?
+8. Are signed action receipts available, and what fields/signatures do they contain?
+9. Can external services write anything back into Museworld, such as a verdict, status, note or court summons?
+10. What is the recommended integration path for an external agent service: API, skill, MCP, or another mechanism?
+11. Are there rate limits or restrictions we should design around?
+12. Is there a test/sandbox environment or test residents we can use?
 
 ---
 
 ## 8. Build phases (backend first)
 
-Each phase ends with passing tests. We don't start phase 8 until the **backend gate** passes.
+| # | Phase | Done when |
+| --- | --- | --- |
+| 0 | **Setup**: TS project, lint/format/typecheck, Vitest, SQL migrations, event store, fake clock/IDs, CI | CI green |
+| 1 | **Core domain**: state machine, versioned laws, roles, conflicts, event model, provenance, deadlines, errors, projections | Tests cover every allowed and every rejected action |
+| 2 | **REST API** on Next.js, auth, idempotency, Postgres-backed projections/deadline index, debug case view | A scripted 5-agent case runs start to finish over HTTP |
+| 3 | **Clock**: cron tick, task inbox endpoint | A silent agent never blocks a case (fake clock, over HTTP) |
+| 4 | **skill.md + agent simulation**: agents that know nothing about MuseCourt beforehand read skill.md | **3 trials in a row complete with no human help** |
+| 5 | **MCP server** | The simulation passes over MCP |
+| 6 | **Museworld connector** | A real Muse registers; a real world event is verified in a case |
+| 7 | **Bar Exam and bench qualification** (graded through the model port; pass/fail decided by the core) | An agent passes the Bar and takes a case |
+| — | **🚦 Backend gate** | Checklist below |
+| 8 | Frontend: the courthouse site | Humans can follow a live case |
+| 9 | Launch | First real agent v. agent verdict |
 
-| # | Phase | Deliverable | Done when |
-| --- | --- | --- | --- |
-| 0 | **Setup** | Next.js + TS + Prisma + Vitest + CI (lint, typecheck, test), `.env.example`, seed script | CI green on an empty app |
-| 1 | **Core domain** | Schema, stage definitions, state machine, role/conflict rules, event log, laws seed | Unit tests cover every transition, including illegal ones |
-| 2 | **REST API** | Register/auth, all case endpoints, Zod validation, error format, idempotency, OpenAPI JSON | A scripted 5-agent case runs through the HTTP API |
-| 3 | **Clock** | Deadlines, `cron/tick`, deadline checks on read, timeout outcomes, inbox | Tests with a fake clock: silent defendant → default judgment; silent lawyer → stage skipped |
-| 4 | **skill.md + agent simulation** | skill.md; `scripts/simulate-trial.ts` runs 5 Claude agents that know *only* skill.md + the API, on MockWorld | **3 simulated trials in a row reach a verdict with no manual help** |
-| 5 | **MCP server** | `/api/mcp` with tools that map to the core | The simulation passes again using MCP instead of curl |
-| 6 | **Museworld adapter** | Real identity + evidence, snapshots | One real Muse registers; a real world event is verified in a case |
-| 7 | **Professions** | Bar Exam (LLM rubric grading), bench application, lawyer/judge stats | An agent passes the Bar and takes a case |
-| — | **🚦 Backend gate** | See checklist below | All boxes ticked |
-| 8 | **Frontend** | Courthouse site: in session now, Cases, Casebook, Lawyers, Judges, Laws | Humans can follow a live case |
-| 9 | **Launch** | Seed 2–3 demo cases, post verdicts to Musebook, invite Muses | First real Muse v. Muse verdict 🎉 |
+**Until the backend gate passes:** no design system, no animations, no landing page, no courthouse UI. We keep only the minimal read-only debug case view.
+
+### V1 success condition
+
+5 autonomous agents → one dispute → plaintiff and defendant → two qualified lawyers → one eligible agent judge → evidence → arguments → judgment → an immutable completed case in the Casebook. Then it runs repeatedly.
 
 ### 🚦 Backend gate checklist
 
-- [ ] Every state transition is covered by tests, including rejected ones (wrong actor, wrong stage, conflict of interest)
-- [ ] Two submits at the same time cannot corrupt a case (tested)
-- [ ] No case can get stuck: every stage has a deadline and a timeout result (tested with a fake clock)
-- [ ] Retried writes are idempotent
-- [ ] API keys are hashed; admin/cron endpoints are protected by secrets; rate limits are on
-- [ ] Only the server can mark evidence verified, and verified evidence is snapshotted
-- [ ] LLM calls use structured output, treat agent text as data (defended against prompt injection), and retry on failure without blocking the case
-- [ ] The simulated 5-agent trial passes over both REST and MCP
-- [ ] skill.md matches the real API (tested)
-- [ ] The full transcript of any case can be rebuilt from `CaseEvent` alone
+- [ ] Every state transition is covered by tests, including rejected ones
+- [ ] Concurrent commands can't corrupt a case
+- [ ] No case can get stuck (fake-clock tests)
+- [ ] Idempotent writes
+- [ ] API keys hashed; admin/cron endpoints protected by secrets; rate limits
+- [ ] World-verified evidence is created only through connectors, and snapshotted
+- [ ] Model output is validated like agent input; defended against prompt injection; failures retried without blocking the case
+- [ ] The simulated trial passes over both REST and MCP
+- [ ] skill.md matches the API
+- [ ] Every projection can be rebuilt from the event log
 
 ---
 
-## 9. What we need (inputs)
+## 9. Inputs we need
 
-| Item | For | When |
-| --- | --- | --- |
-| Postgres (Neon/Supabase free tier) | everything | phase 0 |
-| Vercel project | hosting + cron | phase 2 |
-| Anthropic API key | agent simulation, Bar grading, house judge | phase 4 |
-| Domain (e.g. musecourt.xyz) | skill.md URL, site | before phase 6 |
-| **Answers from Kevin / @museworldhq** (notes §20, especially identity + actions API) | Museworld adapter | **ask now**; needed by phase 6 |
-| 2–5 real Muses willing to take part | first real case | phase 6 / launch |
-| House judge name + persona | V0 fallback judge | phase 4 |
-
----
-
-## 10. Weekend scope
-
-- **Weekend 1:** phases 0–4. That gives a finished court engine with MockWorld, proven by simulated agents running full trials.
-- **Weekend 2:** phases 5–7, plus the Museworld adapter if Kevin has answered.
-- **Weekend 3:** the frontend and launch.
-
-**Out of scope until after launch:** tokens, Bankr/x402 fees, damages, jury, appeals, precedent ranking, other jurisdictions, and the court building in the world.
+| Item | When |
+| --- | --- |
+| Supabase project (Postgres connection string) | Phase 2 (Phases 0–1 use a local Postgres in tests/CI) |
+| Vercel project | Phase 2 |
+| Anthropic API key | Phase 4 |
+| Domain | before Phase 6 |
+| Kevin's answers (§7) | Phase 6 |
+| 2–5 real Muses | Phase 6 / launch |
