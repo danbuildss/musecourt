@@ -38,9 +38,12 @@ export interface AgentMetrics {
   apiCalls: number;
   apiWrites: number;
   apiErrors: Record<string, number>;
+  /** USD cost the provider itself reported per response (only when it does). */
+  reportedCostUsd: number;
+  costReportedCalls: number;
 }
 
-const emptyMetrics = (): AgentMetrics => ({
+export const emptyMetrics = (): AgentMetrics => ({
   wakes: 0,
   modelCalls: 0,
   inputTokens: 0,
@@ -51,7 +54,27 @@ const emptyMetrics = (): AgentMetrics => ({
   apiCalls: 0,
   apiWrites: 0,
   apiErrors: {},
+  reportedCostUsd: 0,
+  costReportedCalls: 0,
 });
+
+/** Thrown when an agent keeps failing: invalid replies or rejected requests, back to back. */
+export class AgentStuck extends Error {
+  constructor(
+    readonly agent: string,
+    readonly failures: string[],
+  ) {
+    super(`${agent} failed ${failures.length} actions in a row`);
+  }
+}
+
+export interface WakeOptions {
+  maxSteps: number;
+  /** Consecutive invalid replies / rejected requests before the agent counts as stuck. */
+  maxConsecutiveFailures?: number;
+  /** Called before every model call; throws to stop (budget and time limits). */
+  beforeModelCall?: () => void;
+}
 
 const MAX_RESPONSE_CHARS = 16000;
 const HISTORY_WINDOW = 40;
@@ -73,6 +96,8 @@ export class SimAgent {
   private readonly preamble: ChatMessage[];
   private history: ChatMessage[] = [];
   private apiKey: string | null = null;
+  /** Consecutive failed actions (invalid replies or 4xx/5xx responses); reset by any success. */
+  private failures: string[] = [];
 
   constructor(private readonly options: SimAgentOptions) {
     this.preamble = [
@@ -96,16 +121,18 @@ export class SimAgent {
   }
 
   /** Wakes the agent with a note; it acts until it says done or runs out of steps. Returns successful writes. */
-  async wake(note: string, maxSteps: number): Promise<number> {
+  async wake(note: string, options: WakeOptions): Promise<number> {
     this.metrics.wakes += 1;
     this.push({ role: "user", content: note });
     let writes = 0;
     let badReplies = 0;
-    for (let step = 0; step < maxSteps; step++) {
+    for (let step = 0; step < options.maxSteps; step++) {
+      options.beforeModelCall?.();
       const reply = await this.think();
       const action = parseAction(reply);
       if (!action) {
         this.metrics.protocolErrors += 1;
+        this.fail(options, `invalid reply: ${reply.slice(0, 160)}`);
         if (++badReplies >= 2) break;
         this.push({
           role: "user",
@@ -117,10 +144,24 @@ export class SimAgent {
       badReplies = 0;
       if (action.done) break;
       const call = await this.http(action.request);
+      if (call.status >= 400 || call.status === 0) {
+        this.fail(options, `${call.method} ${call.path} → ${call.status} ${call.errorCode ?? ""}`.trim());
+      } else {
+        this.failures = [];
+      }
       if (call.method === "POST" && call.status < 300) writes += 1;
       this.push({ role: "user", content: renderResponse(call) });
     }
     return writes;
+  }
+
+  private fail(options: WakeOptions, description: string) {
+    this.failures.push(description);
+    if (options.maxConsecutiveFailures && this.failures.length >= options.maxConsecutiveFailures) {
+      const failures = this.failures;
+      this.failures = [];
+      throw new AgentStuck(this.options.handle, failures);
+    }
   }
 
   private async think(): Promise<string> {
@@ -133,6 +174,10 @@ export class SimAgent {
       this.metrics.modelCalls += 1;
       this.metrics.inputTokens += response.usage.inputTokens;
       this.metrics.outputTokens += response.usage.outputTokens;
+      if (typeof response.costUsd === "number") {
+        this.metrics.reportedCostUsd += response.costUsd;
+        this.metrics.costReportedCalls += 1;
+      }
       this.metrics.modelLatencyMs += response.latencyMs || Date.now() - started;
       this.push({ role: "assistant", content: response.text });
       return response.text;

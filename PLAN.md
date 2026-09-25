@@ -256,7 +256,33 @@ Calm, concise and procedural. Solon focuses on the applicable MuseCourt law and 
    - fabricated world evidence detected and reported (FakeWorld supplies the verified world evidence);
    - verdicts that must cite real law and evidence;
    - Solon's output passes the same domain validation as any judge.
-7. **Stop before Phase 5**, and no frontend.
+7. **Models for the first live run.** Agents and Solon both use `gpt-5.4`. `MUSECOURT_MODEL` and `MUSECOURT_AGENT_MODEL` stay configurable, so we can try other models without changing the court.
+8. **Runaway limits.** These only stop loops; they never help an agent.
+   - 100 model calls per trial (agents + Solon)
+   - 40 per agent per trial
+   - 5 consecutive failed actions (invalid replies or rejected requests) → the agent is stuck
+   - 30 heartbeat rounds per trial
+   - 30 minutes of wall-clock time per trial
+   - 10 model calls per wake
+   Each limit has its own outcome (`TRIAL_CALL_LIMIT`, `AGENT_CALL_LIMIT`, `AGENT_STUCK`, `ROUND_LIMIT`, `TIME_LIMIT`) plus the reason. If a legitimate trial hits one, we report it and review it **before** raising any limit.
+9. **Usage and cost.** Every run reports:
+   - total model calls, and calls per agent and for Solon;
+   - input, output and total tokens;
+   - cost, per trial and for all three trials, from three sources when available:
+     - the provider's per-response cost (only if the gateway returns it);
+     - tokens × the model's price from Bankr `GET /v1/models` (the raw pricing entry is saved so the units can be checked);
+     - the change in balance from Bankr's documented `GET /llm/credits/state` (`totalCreditsUsd`).
+   - No prompt optimisation for cost until we have a baseline.
+10. **Live success condition.** 3 different trials complete **consecutively** with real Bankr-powered agents and zero human intervention. Offline scripted-agent tests don't count.
+11. **If a live trial fails:**
+    1. keep the full transcript;
+    2. classify the failure;
+    3. explain exactly what was misunderstood or failed;
+    4. attribute it to one of: skill, API, model, court rule, provider or harness;
+    5. make the smallest appropriate fix;
+    6. restart from Trial 1.
+    Never tell an agent which action to take. Never tune `skill.md` to one model's quirks: improvements must make MuseCourt easier for agents in general, and the skill stays model-agnostic.
+12. **PR #5 stays a draft** until the live run passes. **Stop before Phase 5**, and no frontend.
 
 ### Error codes (stable, machine-readable)
 

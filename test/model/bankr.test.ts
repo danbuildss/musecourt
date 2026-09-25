@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BankrChatModel, BANKR_DEFAULT_BASE_URL, BANKR_DEFAULT_MODEL } from "@/model/bankr";
+import { BankrChatModel, BankrCostMeter, BANKR_DEFAULT_BASE_URL, BANKR_DEFAULT_MODEL } from "@/model/bankr";
 import { ModelError, extractJsonObject } from "@/model/chat";
 
 const KEY = "bk_test_secret_key_do_not_leak";
@@ -95,6 +95,62 @@ describe("Bankr LLM Gateway adapter (documented interface)", () => {
     const { fn } = mockFetch([{ status: 200, body: { choices: [] } }]);
     const model = new BankrChatModel({ apiKey: KEY, model: "gpt-5.4", fetch: fn });
     await expect(model.complete({ messages: [] })).rejects.toMatchObject({ kind: "BAD_RESPONSE" });
+  });
+});
+
+describe("Bankr cost meter (documented endpoints)", () => {
+  it("reads totalCreditsUsd from /llm/credits/state and the model's pricing entry from /v1/models", async () => {
+    const calls: string[] = [];
+    const fn = (async (url: string, init: RequestInit) => {
+      calls.push(url);
+      expect((init.headers as Record<string, string>)["x-api-key"]).toBe(KEY);
+      const body = url.endsWith("/llm/credits/state")
+        ? { creditBalanceUsd: 20, creditGrantsUsd: 5, totalCreditsUsd: 25 }
+        : {
+            data: [
+              { id: "gpt-5.4", pricing: { prompt: "0.0000012", completion: "0.0000096" } },
+              { id: "other" },
+            ],
+          };
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as unknown as typeof fetch;
+    const meter = new BankrCostMeter({ apiKey: KEY, fetch: fn });
+    expect(await meter.balanceUsd()).toBe(25);
+    expect(await meter.pricing("gpt-5.4")).toEqual({
+      inputPerToken: 0.0000012,
+      outputPerToken: 0.0000096,
+      raw: { id: "gpt-5.4", pricing: { prompt: "0.0000012", completion: "0.0000096" } },
+    });
+    expect(await meter.pricing("other")).toEqual({
+      inputPerToken: null,
+      outputPerToken: null,
+      raw: { id: "other" },
+    });
+    expect(await meter.pricing("missing")).toBeNull();
+    expect(calls).toEqual(["https://api.bankr.bot/llm/credits/state", "https://llm.bankr.bot/v1/models"]);
+  });
+
+  it("returns null instead of guessing when data is unavailable", async () => {
+    const fn = (async () => new Response("nope", { status: 403 })) as unknown as typeof fetch;
+    const meter = new BankrCostMeter({ apiKey: KEY, fetch: fn });
+    expect(await meter.balanceUsd()).toBeNull();
+    expect(await meter.pricing("gpt-5.4")).toBeNull();
+  });
+
+  it("records a per-response cost only if the gateway includes one", async () => {
+    const { fn } = mockFetch([
+      {
+        status: 200,
+        body: {
+          choices: [{ message: { content: "x" } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0.0042 },
+        },
+      },
+      ok,
+    ]);
+    const model = new BankrChatModel({ apiKey: KEY, model: "gpt-5.4", fetch: fn });
+    expect((await model.complete({ messages: [] })).costUsd).toBe(0.0042);
+    expect((await model.complete({ messages: [] })).costUsd).toBeUndefined();
   });
 });
 
