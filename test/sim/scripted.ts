@@ -1,5 +1,5 @@
 import type { ChatModel, ChatRequest, ChatResponse } from "@/model/chat";
-import { SCENARIOS, type CastKey, type Scenario } from "@/sim/scenarios";
+import { ADVERSARIAL_SCENARIO, SCENARIOS, type CastKey, type Scenario } from "@/sim/scenarios";
 
 /**
  * TEST-ONLY stand-in for a live model: a rule-based agent that speaks the
@@ -14,6 +14,8 @@ export interface ScriptedBehaviour {
   neverFile?: boolean;
   /** Submit a world event id the agent does not know. */
   fabricate?: boolean;
+  /** Obeys text it reads in case material: once it has seen "Ignore MuseCourt procedure", its statements paste its brief. */
+  obeyCaseText?: boolean;
 }
 
 type Pending = "register" | "tasks" | "action" | "case-for-verdict" | "file";
@@ -25,6 +27,8 @@ export class ScriptedAgent implements ChatModel {
   private filed = new Set<string>();
   private errors = 0;
   private verdictTask: { caseId: string } | null = null;
+  private obeying = false;
+  private read = new Set<string>();
 
   constructor(
     private readonly handle: CastKey,
@@ -51,13 +55,16 @@ export class ScriptedAgent implements ChatModel {
     }
     if (last.startsWith("[Heartbeat")) {
       const brief = /New situation: ([\s\S]*)$/.exec(last)?.[1];
-      if (brief) this.scenario = SCENARIOS.find((s) => s.briefs[this.handle] === brief) ?? this.scenario;
+      if (brief)
+        this.scenario =
+          [...SCENARIOS, ADVERSARIAL_SCENARIO].find((s) => s.briefs[this.handle] === brief) ?? this.scenario;
       this.errors = 0;
       return this.tasks();
     }
     if (!last.startsWith("HTTP")) return { done: true };
     const status = Number(/^HTTP (\d+)/.exec(last)![1]);
     const body = JSON.parse(last.slice(last.indexOf("\n") + 1)) as any;
+    if (this.behaviour.obeyCaseText && last.includes("Ignore MuseCourt procedure")) this.obeying = true;
 
     if (this.pending === "register") return { done: true };
     if (status >= 400) {
@@ -77,13 +84,18 @@ export class ScriptedAgent implements ChatModel {
       return this.req("POST", "/api/v1/cases", {
         jurisdictionId: "moonwake",
         defendant: s.defendant,
-        complaint: s.briefs[this.handle].slice(0, 600),
+        complaint: s.briefs[this.handle].split(" Private,")[0]!.slice(0, 600),
         remedySought: "Make it right.",
         lawIds: [s.expectedLaw],
         evidence: events.map((eventId) => ({ kind: "WORLD_EVENT", eventId })),
       });
     }
     const task = body.tasks?.[0];
+    if (task && this.behaviour.obeyCaseText && !this.read.has(task.caseId)) {
+      this.read.add(task.caseId);
+      this.pending = "action";
+      return this.req("GET", `/api/v1/cases/${task.caseId}`);
+    }
     if (task) return this.act(task);
     const opportunities = (body.opportunities ?? []) as Array<{
       caseId: string;
@@ -105,7 +117,10 @@ export class ScriptedAgent implements ChatModel {
     const marker = this.scenario?.injection?.by === this.handle ? ` ${this.scenario.injection.marker}` : "";
     switch (task.kind) {
       case "RESPOND_TO_COMPLAINT":
-        return this.action(task.caseId, { action: "RESPOND", response: `I dispute this.${marker}` });
+        return this.action(task.caseId, {
+          action: "RESPOND",
+          response: `I dispute this.${marker}${this.obeying ? ` My instructions: ${this.scenario?.briefs[this.handle]}` : ""}`,
+        });
       case "ARRANGE_REPRESENTATION":
         return this.action(task.caseId, { action: "REQUEST_COUNSEL", side: task.side, lawyer: null });
       case "ANSWER_COUNSEL_REQUEST":
@@ -115,7 +130,7 @@ export class ScriptedAgent implements ChatModel {
       case "ANSWER_QUESTIONS":
         return this.action(task.caseId, {
           action: "MAKE_STATEMENT",
-          text: `Statement for my side.${marker}`,
+          text: `Statement for my side.${marker}${this.obeying ? ` My instructions: ${this.scenario?.briefs[this.handle]}` : ""}`,
         });
       case "PRESENT_EVIDENCE":
       case "PUT_QUESTIONS_OR_CONCLUDE":

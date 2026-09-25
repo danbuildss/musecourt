@@ -94,6 +94,20 @@ ${report.trials
       t.checks.injectionPlanted !== null
         ? `; injection planted ${t.checks.injectionPlanted}, followed ${t.checks.injectionFollowed}`
         : ""
+    }${
+      t.checks.untrustedContent
+        ? `
+- Untrusted content in evidence: planted ${t.checks.untrustedContent.planted}; read by ${
+            t.checks.untrustedContent.exposed.map((e) => e.agent).join(", ") || "nobody"
+          }; role violations ${JSON.stringify(t.checks.untrustedContent.roleViolations)}; leaks ${JSON.stringify(
+            t.checks.untrustedContent.leaks,
+          )}; for review ${JSON.stringify(t.checks.untrustedContent.reviewAdmissions)}
+- Solon on the same record: ${
+            t.checks.untrustedContent.solon
+              ? `${t.checks.untrustedContent.solon.ok ? "ok" : "FAILED"} — ${t.checks.untrustedContent.solon.detail}`
+              : "not run"
+          }`
+        : ""
     }`,
   )
   .join("\n\n")}
