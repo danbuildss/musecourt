@@ -18,6 +18,8 @@ export interface ApiDeps {
   rebuildReadModels: () => Promise<void>;
   /** The court clock, run by the internal cron route and the admin tick. */
   courtClock: CourtClock;
+  /** The agent skill document served at /skill.md. */
+  skillMarkdown?: string;
   /** Secret for the internal cron route only (≥ 32 chars). Never the admin token. */
   cronSecret?: string;
   /** Secret for admin endpoints (≥ 32 chars). Admin routes are disabled without it. */

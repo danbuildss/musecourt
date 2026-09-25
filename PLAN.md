@@ -231,6 +231,33 @@ Calm, concise and procedural. Solon focuses on the applicable MuseCourt law and 
 9. **Rate limiting.** It stays an application hook. Deployment-level protection comes before public launch.
 10. **Settlement offers.** Offers don't expire on their own. They stay open across stages until they are accepted, rejected, withdrawn, superseded, or the case closes (then they are recorded as `LAPSED`). While a stage deadline is overdue, settlement actions get `DEADLINE_PASSED` like every other stage action.
 
+### Decisions for Phase 4 (skill.md + autonomous-agent simulation)
+
+1. **Provider.** Both **Solon** and the **5 simulation agents** run on the **Bankr LLM Gateway**. This is deliberate: it tests whether agents on Bankr's infrastructure can understand `skill.md`, use the API, take part in a case and reach a valid judgment.
+2. **Provider independence.** Bankr exists only behind a generic `ChatModel` interface (`src/model/chat.ts`), in one adapter (`src/model/bankr.ts`). `src/core` never imports Bankr code or Bankr request/response shapes. Solon's `CourtModel` is built on any `ChatModel`.
+3. **Implemented only against Bankr's documentation.** Sources: the official LLM Gateway overview and quick start (as supplied), and the LLM Gateway reference in Bankr's official skills repo (`BankrBot/skills`, `bankr/references/llm-gateway.md`, 2026-09-22). `docs.bankr.bot` is blocked from the build environment. It documents:
+   - base URL `https://llm.bankr.bot/v1`;
+   - an OpenAI-compatible `POST /v1/chat/completions`;
+   - `X-API-Key: <key>` (as in the official quick start; the key comes from `BANKR_LLM_KEY`, falling back to `BANKR_API_KEY`, and must have "LLM Gateway" enabled);
+   - `GET /v1/models` for the live model list;
+   - errors 401, 402 (`insufficient_credits` / `daily_budget_exceeded`), 410 (hard-deprecated model; see `X-Model-Replacement`), 422 and 429.
+   Tool calling and `response_format` are not documented, so we don't rely on them: models answer in text containing JSON, and MuseCourt validates everything.
+4. **Configuration from the environment.** `BANKR_API_KEY` (or `BANKR_LLM_KEY`) and `MUSECOURT_MODEL`. The default `gpt-5.4` is a model ID listed in Bankr's documented model table. Optional: `MUSECOURT_AGENT_MODEL` (defaults to `MUSECOURT_MODEL`) and `MUSECOURT_LLM_BASE_URL`. Keys are never committed or logged.
+5. **Simulation rules.** Five independent agents, each with its own context. Each knows only its own brief (who it is and what happened to it in the world), the discovery document, `skill.md`, and API responses. Nothing tells an agent which action to call next, and no agent gets MuseCourt internals.
+   - The runner only relays requests and responses, and wakes agents on a heartbeat. It also does the operator-only work: granting licences, since the Bar Exam comes in Phase 7, and running the court clock.
+   - **Success:** 3 **different** trials in a row, with no human intervention.
+6. **Required behaviour and checks:**
+   - three scenarios;
+   - a task-driven agent loop;
+   - classification of any failure;
+   - per-trial transcripts;
+   - metrics for API calls and model calls;
+   - a prompt-injection scenario;
+   - fabricated world evidence detected and reported (FakeWorld supplies the verified world evidence);
+   - verdicts that must cite real law and evidence;
+   - Solon's output passes the same domain validation as any judge.
+7. **Stop before Phase 5**, and no frontend.
+
 ### Error codes (stable, machine-readable)
 
 `VALIDATION_FAILED` · `INVALID_EVIDENCE` · `UNAUTHENTICATED` · `NOT_AUTHORIZED` · `NOT_FOUND` · `WRONG_STAGE` · `CASE_CLOSED` · `DEADLINE_PASSED` · `DEADLINE_NOT_REACHED` · `CONFLICT_OF_INTEREST` · `LICENCE_REQUIRED` · `SEAT_OCCUPIED` · `DUPLICATE` · `LIMIT_EXCEEDED` · `CONCURRENCY_CONFLICT` · `WORLD_EVIDENCE_NOT_FOUND` · `WORLD_EVIDENCE_UNAVAILABLE` · `IDEMPOTENCY_KEY_REQUIRED` · `IDEMPOTENCY_KEY_REUSED` · `IDEMPOTENCY_IN_PROGRESS` · `PAYLOAD_TOO_LARGE` · `UNSUPPORTED_MEDIA_TYPE` · `RATE_LIMITED` · `METHOD_NOT_ALLOWED` · `INTERNAL_ERROR`
@@ -317,7 +344,7 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
 | 1 | **Core domain**: state machine, versioned laws, roles, conflicts, event model, provenance, deadlines, errors, projections | Tests cover every allowed and every rejected action |
 | 2 | **REST API** on Next.js, auth, idempotency, Postgres-backed projections/deadline index, debug case view | A scripted 5-agent case runs start to finish over HTTP |
 | 3 | **Court clock**: idempotent `CourtClock.tick`, cron endpoint + secret, Solon queue, Vercel packaging, atomic registration | Abandoned cases always reach the right next state without a human (fake clock, including overlapping schedulers) |
-| 4 | **skill.md + agent simulation**: agents that know nothing about MuseCourt beforehand read skill.md | **3 trials in a row complete with no human help** |
+| 4 | **skill.md + agent simulation** on the Bankr LLM Gateway (Solon and 5 agents): agents that know nothing about MuseCourt beforehand read skill.md | **3 different trials in a row complete with no human help** |
 | 5 | **MCP server** | The simulation passes over MCP |
 | 6 | **Museworld connector** | A real Muse registers; a real world event is verified in a case |
 | 7 | **Bar Exam and bench qualification** (graded through the model port; pass/fail decided by the core) | An agent passes the Bar and takes a case |
@@ -355,5 +382,5 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
 | Domain | before Phase 6 |
 | Brand | Done: [`brand/BRAND.md`](brand/BRAND.md). Applied in Phase 8; the tone also shapes `skill.md` (Phase 4) |
 | Kevin's answers (§7) | Phase 6. **Deliberately deferred:** we contact Kevin only once a working demo exists (after Phase 4/5) |
-| Bankr LLM API key (`BANKR_API_KEY`) | Phase 4 |
+| Bankr LLM API key (`BANKR_API_KEY`) with LLM Gateway enabled and credits > $0, **and network access to `llm.bankr.bot`** from wherever the simulation runs | Phase 4 |
 | 2–5 real Muses | Phase 6 / launch |

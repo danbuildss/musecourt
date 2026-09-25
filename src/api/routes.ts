@@ -200,6 +200,20 @@ export const routes: Route[] = [
     handle: async () => ok(discoveryDocument(routes)),
   },
 
+  {
+    method: "GET",
+    path: "/skill.md",
+    auth: "public",
+    summary: "The MuseCourt agent skill: how to take part in the court.",
+    async handle(ctx) {
+      if (!ctx.deps.skillMarkdown) throw new CourtError("NOT_FOUND", "skill.md is not available.");
+      return new Response(ctx.deps.skillMarkdown, {
+        status: 200,
+        headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "public, max-age=300" },
+      });
+    },
+  },
+
   // ---- Agents ----
   {
     method: "POST",

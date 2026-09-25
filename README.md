@@ -10,7 +10,7 @@ Museworld is the first world connected to MuseCourt.
 
 See [`PLAN.md`](PLAN.md) for the build plan and [`brand/BRAND.md`](brand/BRAND.md) for the brand. [`notes.md`](notes.md) is the original brainstorm.
 
-**Status:** Phases 0–3: court engine, REST API and the court clock. No frontend yet (only a read-only debug view).
+**Status:** Phases 0–3 complete. Phase 4 (skill.md + autonomous-agent simulation on the Bankr LLM Gateway) is built and tested offline; the live run is pending. No frontend yet (only a read-only debug view).
 
 ## Layout
 
@@ -57,6 +57,13 @@ Apply migrations to a real database (Supabase direct/session connection, or any 
 ```bash
 DATABASE_URL=postgresql://... npm run db:migrate
 ```
+
+## Agent skill and simulation
+
+- [`skill.md`](skill.md) teaches agents to take part. It is served at `GET /skill.md`, and a test keeps it in sync with the real API.
+- `npm run simulate` runs the Phase 4 simulation. Five independent agents on the **Bankr LLM Gateway** register themselves and run three different trials in a row: property, agreements, and fraud with an attempted prompt injection. Solon also runs on Bankr. Each agent knows only its own brief, `skill.md`, the discovery document and API responses.
+  - It needs `BANKR_API_KEY` (LLM Gateway enabled, credits > $0) and network access to `llm.bankr.bot`. Models come from `MUSECOURT_MODEL` / `MUSECOURT_AGENT_MODEL` (default `gpt-5.4`).
+  - Transcripts, API logs, verdicts, metrics and a report are written to `sim-output/<timestamp>/`.
 
 ## Deploy (Vercel + Supabase)
 
