@@ -33,7 +33,7 @@ describe("Solon, the MuseCourt House Judge", () => {
     const t = await createTestCourt();
     const caseId = await caseBeforeSolon(t);
     const model = new FakeModel({ judgment: () => liable });
-    const state = await new HouseJudgeService(t.court, model).deliberate(caseId);
+    const state = await new HouseJudgeService(t.court, model, t.readModels).deliberate(caseId);
     expect(state.outcome).toBe("VERDICT");
     expect(state.verdict).toMatchObject({ judge: { kind: "HOUSE" }, finding: "LIABLE" });
 
@@ -48,9 +48,15 @@ describe("Solon, the MuseCourt House Judge", () => {
     const t = await createTestCourt();
     const caseId = await caseBeforeSolon(t);
     const model = new FakeModel({ judgment: () => ({ ...liable, citedEvidenceIds: ["ev_invented"] }) });
-    await expectCourtError(new HouseJudgeService(t.court, model).deliberate(caseId), "NOT_FOUND");
+    await expectCourtError(
+      new HouseJudgeService(t.court, model, t.readModels).deliberate(caseId),
+      "INVALID_EVIDENCE",
+    );
     const uncharged = new FakeModel({ judgment: () => ({ ...liable, citedLawIds: ["fraud"] }) });
-    await expectCourtError(new HouseJudgeService(t.court, uncharged).deliberate(caseId), "VALIDATION_FAILED");
+    await expectCourtError(
+      new HouseJudgeService(t.court, uncharged, t.readModels).deliberate(caseId),
+      "VALIDATION_FAILED",
+    );
     expect((await t.court.getCase(caseId))!.status).toBe("OPEN");
   });
 
@@ -62,21 +68,21 @@ describe("Solon, the MuseCourt House Judge", () => {
         throw new Error("model unavailable");
       },
     });
-    const service = new HouseJudgeService(t.court, failing);
+    const service = new HouseJudgeService(t.court, failing, t.readModels);
     expect(await service.deliberatePending()).toEqual([{ caseId, ok: false, error: "model unavailable" }]);
     const state = (await t.court.getCase(caseId))!;
     t.clock.set(state.deadline!);
     const retried = await t.court.expireDeadline(caseId);
     expect(retried).toMatchObject({ stage: "DELIBERATION", judge: { kind: "HOUSE" } });
 
-    const working = new HouseJudgeService(t.court, new FakeModel({ judgment: () => liable }));
+    const working = new HouseJudgeService(t.court, new FakeModel({ judgment: () => liable }), t.readModels);
     expect(await working.deliberatePending()).toEqual([{ caseId, ok: true }]);
   });
 
   it("only rules on cases it presides over in deliberation", async () => {
     const t = await createTestCourt();
     const { caseId } = await fileStandardCase(t);
-    const service = new HouseJudgeService(t.court, new FakeModel({ judgment: () => liable }));
+    const service = new HouseJudgeService(t.court, new FakeModel({ judgment: () => liable }), t.readModels);
     await expectCourtError(service.deliberate(caseId), "WRONG_STAGE");
     await expectCourtError(service.deliberate("case_missing"), "NOT_FOUND");
   });
@@ -86,7 +92,7 @@ describe("Solon, the MuseCourt House Judge", () => {
     const caseId = await caseBeforeSolon(t);
     await expectCourtError(
       t.act(caseId, t.agents.sol, { type: "IssueVerdict", finding: "NOT_LIABLE", reasoning: "I am Solon." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -94,7 +100,9 @@ describe("Solon, the MuseCourt House Judge", () => {
     const t = await createTestCourt();
     const caseId = await caseBeforeSolon(t);
     const run = (draft: HouseJudgmentDraft) =>
-      new HouseJudgeService(t.court, new FakeModel({ judgment: () => draft })).deliberate(caseId);
+      new HouseJudgeService(t.court, new FakeModel({ judgment: () => draft }), t.readModels).deliberate(
+        caseId,
+      );
     await expectCourtError(run({ ...liable, sentence: [] }), "VALIDATION_FAILED");
     await expectCourtError(run({ ...liable, citedLawIds: [] }), "VALIDATION_FAILED");
     await expectCourtError(run({ ...liable, finding: "NOT_LIABLE" }), "VALIDATION_FAILED");

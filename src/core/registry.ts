@@ -64,7 +64,7 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
         registeredAt: e.occurredAt,
         licences: {},
       });
-      state.handles.set(d.handle.toLowerCase(), d.agentId);
+      state.handles.set(normalizeHandle(d.handle), d.agentId);
       if (d.world) state.worldIdentities.set(worldKey(d.world.connectorId, d.world.worldAgentId), d.agentId);
       break;
     }
@@ -119,7 +119,35 @@ export function requireAgent(state: RegistryState, agentId: string): AgentRecord
 // Commands
 // ---------------------------------------------------------------------------
 
-const HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]*$/i;
+const HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/;
+
+/** Names that could be mistaken for the court itself. */
+export const RESERVED_HANDLES: ReadonlySet<string> = new Set([
+  "admin",
+  "administrator",
+  "api",
+  "clerk",
+  "court",
+  "house-judge",
+  "housejudge",
+  "judge",
+  "me",
+  "moderator",
+  "musecourt",
+  "muse-court",
+  "root",
+  "solon",
+  "staff",
+  "support",
+  "system",
+]);
+
+/** Canonical form of a handle: Unicode NFKC, trimmed, lower-case. */
+export function normalizeHandle(handle: string): string {
+  return handle.normalize("NFKC").trim().toLowerCase();
+}
 
 export interface RegisterAgentInput {
   agentId: string;
@@ -134,23 +162,29 @@ export function decideRegisterAgent(
   actor: Actor,
   input: RegisterAgentInput,
 ): CourtEvent[] {
-  if (actor.kind === "agent") fail("NOT_PERMITTED", "Agents cannot register other agents.");
-  const handle = requireText(input.handle, "handle", LIMITS.handleMin, LIMITS.handleMax);
+  if (actor.kind === "agent") fail("NOT_AUTHORIZED", "Agents cannot register other agents.");
+  if (typeof input.handle !== "string")
+    fail("VALIDATION_FAILED", "handle must be a string.", { field: "handle" });
+  const handle = requireText(normalizeHandle(input.handle), "handle", LIMITS.handleMin, LIMITS.handleMax);
   if (!HANDLE_PATTERN.test(handle)) {
     fail(
       "VALIDATION_FAILED",
       "handle may contain letters, digits, '-' and '_' and must start with a letter or digit.",
-      {
-        field: "handle",
-      },
+      { field: "handle" },
     );
   }
-  if (state.handles.has(handle.toLowerCase()))
-    fail("DUPLICATE", `Handle ${handle} is already taken.`, { handle });
+  if (RESERVED_HANDLES.has(handle))
+    fail("VALIDATION_FAILED", `Handle ${handle} is reserved.`, { field: "handle" });
+  if (state.handles.has(handle)) fail("DUPLICATE", `Handle ${handle} is already taken.`, { handle });
   if (state.agents.has(input.agentId)) fail("DUPLICATE", `Agent ${input.agentId} already exists.`);
   const displayName = input.displayName
     ? requireText(input.displayName, "displayName", 1, LIMITS.displayNameMax)
     : handle;
+  if (CONTROL_CHARS.test(displayName)) {
+    fail("VALIDATION_FAILED", "displayName must not contain control or invisible formatting characters.", {
+      field: "displayName",
+    });
+  }
   const ownerRef = input.ownerRef ? requireText(input.ownerRef, "ownerRef", 1, 200) : null;
   const world = input.world ?? null;
   if (world) {
@@ -175,7 +209,7 @@ export function decideGrantLicence(
   input: GrantLicenceInput,
 ): CourtEvent[] {
   // V0: admins grant by hand. Phase 7: the system grants after a passed exam.
-  if (actor.kind === "agent") fail("NOT_PERMITTED", "Licences are granted by the court, not by agents.");
+  if (actor.kind === "agent") fail("NOT_AUTHORIZED", "Licences are granted by the court, not by agents.");
   const via = actor.kind === "admin" ? "ADMIN" : "EXAM";
   const agent = requireAgent(state, input.agentId);
   if (hasActiveLicence(agent, input.licence)) {
@@ -200,7 +234,7 @@ export function decideRevokeLicence(
   actor: Actor,
   input: { agentId: string; licence: LicenceType; reason: string },
 ): CourtEvent[] {
-  if (actor.kind !== "admin") fail("NOT_PERMITTED", "Only an admin can revoke licences.");
+  if (actor.kind !== "admin") fail("NOT_AUTHORIZED", "Only an admin can revoke licences.");
   const agent = requireAgent(state, input.agentId);
   if (!hasActiveLicence(agent, input.licence)) {
     fail("NOT_FOUND", `${agent.handle} has no active ${input.licence} licence.`);

@@ -175,7 +175,7 @@ class Draft {
 // ---------------------------------------------------------------------------
 
 function requireAgentActor(actor: Actor): string {
-  if (actor.kind !== "agent") fail("NOT_PERMITTED", "This action must be taken by an agent.");
+  if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "This action must be taken by an agent.");
   return actor.agentId;
 }
 
@@ -200,30 +200,30 @@ function requireStageAction(state: CaseState, action: CaseAction): Stage {
 
 function currentRoleOf(state: CaseState, agentId: string): CaseRole {
   const holding = state.roles.find((h) => h.agentId === agentId && h.current);
-  return holding?.role ?? fail("NOT_PERMITTED", "You have no role in this case.");
+  return holding?.role ?? fail("NOT_AUTHORIZED", "You have no role in this case.");
 }
 
 function requireMemberSide(state: CaseState, agentId: string): Side {
-  return sideOfMember(state, agentId) ?? fail("NOT_PERMITTED", "Only a party or its counsel can do this.");
+  return sideOfMember(state, agentId) ?? fail("NOT_AUTHORIZED", "Only a party or its counsel can do this.");
 }
 
 function requireRepresentative(state: CaseState, agentId: string, side: Side): void {
   if (representativeOf(state, side) === agentId) return;
   if (partyOf(state, side) === agentId) {
-    fail("NOT_PERMITTED", "You are represented by counsel; your counsel acts for you in this stage.", {
+    fail("NOT_AUTHORIZED", "You are represented by counsel; your counsel acts for you in this stage.", {
       side,
     });
   }
-  fail("NOT_PERMITTED", `Only the ${side} side's representative can act in this stage.`, { side });
+  fail("NOT_AUTHORIZED", `Only the ${side} side's representative can act in this stage.`, { side });
 }
 
 /** Resolves who is acting as judge; the house judge acts through the SYSTEM actor. */
 function requireJudge(state: CaseState, actor: Actor): JudgeSeat {
   const judge = state.judge;
-  if (!judge) fail("NOT_PERMITTED", "No judge is seated in this case.");
+  if (!judge) fail("NOT_AUTHORIZED", "No judge is seated in this case.");
   if (judge.kind === "AGENT" && actor.kind === "agent" && actor.agentId === judge.agentId) return judge;
   if (judge.kind === "HOUSE" && actor.kind === "system") return judge;
-  fail("NOT_PERMITTED", "Only the presiding judge can do this.");
+  fail("NOT_AUTHORIZED", "Only the presiding judge can do this.");
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ function recordAgentEvidence(
     case "TESTIMONY": {
       if (partyOf(state, side) !== agentId) {
         fail(
-          "NOT_PERMITTED",
+          "NOT_AUTHORIZED",
           "Testimony is a party's own account; only the plaintiff or defendant can give it.",
         );
       }
@@ -314,7 +314,7 @@ function recordAgentEvidence(
       return;
     }
     default:
-      fail("VALIDATION_FAILED", "evidence.kind must be WORLD_EVENT, DOCUMENT or TESTIMONY.");
+      fail("INVALID_EVIDENCE", "evidence.kind must be WORLD_EVENT, DOCUMENT or TESTIMONY.");
   }
 }
 
@@ -337,7 +337,7 @@ function requireActiveEvidenceIds(state: CaseState, ids: string[]): void {
   const active = new Set(activeEvidence(state).map((e) => e.evidenceId));
   for (const id of ids) {
     if (!active.has(id))
-      fail("NOT_FOUND", `Evidence ${id} is not in the record (or was withdrawn).`, { evidenceId: id });
+      fail("INVALID_EVIDENCE", `Evidence ${id} is not in the record (or was withdrawn).`, { evidenceId: id });
   }
 }
 
@@ -419,7 +419,16 @@ export function decideCase(state: CaseState | null, command: CaseCommand, ctx: C
   if (!state) fail("NOT_FOUND", "Case not found.");
   const draft = new Draft(state, ctx);
   const action = COMMAND_ACTION[command.type];
-  if (action) requireStageAction(state, action);
+  if (action) {
+    const stage = requireStageAction(state, action);
+    // A stage's deadline is final: late actions fail until the court clock applies the timeout.
+    if (ctx.now.getTime() >= new Date(state.deadline!).getTime()) {
+      fail("DEADLINE_PASSED", `The ${stage} deadline (${state.deadline}) has passed.`, {
+        stage,
+        deadline: state.deadline,
+      });
+    }
+  }
   handle(draft, command);
   autoProgress(draft);
   assertRosterInvariants(draft.case, ctx.registry);
@@ -434,7 +443,7 @@ function handle(draft: Draft, command: CaseCommand): void {
     case "RespondToComplaint": {
       const agentId = requireAgentActor(actor);
       if (requireMemberSide(state, agentId) !== "DEFENCE") {
-        fail("NOT_PERMITTED", "Only the defendant or defence counsel can answer the complaint.");
+        fail("NOT_AUTHORIZED", "Only the defendant or defence counsel can answer the complaint.");
       }
       const response = requireText(command.response, "response", LIMITS.responseMin, LIMITS.responseMax);
       draft.emit(
@@ -450,7 +459,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       const agentId = requireAgentActor(actor);
       const side = requireSide(command.side);
       if (partyOf(state, side) !== agentId)
-        fail("NOT_PERMITTED", "Only the party itself can request counsel.");
+        fail("NOT_AUTHORIZED", "Only the party itself can request counsel.");
       if (counselOf(state, side)) fail("SEAT_OCCUPIED", "This side already has counsel.", { side });
       const lawyerId = command.lawyerId ?? null;
       if (lawyerId) assertCanTakeRole(state, registry, lawyerId, counselRoleFor(side));
@@ -464,7 +473,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       const request =
         state.counselRequests[side] ?? fail("NOT_FOUND", "There is no pending request for counsel.");
       if (request.lawyerId && request.lawyerId !== agentId) {
-        fail("NOT_PERMITTED", "This request for counsel was made to a different lawyer.");
+        fail("NOT_AUTHORIZED", "This request for counsel was made to a different lawyer.");
       }
       assertCanTakeRole(state, registry, agentId, counselRoleFor(side));
       draft.emit(event("CounselAppointed", { side, lawyerId: agentId }));
@@ -486,7 +495,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       const agentId = requireAgentActor(actor);
       const side = requireSide(command.side);
       if (partyOf(state, side) !== agentId)
-        fail("NOT_PERMITTED", "Only the party itself can choose self-representation.");
+        fail("NOT_AUTHORIZED", "Only the party itself can choose self-representation.");
       if (counselOf(state, side))
         fail("SEAT_OCCUPIED", "This side has counsel; counsel must withdraw first.");
       if (state.representation[side].mode === "SELF") fail("DUPLICATE", "Already self-represented.");
@@ -498,7 +507,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       const agentId = requireAgentActor(actor);
       const side =
         SIDES.find((s) => counselOf(state, s) === agentId) ??
-        fail("NOT_PERMITTED", "You are not counsel in this case.");
+        fail("NOT_AUTHORIZED", "You are not counsel in this case.");
       const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
       draft.emit(event("CounselWithdrew", { side, lawyerId: agentId, reason }));
       return;
@@ -521,7 +530,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       const stage = state.stage!;
       const side: Side = stage === "EVIDENCE_PLAINTIFF" ? "PLAINTIFF" : "DEFENCE";
       if (requireMemberSide(state, agentId) !== side) {
-        fail("NOT_PERMITTED", `Only the ${side} side can submit evidence during ${stage}.`);
+        fail("NOT_AUTHORIZED", `Only the ${side} side can submit evidence during ${stage}.`);
       }
       recordAgentEvidence(draft, agentId, side, stage, command.evidence);
       return;
@@ -533,9 +542,9 @@ function handle(draft: Draft, command: CaseCommand): void {
         state.evidence.find((e) => e.evidenceId === command.evidenceId) ??
         fail("NOT_FOUND", `Evidence ${command.evidenceId} not found.`);
       if (item.withdrawn) fail("DUPLICATE", "Evidence already withdrawn.");
-      if (item.submittedBy.kind === "COURT") fail("NOT_PERMITTED", "Court records cannot be withdrawn.");
+      if (item.submittedBy.kind === "COURT") fail("NOT_AUTHORIZED", "Court records cannot be withdrawn.");
       if (requireMemberSide(state, agentId) !== item.side) {
-        fail("NOT_PERMITTED", "Only the side that submitted evidence can withdraw it.");
+        fail("NOT_AUTHORIZED", "Only the side that submitted evidence can withdraw it.");
       }
       const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
       draft.emit(event("EvidenceWithdrawn", { evidenceId: item.evidenceId, byAgentId: agentId, reason }));
@@ -577,7 +586,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       if (!offer) fail("NOT_FOUND", `No open settlement offer ${command.offerId}.`);
       const side = requireMemberSide(state, agentId);
       if (side !== otherSide(offer.fromSide))
-        fail("NOT_PERMITTED", "Only the other side can answer a settlement offer.");
+        fail("NOT_AUTHORIZED", "Only the other side can answer a settlement offer.");
       if (command.decision === "ACCEPT") {
         draft.emit(
           event("SettlementAccepted", {
@@ -601,7 +610,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       const offer = state.offers.find((o) => o.offerId === command.offerId && o.status === "OPEN");
       if (!offer) fail("NOT_FOUND", `No open settlement offer ${command.offerId}.`);
       if (requireMemberSide(state, agentId) !== offer.fromSide) {
-        fail("NOT_PERMITTED", "Only the side that made an offer can withdraw it.");
+        fail("NOT_AUTHORIZED", "Only the side that made an offer can withdraw it.");
       }
       draft.emit(event("SettlementOfferWithdrawn", { offerId: offer.offerId, reason: "WITHDRAWN" }));
       return;
@@ -610,7 +619,7 @@ function handle(draft: Draft, command: CaseCommand): void {
     case "WithdrawCase": {
       const agentId = requireAgentActor(actor);
       if (requireMemberSide(state, agentId) !== "PLAINTIFF") {
-        fail("NOT_PERMITTED", "Only the plaintiff or plaintiff counsel can withdraw the case.");
+        fail("NOT_AUTHORIZED", "Only the plaintiff or plaintiff counsel can withdraw the case.");
       }
       const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
       draft.emit(event("CaseWithdrawn", { byAgentId: agentId, reason }));
@@ -633,7 +642,7 @@ function handle(draft: Draft, command: CaseCommand): void {
       return expireDeadline(draft);
 
     case "CorrectRecord": {
-      if (actor.kind !== "admin") fail("NOT_PERMITTED", "Only an admin can append a record correction.");
+      if (actor.kind !== "admin") fail("NOT_AUTHORIZED", "Only an admin can append a record correction.");
       const target = command.targetStreamVersion;
       if (!Number.isInteger(target) || target < 1 || target > state.version) {
         fail("VALIDATION_FAILED", "targetStreamVersion must reference an existing event in this case.");
@@ -667,7 +676,7 @@ function makeStatement(draft: Draft, command: Extract<CaseCommand, { type: "Make
 
   if (kind === "QUESTION") {
     const judge = requireJudge(state, draft.ctx.actor);
-    if (judge.kind !== "AGENT") fail("NOT_PERMITTED", "The house judge does not put questions.");
+    if (judge.kind !== "AGENT") fail("NOT_AUTHORIZED", "The house judge does not put questions.");
     const addressedTo = requireStringArray(command.addressedTo, "addressedTo").map(requireSide);
     if (addressedTo.length === 0)
       fail("VALIDATION_FAILED", "Questions must be addressed to at least one side.");
@@ -692,9 +701,9 @@ function makeStatement(draft: Draft, command: Extract<CaseCommand, { type: "Make
   let side: Side;
   if (kind === "ANSWER") {
     side =
-      sideRepresentedBy(state, agentId) ?? fail("NOT_PERMITTED", "Only a side's representative can answer.");
+      sideRepresentedBy(state, agentId) ?? fail("NOT_AUTHORIZED", "Only a side's representative can answer.");
     if (!state.questionsAddressedTo.includes(side)) {
-      fail("NOT_PERMITTED", "The judge did not address questions to your side.", { side });
+      fail("NOT_AUTHORIZED", "The judge did not address questions to your side.", { side });
     }
   } else {
     if (spec.mustAct.kind !== "SIDE") fail("WRONG_STAGE", "No arguments are heard in this stage.");
@@ -790,7 +799,7 @@ const SIDE_NAME: Record<Side, string> = { PLAINTIFF: "plaintiff", DEFENCE: "defe
 
 function expireDeadline(draft: Draft): void {
   const state = draft.case;
-  if (draft.ctx.actor.kind !== "system") fail("NOT_PERMITTED", "Only the court clock can expire deadlines.");
+  if (draft.ctx.actor.kind !== "system") fail("NOT_AUTHORIZED", "Only the court clock can expire deadlines.");
   const stage = requireOpen(state);
   const deadline = state.deadline!;
   if (draft.ctx.now.getTime() < new Date(deadline).getTime()) {

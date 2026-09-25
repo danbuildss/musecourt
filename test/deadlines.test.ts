@@ -31,8 +31,8 @@ describe("deadlines", () => {
     t.clock.advanceHours(47);
     await expectCourtError(t.court.expireDeadline(caseId), "DEADLINE_NOT_REACHED");
     t.clock.advanceHours(1);
-    await expectCourtError(t.act(caseId, t.agents.maple, { type: "ExpireDeadline" }), "NOT_PERMITTED");
-    await expectCourtError(t.court.act(caseId, t.admin, { type: "ExpireDeadline" }), "NOT_PERMITTED");
+    await expectCourtError(t.act(caseId, t.agents.maple, { type: "ExpireDeadline" }), "NOT_AUTHORIZED");
+    await expectCourtError(t.court.act(caseId, t.admin, { type: "ExpireDeadline" }), "NOT_AUTHORIZED");
     const state = await t.court.expireDeadline(caseId);
     expect(state.stage).toBe("PRE_TRIAL");
   });
@@ -163,7 +163,7 @@ describe("deadlines", () => {
     // The replaced judge can no longer rule.
     await expectCourtError(
       t.act(caseId, t.agents.sol, { type: "IssueVerdict", finding: "NOT_LIABLE", reasoning: "Late." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     const firstDeadline = state.deadline;
     state = await expireCurrent(t, caseId);
@@ -251,5 +251,36 @@ describe("deadline policy validation", () => {
     const t = await createTestCourt();
     const { caseId } = await fileStandardCase(t);
     await expectCourtError(t.court.act(caseId, SYSTEM, { type: "ExpireDeadline" }), "DEADLINE_NOT_REACHED");
+  });
+});
+
+describe("acting after a deadline", () => {
+  it("fails with DEADLINE_PASSED for every stage action until the clock applies the timeout", async () => {
+    const t = await createTestCourt();
+    const { caseId } = await fileStandardCase(t);
+    t.clock.advanceHours(48);
+    await expectCourtError(
+      t.act(caseId, t.agents.nova, { type: "RespondToComplaint", response: "Late." }),
+      "DEADLINE_PASSED",
+    );
+    await expectCourtError(
+      t.act(caseId, t.agents.maple, { type: "OfferSettlement", terms: "Late." }),
+      "DEADLINE_PASSED",
+    );
+    await expectCourtError(t.act(caseId, t.agents.sol, { type: "VolunteerAsJudge" }), "DEADLINE_PASSED");
+    // Stage checks still come first, and admin corrections are not stage actions.
+    await expectCourtError(
+      t.act(caseId, t.agents.sol, { type: "IssueVerdict", finding: "LIABLE", reasoning: "x" }),
+      "WRONG_STAGE",
+    );
+    await t.court.act(caseId, t.admin, {
+      type: "CorrectRecord",
+      targetStreamVersion: 1,
+      note: "Still allowed.",
+    });
+    const state = await t.court.expireDeadline(caseId);
+    expect(state.stage).toBe("PRE_TRIAL");
+    const ok = await t.act(caseId, t.agents.sol, { type: "VolunteerAsJudge" });
+    expect(ok.judge).toEqual({ kind: "AGENT", agentId: t.agents.sol });
   });
 });

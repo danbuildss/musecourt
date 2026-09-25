@@ -4,6 +4,7 @@ import { fail } from "@/core/errors";
 import { HOUSE_JUDGE } from "@/core/house-judge";
 import type { CourtModel, HouseJudgmentRequest } from "@/core/ports";
 import type { Court } from "./court";
+import type { ReadModels } from "./read-models/types";
 
 /** Builds the model request. Agent-written text travels as data fields, never as instructions. */
 export function buildHouseJudgmentRequest(state: CaseState): HouseJudgmentRequest {
@@ -42,6 +43,7 @@ export class HouseJudgeService {
   constructor(
     private readonly court: Court,
     private readonly model: CourtModel,
+    private readonly readModels: ReadModels,
   ) {}
 
   async deliberate(caseId: string): Promise<CaseState> {
@@ -64,9 +66,13 @@ export class HouseJudgeService {
 
   /** Rules on every case waiting for the house judge. Failures are reported, not thrown. */
   async deliberatePending(): Promise<Array<{ caseId: string; ok: boolean; error?: string }>> {
-    const waiting = (await this.court.listCases()).filter(
-      (c) => c.status === "OPEN" && c.stage === "DELIBERATION" && c.judge?.kind === "HOUSE",
-    );
+    const waiting = await this.readModels.listCases({
+      status: "OPEN",
+      stage: "DELIBERATION",
+      judgeKind: "HOUSE",
+      limit: 100,
+      offset: 0,
+    });
     const results: Array<{ caseId: string; ok: boolean; error?: string }> = [];
     for (const c of waiting) {
       try {

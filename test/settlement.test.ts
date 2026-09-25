@@ -62,15 +62,15 @@ describe("settlements", () => {
     const offerId = state.offers[0]!.offerId;
     await expectCourtError(
       t.act(caseId, t.agents.maple, { type: "RespondToSettlement", offerId, decision: "ACCEPT" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.act(caseId, t.agents.bob, { type: "RespondToSettlement", offerId, decision: "ACCEPT" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.act(caseId, t.agents.bob, { type: "OfferSettlement", terms: "Me too." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -80,7 +80,7 @@ describe("settlements", () => {
     await t.act(caseId, t.agents.sol, { type: "VolunteerAsJudge" });
     await expectCourtError(
       t.act(caseId, t.agents.sol, { type: "OfferSettlement", terms: "Settle!" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -112,7 +112,7 @@ describe("settlements", () => {
     const offerId = state.offers[0]!.offerId;
     await expectCourtError(
       t.act(caseId, t.agents.maple, { type: "WithdrawSettlementOffer", offerId }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     const after = await t.act(caseId, t.agents.nova, { type: "WithdrawSettlementOffer", offerId });
     expect(after.offers[0]!.status).toBe("WITHDRAWN");

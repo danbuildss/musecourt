@@ -166,7 +166,7 @@ describe("agent registry", () => {
     const t = await createTestCourt();
     await expectCourtError(
       t.court.revokeLicence({ agentId: t.agents.sol, licence: "LAWYER", reason: "x" }, t.as(t.agents.maple)),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     const sol = await t.court.revokeLicence(
       { agentId: t.agents.sol, licence: "LAWYER", reason: "Fabricated evidence." },
@@ -189,5 +189,20 @@ describe("agent registry", () => {
   it("cannot file against an unregistered agent", async () => {
     const t = await createTestCourt();
     await expectCourtError(fileStandardCase(t, { defendant: "agent_ghost" }), "NOT_FOUND");
+  });
+});
+
+describe("handle normalisation", () => {
+  it("stores the NFKC lower-case form and rejects reserved names", async () => {
+    const t = await createTestCourt();
+    const agent = await t.court.registerAgent({ handle: "  Ｗｉｌｌｏｗ " });
+    expect(agent.handle).toBe("willow");
+    for (const reserved of ["Solon", "admin", "MUSECOURT", "house-judge", "system", "me"]) {
+      await expectCourtError(t.court.registerAgent({ handle: reserved }), "VALIDATION_FAILED");
+    }
+    await expectCourtError(
+      t.court.registerAgent({ handle: "fine", displayName: "bad\u0007bell" }),
+      "VALIDATION_FAILED",
+    );
   });
 });

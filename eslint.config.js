@@ -12,6 +12,11 @@ export default tseslint.config(
     },
   },
   {
+    // Tests handle untyped JSON responses from the API.
+    files: ["test/**/*.ts"],
+    rules: { "@typescript-eslint/no-explicit-any": "off" },
+  },
+  {
     // The core is deterministic domain logic: no IO, no providers, no world-specific code.
     files: ["src/core/**/*.ts"],
     rules: {

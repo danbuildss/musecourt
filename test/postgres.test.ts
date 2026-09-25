@@ -2,6 +2,7 @@ import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { agentActor } from "@/core/actor";
 import { event } from "@/core/events";
+import { createPostgresBackend } from "@/infra/backends";
 import { migrate } from "@/infra/migrate";
 import { PostgresEventStore } from "@/infra/postgres-event-store";
 import { eventStoreContract } from "./event-store-contract";
@@ -30,7 +31,10 @@ describe.skipIf(!pool)("Postgres", () => {
     it("are idempotent and recorded", async () => {
       expect(await migrate(pool!)).toEqual([]);
       const { rows } = await pool!.query("SELECT name FROM musecourt.schema_migrations ORDER BY name");
-      expect(rows.map((r) => r.name)).toEqual(["0001_event_store.sql"]);
+      expect(rows.map((r) => r.name)).toEqual([
+        "0001_event_store.sql",
+        "0002_read_models_auth_idempotency.sql",
+      ]);
     });
 
     it("keep MuseCourt out of the public schema", async () => {
@@ -81,7 +85,7 @@ describe.skipIf(!pool)("Postgres", () => {
   });
 
   it("runs a full trial on Postgres and rebuilds identical state from the stored log", async () => {
-    const t = await createTestCourt({ store: new PostgresEventStore(pool!) });
+    const t = await createTestCourt({ backend: createPostgresBackend(pool!) });
     const { caseId } = await fileStandardCase(t);
     await driveToDeliberation(t, caseId);
     const closed = await t.act(caseId, t.agents.sol, {
@@ -94,7 +98,7 @@ describe.skipIf(!pool)("Postgres", () => {
     });
     expect(closed.outcome).toBe("VERDICT");
     expect(closed.evidence[0]!.world!.snapshot.eventId).toBe("action_72882");
-    const cases = await t.court.listCases();
+    const cases = await t.court.replayAllCases();
     expect(cases).toEqual([closed]);
   });
 });

@@ -27,6 +27,8 @@ import {
   type JurisdictionState,
 } from "@/core/jurisdiction";
 import type { EventStore, WorldConnector } from "@/core/ports";
+import { opportunitiesForAgent, type Opportunity } from "./projections/tasks";
+import type { ReadModels } from "./read-models/types";
 import { DEFAULT_DEADLINE_POLICY, validateDeadlinePolicy, type DeadlinePolicy } from "@/core/procedure";
 import {
   buildRegistry,
@@ -40,6 +42,8 @@ import {
 
 export interface CourtDeps {
   store: EventStore;
+  /** Derived query state, kept in step with the store by the projector. */
+  readModels: ReadModels;
   clock: Clock;
   ids: IdGenerator;
   connectors?: WorldConnector[];
@@ -213,29 +217,42 @@ export class Court {
     return this.act(caseId, SYSTEM, { type: "ExpireDeadline" });
   }
 
-  /** Expires every deadline that has passed. Safe to run repeatedly (cron / on read). */
-  async processDueDeadlines(): Promise<
-    Array<{ caseId: string; result: "EXPIRED" | "SKIPPED"; code?: string }>
-  > {
-    const now = this.deps.clock.now().getTime();
-    const due = (await this.listCases()).filter(
-      (c) => c.status === "OPEN" && c.deadline && new Date(c.deadline).getTime() <= now,
-    );
+  /** Expires every deadline that has passed. Safe to run repeatedly and concurrently (cron). */
+  async processDueDeadlines(
+    limit = 500,
+  ): Promise<Array<{ caseId: string; result: "EXPIRED" | "SKIPPED"; code?: string }>> {
+    const due = await this.deps.readModels.dueCaseIds(this.deps.clock.now(), limit);
     const results: Array<{ caseId: string; result: "EXPIRED" | "SKIPPED"; code?: string }> = [];
-    for (const c of due) {
+    for (const caseId of due) {
       try {
-        await this.expireDeadline(c.caseId);
-        results.push({ caseId: c.caseId, result: "EXPIRED" });
+        await this.expireDeadline(caseId);
+        results.push({ caseId, result: "EXPIRED" });
       } catch (error) {
         // Another worker got there first; the case has already moved on.
         if (isCourtError(error, "DEADLINE_NOT_REACHED") || isCourtError(error, "CASE_CLOSED")) {
-          results.push({ caseId: c.caseId, result: "SKIPPED", code: error.code });
+          results.push({ caseId, result: "SKIPPED", code: error.code });
         } else {
           throw error;
         }
       }
     }
     return results;
+  }
+
+  /** Open counsel requests and empty benches this agent is eligible to take (conflict-checked). */
+  async findOpportunities(agentId: string, limit = 50): Promise<Opportunity[]> {
+    const candidates = new Map<string, true>();
+    for (const needs of ["LAWYER", "JUDGE"] as const) {
+      for (const c of await this.deps.readModels.listCases({ status: "OPEN", needs, limit, offset: 0 })) {
+        candidates.set(c.caseId, true);
+      }
+    }
+    const states: CaseState[] = [];
+    for (const caseId of candidates.keys()) {
+      const state = await this.getCase(caseId);
+      if (state) states.push(state);
+    }
+    return opportunitiesForAgent(agentId, states, await this.getRegistry());
   }
 
   // -------------------------------------------------------------------------
@@ -258,8 +275,11 @@ export class Court {
     return this.deps.store.readStream(caseStream(caseId));
   }
 
-  /** Phase 1: folds the whole log. Phase 2 replaces this with a Postgres read model. */
-  async listCases(): Promise<CaseState[]> {
+  /**
+   * Replays every case from the full log. For rebuilds, tests and audits only:
+   * API reads go through the read models.
+   */
+  async replayAllCases(): Promise<CaseState[]> {
     const byStream = new Map<string, StoredEvent[]>();
     for (const e of await this.deps.store.readAll()) {
       if (!e.streamId.startsWith("case:")) continue;

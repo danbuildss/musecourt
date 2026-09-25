@@ -15,10 +15,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx scripts/migrate.ts",
-    "check": "npm run lint && npm run format && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run format && npm run typecheck && npm run test",
+    "serve": "tsx scripts/serve.ts"
   },
   "dependencies": {
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
