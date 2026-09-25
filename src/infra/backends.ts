@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { CredentialStore, IdempotencyStore } from "@/api/stores";
 import type { EventStore } from "@/core/ports";
+import type { ClockLease } from "@/court/court-clock";
 import { projectEvents, rebuildFromLog } from "@/court/read-models/projector";
 import type { ReadModels } from "@/court/read-models/types";
 import { MemoryCredentialStore, MemoryIdempotencyStore } from "./memory-auth-stores";
@@ -16,6 +17,8 @@ export interface Backend {
   readModels: ReadModels;
   credentials: CredentialStore;
   idempotency: IdempotencyStore;
+  /** Best-effort lease so overlapping clock runs don't duplicate work. */
+  clockLease: ClockLease;
   /** Drops all read models and rebuilds them from the event log. */
   rebuildReadModels(): Promise<void>;
   /** Snapshot of all read-model rows (consistency tests). */
@@ -32,6 +35,7 @@ export function createMemoryBackend(): Backend & { credentials: MemoryCredential
     readModels,
     credentials: new MemoryCredentialStore(),
     idempotency: new MemoryIdempotencyStore(),
+    clockLease: memoryLease(),
     rebuildReadModels: async () => rebuildFromLog(await store.readAll(), readModels),
     dumpReadModels: async () => readModels.dump(),
   };
@@ -52,6 +56,7 @@ export function createPostgresBackend(pool: Pool): Backend {
     readModels,
     credentials: new PostgresCredentialStore(pool),
     idempotency: new PostgresIdempotencyStore(pool),
+    clockLease: postgresLease(pool),
     async rebuildReadModels() {
       const client = await pool.connect();
       try {
@@ -69,5 +74,46 @@ export function createPostgresBackend(pool: Pool): Backend {
       }
     },
     dumpReadModels: () => readModels.dump(),
+  };
+}
+
+function memoryLease(): ClockLease {
+  let held = false;
+  return {
+    async tryAcquire() {
+      if (held) return null;
+      held = true;
+      return async () => {
+        held = false;
+      };
+    },
+  };
+}
+
+/** Session advisory lock on a dedicated connection; released explicitly or when the connection dies. */
+function postgresLease(pool: Pool): ClockLease {
+  return {
+    async tryAcquire() {
+      const client = await pool.connect();
+      try {
+        const { rows } = await client.query<{ ok: boolean }>(
+          "SELECT pg_try_advisory_lock(hashtext('musecourt_clock')) AS ok",
+        );
+        if (!rows[0]?.ok) {
+          client.release();
+          return null;
+        }
+      } catch (error) {
+        client.release();
+        throw error;
+      }
+      return async () => {
+        try {
+          await client.query("SELECT pg_advisory_unlock(hashtext('musecourt_clock'))");
+        } finally {
+          client.release();
+        }
+      };
+    },
   };
 }

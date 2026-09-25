@@ -4,3 +4,5 @@ coverage
 .env.local
 .next
 *.log
+.vercel
+dist

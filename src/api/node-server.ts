@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { errorResponse } from "./http";
 import { ApiError } from "./errors";
 import type { MuseCourtApi } from "./app";
@@ -8,7 +8,21 @@ import type { MuseCourtApi } from "./app";
  * streaming, before the handler sees them.
  */
 export function createNodeServer(api: MuseCourtApi, options: { maxBodyBytes: number }): Server {
-  return createServer(async (req, res) => {
+  return createServer(createNodeHandler(api, options));
+}
+
+export interface NodeHandlerOptions {
+  maxBodyBytes: number;
+  /** Rewrites the incoming URL before routing (e.g. to undo a platform rewrite). */
+  rewriteUrl?: (url: string) => string;
+}
+
+/** A plain `(req, res)` handler, usable by node:http or serverless platforms such as Vercel. */
+export function createNodeHandler(
+  api: MuseCourtApi,
+  options: NodeHandlerOptions,
+): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+  return async (req, res) => {
     let response: Response;
     try {
       const body = await readBody(req, options.maxBodyBytes);
@@ -17,7 +31,8 @@ export function createNodeServer(api: MuseCourtApi, options: { maxBodyBytes: num
         if (Array.isArray(value)) value.forEach((v) => headers.append(key, v));
         else if (value !== undefined) headers.set(key, value);
       }
-      const request = new Request(`http://${req.headers.host ?? "localhost"}${req.url ?? "/"}`, {
+      const path = options.rewriteUrl ? options.rewriteUrl(req.url ?? "/") : (req.url ?? "/");
+      const request = new Request(`http://${req.headers.host ?? "localhost"}${path}`, {
         method: req.method,
         headers,
         body: body && body.length > 0 ? new Uint8Array(body) : undefined,
@@ -32,7 +47,7 @@ export function createNodeServer(api: MuseCourtApi, options: { maxBodyBytes: num
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));
     res.end(Buffer.from(await response.arrayBuffer()));
-  });
+  };
 }
 
 function readBody(req: IncomingMessage, maxBytes: number): Promise<Buffer | null> {

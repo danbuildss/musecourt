@@ -66,7 +66,13 @@ describe.each(BACKENDS)("read models (%s)", (backend) => {
       for (const state of await h.court.replayAllCases()) {
         const fromApi = (await h.get(`/api/v1/cases/${state.caseId}`)).body.case;
         const replayed = buildCase(await h.court.getCaseEvents(state.caseId))!;
-        expect(fromApi).toEqual(JSON.parse(JSON.stringify(toCaseView(replayed, registry))));
+        // `stage.overdue` is computed at read time, not stored; compare everything else.
+        const expected = JSON.parse(JSON.stringify(toCaseView(replayed, registry)));
+        expect(
+          fromApi.stage ? { ...fromApi, stage: { ...fromApi.stage, overdue: undefined } } : fromApi,
+        ).toEqual(
+          expected.stage ? { ...expected, stage: { ...expected.stage, overdue: undefined } } : expected,
+        );
       }
       for (const agent of Object.values(agents)) {
         const expected = (await h.court.replayAllCases())
@@ -77,7 +83,8 @@ describe.each(BACKENDS)("read models (%s)", (backend) => {
               a.caseNumber.localeCompare(b.caseNumber) ||
               a.kind.localeCompare(b.kind),
           );
-        expect((await h.tasks(agent)).tasks).toEqual(JSON.parse(JSON.stringify(expected)));
+        const fromApiTasks = (await h.tasks(agent)).tasks.map(({ overdue: _overdue, ...task }: any) => task);
+        expect(fromApiTasks).toEqual(JSON.parse(JSON.stringify(expected)));
       }
     } finally {
       await h.close();

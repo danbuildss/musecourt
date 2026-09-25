@@ -1,6 +1,8 @@
 import type { Clock } from "@/core/clock";
 import type { IdGenerator } from "@/core/ids";
-import type { WorldConnector } from "@/core/ports";
+import type { CourtModel, WorldConnector } from "@/core/ports";
+import { CourtClock } from "@/court/court-clock";
+import { HouseJudgeService } from "@/court/house-judge-service";
 import type { DeadlinePolicy } from "@/core/procedure";
 import { Court } from "@/court/court";
 import type { Backend } from "@/infra/backends";
@@ -14,6 +16,9 @@ export interface MuseCourtAppOptions {
   connectors?: WorldConnector[];
   deadlinePolicy?: DeadlinePolicy;
   adminToken?: string;
+  cronSecret?: string;
+  /** Model behind Solon's drafts. Without one, Solon cases wait (Phase 4 adds the Bankr adapter). */
+  model?: CourtModel;
   registrationLimiter?: RateLimiter;
   trustProxy?: boolean;
   maxBodyBytes?: number;
@@ -22,7 +27,11 @@ export interface MuseCourtAppOptions {
 }
 
 /** Composition root: one Court and one API over a backend. */
-export function createMuseCourtApp(options: MuseCourtAppOptions): { court: Court; api: MuseCourtApi } {
+export function createMuseCourtApp(options: MuseCourtAppOptions): {
+  court: Court;
+  api: MuseCourtApi;
+  courtClock: CourtClock;
+} {
   const { backend } = options;
   const court = new Court({
     store: backend.store,
@@ -32,7 +41,16 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): { court: Court
     connectors: options.connectors,
     deadlinePolicy: options.deadlinePolicy,
   });
+  const courtClock = new CourtClock({
+    court,
+    readModels: backend.readModels,
+    clock: options.clock,
+    houseJudge: options.model ? new HouseJudgeService(court, options.model, backend.readModels) : undefined,
+    lease: backend.clockLease,
+  });
   const api = createApi({
+    courtClock,
+    cronSecret: options.cronSecret,
     court,
     readModels: backend.readModels,
     credentials: backend.credentials,
@@ -46,5 +64,5 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): { court: Court
     idempotencyWaitMs: options.idempotencyWaitMs,
     onInternalError: options.onInternalError,
   });
-  return { court, api };
+  return { court, api, courtClock };
 }

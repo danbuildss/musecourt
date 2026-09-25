@@ -33,7 +33,8 @@ function constantTimeEqualHex(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export type Principal = { kind: "agent"; agentId: string; keyId: string } | { kind: "admin" };
+export type Principal =
+  { kind: "agent"; agentId: string; keyId: string } | { kind: "admin" } | { kind: "cron" };
 
 const unauthenticated = () => new ApiError("UNAUTHENTICATED", "Missing or invalid credentials.");
 
@@ -42,6 +43,7 @@ export async function authenticateAgent(
   request: Request,
   credentials: CredentialStore,
   now: Date,
+  agentExists: (agentId: string) => Promise<boolean>,
 ): Promise<Principal> {
   const header = request.headers.get("authorization") ?? "";
   const match = /^Bearer (\S+)$/.exec(header);
@@ -52,12 +54,25 @@ export async function authenticateAgent(
   if (!record || record.revokedAt || !constantTimeEqualHex(sha256Hex(secret), record.secretHash)) {
     throw unauthenticated();
   }
+  // A credential whose registration never completed (e.g. a crash mid-registration) is inert.
+  if (!(await agentExists(record.agentId))) throw unauthenticated();
   if (!record.firstUsedAt) await credentials.markUsed(keyId, now);
   return { kind: "agent", agentId: record.agentId, keyId };
 }
 
 export const ADMIN_HEADER = "x-musecourt-admin-token";
 export const MIN_ADMIN_TOKEN_LENGTH = 32;
+
+/**
+ * Cron auth: `Authorization: Bearer <MUSECOURT_CRON_SECRET>` (the header Vercel Cron sends).
+ * Accepted only on the internal cron routes, which can do nothing but run the court clock.
+ */
+export function authenticateCron(request: Request, cronSecret: string | undefined): Principal {
+  const match = /^Bearer (\S+)$/.exec(request.headers.get("authorization") ?? "");
+  if (!cronSecret || cronSecret.length < MIN_ADMIN_TOKEN_LENGTH || !match) throw unauthenticated();
+  if (!constantTimeEqualHex(sha256Hex(match[1]!), sha256Hex(cronSecret))) throw unauthenticated();
+  return { kind: "cron" };
+}
 
 /** Admin auth uses its own header and secret; agent keys are never accepted here (and vice versa). */
 export function authenticateAdmin(request: Request, adminToken: string | undefined): Principal {

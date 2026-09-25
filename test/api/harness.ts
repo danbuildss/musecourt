@@ -5,6 +5,7 @@ import { DEFAULT_MAX_BODY_BYTES } from "@/api/http";
 import { createNodeServer } from "@/api/node-server";
 import type { RateLimiter } from "@/api/rate-limit";
 import { FakeWorld } from "@/connectors/fake-world";
+import type { CourtModel } from "@/core/ports";
 import type { DeadlinePolicy } from "@/core/procedure";
 import { createMemoryBackend, createPostgresBackend, type Backend } from "@/infra/backends";
 import { migrate } from "@/infra/migrate";
@@ -13,6 +14,7 @@ import { FakeClock } from "@/testing/fake-clock";
 import { SequentialIds } from "@/testing/sequential-ids";
 
 export const ADMIN_TOKEN = "test-admin-token-0123456789abcdef-0123456789";
+export const CRON_SECRET = "test-cron-secret-fedcba9876543210-fedcba9876543210";
 export const JURISDICTION = "fake";
 
 const pgUrl = process.env.TEST_DATABASE_URL;
@@ -57,6 +59,8 @@ export async function startApi(
     maxBodyBytes?: number;
     world?: FakeWorld;
     breakReadModels?: boolean;
+    model?: CourtModel;
+    cronSecret?: string | null;
   } = {},
 ) {
   const backend = options.backend === "postgres" ? await freshPostgres() : createMemoryBackend();
@@ -75,6 +79,8 @@ export async function startApi(
     connectors: [world],
     deadlinePolicy: options.policy,
     adminToken: ADMIN_TOKEN,
+    cronSecret: options.cronSecret === null ? undefined : (options.cronSecret ?? CRON_SECRET),
+    model: options.model,
     registrationLimiter: options.registrationLimiter,
     maxBodyBytes: options.maxBodyBytes,
     idempotencyWaitMs: 3000,
@@ -165,6 +171,11 @@ export async function startApi(
     );
 
   const tick = () => post("/api/v1/admin/tick", {}, { admin: true });
+  const cronTick = (method: "GET" | "POST" = "POST", secret: string = CRON_SECRET) =>
+    request(method, "/api/v1/internal/cron/tick", {
+      headers: { authorization: `Bearer ${secret}` },
+      idempotencyKey: null,
+    });
 
   return {
     baseUrl,
@@ -182,6 +193,7 @@ export async function startApi(
     tasks,
     fileCase,
     tick,
+    cronTick,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }

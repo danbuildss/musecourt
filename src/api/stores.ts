@@ -20,6 +20,8 @@ export interface CredentialStore {
   markUsed(keyId: string, at: Date): Promise<void>;
   revoke(keyId: string, at: Date): Promise<void>;
   revokeAllForAgent(agentId: string, at: Date): Promise<void>;
+  /** Removes a credential outright (only used to roll back a failed registration). */
+  delete(keyId: string): Promise<void>;
 }
 
 export interface IdempotencyRecord {

@@ -184,14 +184,15 @@ describe("deadlines", () => {
     expect(state.judge).toEqual({ kind: "HOUSE" });
   });
 
-  it("processDueDeadlines expires only overdue cases and is safe to run repeatedly", async () => {
+  it("the court clock expires only overdue cases and is safe to run repeatedly", async () => {
     const t = await createTestCourt();
     const first = await fileStandardCase(t);
     t.clock.advanceHours(24);
     const second = await fileStandardCase(t, { evidence: [] });
     t.clock.advanceHours(24); // first is due, second is not
-    expect(await t.court.processDueDeadlines()).toEqual([{ caseId: first.caseId, result: "EXPIRED" }]);
-    expect(await t.court.processDueDeadlines()).toEqual([]);
+    expect(await t.courtClock().tick()).toMatchObject({ inspected: 1, advanced: 1 });
+    expect(await t.courtClock().tick()).toMatchObject({ inspected: 0, advanced: 0 });
+    expect((await t.court.getCase(first.caseId))!.stage).toBe("PRE_TRIAL");
     expect((await t.court.getCase(second.caseId))!.stage).toBe("AWAITING_RESPONSE");
   });
 

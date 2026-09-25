@@ -35,6 +35,10 @@ export class MemoryCredentialStore implements CredentialStore {
     }
   }
 
+  async delete(keyId: string): Promise<void> {
+    this.records.delete(keyId);
+  }
+
   /** Test helper: everything stored (to prove raw secrets are absent). */
   all(): CredentialRecord[] {
     return [...this.records.values()].map((r) => ({ ...r }));
