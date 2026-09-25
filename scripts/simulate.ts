@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import { loadSkillMarkdown } from "@/api/skill";
-import { BankrChatModel } from "@/model/bankr";
-import { LlmCourtModel } from "@/model/llm-court-model";
+import { BANKR_DEFAULT_MODEL, BankrChatModel, BankrCostMeter } from "@/model/bankr";
 import { writeSimulationReport } from "@/sim/report";
 import { runSimulation } from "@/sim/runner";
 
@@ -16,13 +15,15 @@ if (!process.env.BANKR_API_KEY && !process.env.BANKR_LLM_KEY) {
   console.error("Set BANKR_API_KEY (an API key with LLM Gateway enabled and credits > $0).");
   process.exit(2);
 }
-const solonChat = BankrChatModel.fromEnv();
-const agentModelId = process.env.MUSECOURT_AGENT_MODEL || process.env.MUSECOURT_MODEL;
+const solonModelId = process.env.MUSECOURT_MODEL || BANKR_DEFAULT_MODEL;
+const agentModelId = process.env.MUSECOURT_AGENT_MODEL || solonModelId;
 
 const report = await runSimulation({
   skillMarkdown: loadSkillMarkdown(),
   agentModel: () => BankrChatModel.fromEnv(process.env, agentModelId),
-  solonModel: new LlmCourtModel(solonChat),
+  solonChat: BankrChatModel.fromEnv(process.env, solonModelId),
+  modelIds: { agent: agentModelId, solon: solonModelId },
+  costMeter: BankrCostMeter.fromEnv(),
   log: (line) => console.log(`[sim] ${line}`),
 });
 const dir = join(process.cwd(), "sim-output", report.startedAt.replace(/[:.]/g, "-"));

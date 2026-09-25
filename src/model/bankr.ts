@@ -1,4 +1,4 @@
-import { ModelError, type ChatModel, type ChatRequest, type ChatResponse } from "./chat";
+import { ModelError, type ChatModel, type ChatRequest, type ChatResponse, type CostMeter } from "./chat";
 
 /**
  * Bankr LLM Gateway adapter. Implemented strictly against Bankr's documented
@@ -26,7 +26,7 @@ export interface BankrOptions {
 interface CompletionBody {
   model?: string;
   choices?: Array<{ message?: { content?: string | null } }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: unknown };
   error?: { message?: string; type?: string; code?: string } | string;
 }
 
@@ -93,6 +93,8 @@ export class BankrChatModel implements ChatModel {
         outputTokens: body.usage?.completion_tokens ?? 0,
       },
       latencyMs: Date.now() - started,
+      // Not documented by Bankr; recorded only if the gateway happens to include it.
+      ...(typeof body.usage?.cost === "number" ? { costUsd: body.usage.cost } : {}),
     };
   }
 }
@@ -126,5 +128,71 @@ function toModelError(res: Response, body: CompletionBody): ModelError {
       return res.status >= 500
         ? new ModelError("UPSTREAM", `Bankr gateway error ${res.status}${suffix}.`, res.status)
         : new ModelError("BAD_REQUEST", `Bankr rejected the request (${res.status})${suffix}.`, res.status);
+  }
+}
+
+/**
+ * Spend information from documented Bankr endpoints:
+ *  - balance: GET https://api.bankr.bot/llm/credits/state → totalCreditsUsd (X-API-Key auth)
+ *  - pricing: GET <gateway>/v1/models → the model's entry ("current pricing"); the raw entry is kept.
+ * Pricing field names/units are not specified in the reference we have, so a per-token price is only
+ * derived from the conventional `pricing.prompt` / `pricing.completion` fields when present, and the
+ * raw entry is always reported so the interpretation can be checked.
+ */
+export class BankrCostMeter implements CostMeter {
+  private models: Promise<unknown[] | null> | null = null;
+
+  constructor(
+    private readonly options: { apiKey: string; baseUrl?: string; accountUrl?: string; fetch?: typeof fetch },
+  ) {}
+
+  static fromEnv(env: NodeJS.ProcessEnv = process.env): BankrCostMeter {
+    return new BankrCostMeter({
+      apiKey: env.BANKR_LLM_KEY || env.BANKR_API_KEY || "",
+      baseUrl: env.MUSECOURT_LLM_BASE_URL,
+    });
+  }
+
+  private get(url: string): Promise<unknown | null> {
+    const doFetch = this.options.fetch ?? fetch;
+    return doFetch(url, {
+      headers: { "x-api-key": this.options.apiKey },
+      signal: AbortSignal.timeout(20_000),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null);
+  }
+
+  async balanceUsd(): Promise<number | null> {
+    const state = (await this.get(
+      `${this.options.accountUrl ?? "https://api.bankr.bot"}/llm/credits/state`,
+    )) as {
+      totalCreditsUsd?: unknown;
+    } | null;
+    return typeof state?.totalCreditsUsd === "number" ? state.totalCreditsUsd : null;
+  }
+
+  async pricing(model: string) {
+    this.models ??= this.get(
+      `${(this.options.baseUrl ?? BANKR_DEFAULT_BASE_URL).replace(/\/+$/, "")}/models`,
+    ).then(
+      (body) =>
+        ((body as { data?: unknown[] } | null)?.data ?? (Array.isArray(body) ? body : null)) as
+          unknown[] | null,
+    );
+    const entry = ((await this.models) ?? []).find((m) => (m as { id?: string }).id === model) as
+      { pricing?: Record<string, unknown> } | undefined;
+    if (!entry) return null;
+    const num = (v: unknown) =>
+      typeof v === "number"
+        ? v
+        : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
+          ? Number(v)
+          : null;
+    return {
+      inputPerToken: num(entry.pricing?.prompt),
+      outputPerToken: num(entry.pricing?.completion),
+      raw: entry,
+    };
   }
 }

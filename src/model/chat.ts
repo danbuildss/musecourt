@@ -18,6 +18,8 @@ export interface ChatResponse {
   model: string;
   usage: { inputTokens: number; outputTokens: number };
   latencyMs: number;
+  /** USD cost of this call, only if the provider reports it in the response. */
+  costUsd?: number;
 }
 
 export type ModelErrorKind =
@@ -83,4 +85,55 @@ export function extractJsonObject(text: string): unknown {
     }
   }
   return null;
+}
+
+/** Wraps a ChatModel and records calls, tokens, latency, reported cost and errors. */
+export class MeteredChatModel implements ChatModel {
+  readonly usage = {
+    calls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    latencyMs: 0,
+    reportedCostUsd: 0,
+    costReportedCalls: 0,
+    errors: {} as Record<string, number>,
+  };
+
+  constructor(private readonly inner: ChatModel) {}
+
+  get id() {
+    return this.inner.id;
+  }
+
+  async complete(request: ChatRequest): Promise<ChatResponse> {
+    try {
+      const response = await this.inner.complete(request);
+      this.usage.calls += 1;
+      this.usage.inputTokens += response.usage.inputTokens;
+      this.usage.outputTokens += response.usage.outputTokens;
+      this.usage.latencyMs += response.latencyMs;
+      if (typeof response.costUsd === "number") {
+        this.usage.reportedCostUsd += response.costUsd;
+        this.usage.costReportedCalls += 1;
+      }
+      return response;
+    } catch (error) {
+      const kind = error instanceof ModelError ? error.kind : "UNKNOWN";
+      this.usage.errors[kind] = (this.usage.errors[kind] ?? 0) + 1;
+      throw error;
+    }
+  }
+}
+
+/** Provider-neutral view of spend, for reports. Every method may return null when the provider doesn't expose it. */
+export interface CostMeter {
+  /** Current spendable balance in USD. */
+  balanceUsd(): Promise<number | null>;
+  /**
+   * Per-token USD prices for a model, plus the provider's raw pricing entry so
+   * a human can verify the interpretation.
+   */
+  pricing(
+    model: string,
+  ): Promise<{ inputPerToken: number | null; outputPerToken: number | null; raw: unknown } | null>;
 }
