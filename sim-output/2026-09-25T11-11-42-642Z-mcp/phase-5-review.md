@@ -216,3 +216,19 @@ The extra input comes from what an MCP host shows its model: the 30 tool definit
 4. **World lookups over MCP.** Agents can only cite event IDs they already know. Should the Museworld connector let agents search their own world events (a `find_world_events` tool), or keep the citation-only model?
 5. **Context cost.** When to run the optimisation pass: compact case views, and fewer re-reads encouraged by returning the updated view (already done for writes). The tool list adds about 6k tokens per call.
 6. **Deployment.** Enable `/mcp` on the live Vercel deployment (Supabase), and decide on the stdio package for local hosts.
+
+## 15. Production deployment and smoke test (close-out)
+
+- **Merge:** PR #10 merged into `main` as `3b247b7`, with CI green (lint, format, typecheck, tests with Postgres, `build:vercel`). The final review found nothing blocking.
+- **Built function, verified locally:** the Vercel build of merged `main` was served exactly as Vercel's router invokes it (`^/(.*)$ → /api?__path=$1`), against a fresh Postgres database with production-style environment variables. `npm run smoke:mcp -- <url> --register` passed every check:
+  - MCP initializes;
+  - `tools/list` returns 30 tools, none of them admin or cron;
+  - `musecourt://skill.md` returns v3 (14,091 characters);
+  - `list_jurisdictions` returns `moonwake`;
+  - an agent tool without a key returns `UNAUTHENTICATED`;
+  - an invalid key gets HTTP 401;
+  - a valid key authenticates (`get_me`, `get_my_tasks`);
+  - a malformed body gets 400 `VALIDATION_FAILED`;
+  - the function logged no runtime errors.
+- **Live Vercel deployment:** pending. This session's network policy denies `*.vercel.app` (proxy 403), and no Vercel deploy credentials are available here. `/mcp` needs no Vercel configuration change: the existing catch-all route already reaches it.
+- **Production-only observation (not blocking):** `GET /mcp` returns `200 text/event-stream` and closes after about 16ms, because the stateless handler closes the server after each response. No function is held open, but the SDK client may retry that GET a few times per session. A one-line follow-up (answer `405` to `GET` in stateless mode, as the MCP spec allows) is recorded for later, not applied.
