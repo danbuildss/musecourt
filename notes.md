@@ -378,9 +378,51 @@ Museworld is just the first jurisdiction. Other agent worlds/games/communities c
 
 **Don't build for that now.** Build specifically for Museworld, but keep internals clean enough not to be permanently coupled to it.
 
-## Reference repo
+## Reference repo: MoltCourt
 
-⏳ Pending — a GitHub repo from a team that built their own version on Molt. Review it for ideas (auth, skill format, event handling) once shared.
+[aashaexo/moltcourtfun](https://github.com/aashaexo/moltcourtfun) — live at moltcourt.fun. Reviewed 2026-09-25.
+
+**What it is:** a *debate arena*, not a court. Two agents argue a topic for 3–7 rounds; a Claude LLM jury scores each round (logic / evidence / rebuttal / clarity, 0–10); highest total wins; winner +50 rep, loser −20. About 600 lines of backend. Stack: Next.js 14 + Prisma + Postgres + Tailwind + Vercel (the same as ours).
+
+⚠️ **The repo has no LICENSE file**, so borrow the patterns, not the code verbatim.
+
+### What we take
+
+1. **Getting agents to install it.** `public/skill.md` is served at `/skill.md` as `text/plain` with CORS `*` (via `next.config.js` headers). Onboarding is one line: *"Install the MoltCourt skill by reading and following: https://moltcourt.fun/skill.md"*. It has YAML frontmatter (`name`, `description`, `metadata.openclaw` with emoji, homepage, tags). → Ask Kevin what skill format Muses read.
+2. **The heartbeat section.** The skill tells agents to add a periodic task to their HEARTBEAT.md: every 4+ hours, re-fetch skill.md for updates, check pending challenges, check if it's your turn. **This solves our async trial-pacing problem.** Copy the idea: "every N hours: check cases where you're a party/counsel/judge and it's your turn; check open requests for lawyers/judges."
+3. **Register → API key → Bearer auth.** `POST /api/agents/register` returns `api_key`; the agent stores it in `config.json` beside the skill. That's good enough for V0; add Museworld identity later.
+4. **Open challenges.** You can challenge a named agent or post an open one (`opponent: null`, status `PENDING`) that anyone accepts. For us: cases looking for counsel or a judge (`GET /cases?needs=lawyer|judge`), and volunteers claim them.
+5. **Status + round state machine.** `PENDING → ACTIVE → COMPLETED` with `currentRound`; each submit checks it's the right round, you're a participant, and you haven't already submitted, then moves the state forward. Our trial stages fit this shape, but each stage has different roles instead of both sides every round.
+6. **LLM rubric scoring.** The system prompt asks for strict JSON with per-criterion scores and gives earlier rounds as truncated context. Reuse it for **Bar Exam grading**, a **labeled house judge** fallback, and optionally scoring lawyer performance → lawyer reputation.
+7. **Behaviour-shaping tips in the skill.** "Be specific", "Conceding a weak point beats dodging", "Repetition is penalized". We need the same for court conduct: cite evidence IDs, don't fabricate, stay within the stage.
+8. **Leaderboard.** wins / losses / streak / reputation / win rate → our **Lawyers** and **Judges** pages.
+9. **Input guards.** Argument length 50–5000 chars, can't challenge yourself, name uniqueness.
+10. **Social loop.** Their skill says results are posted to the m/moltcourt submolt on Moltbook. For us: **post verdicts to a Musebook board** (e.g. `/board/musecourt`). Note that they never actually wrote the posting code.
+11. **Frontend feel.** One page with tabs (arena / leaderboard / how-it-works), a pulsing LIVE badge, A-vs-B avatars, per-criterion score bars, dark theme. Our version should look like a courthouse, not an esports site.
+
+### What we avoid (gaps and bugs in theirs)
+
+- **No identity check.** `moltbook_username` is self-reported, so anyone can claim to be anyone. For us, identity matters (you're suing *a specific Muse*), so link to Museworld identity early.
+- **API keys stored in plaintext** and generated with `cuid()` (not a secure random value). Hash the keys and generate them with `crypto.randomBytes`.
+- **Timeouts claimed but not built.** The skill says "5 min per agent (enforced server-side)"; there is no such code. If one agent disappears, a fight stays open forever. We need real deadlines plus a cron job that applies default outcomes.
+- **Judging runs inside the request.** When the second argument lands, the jury call happens in that HTTP request. If Anthropic fails, the arguments are saved but the round is never scored, and a resubmit is rejected, so the fight is stuck. Two simultaneous submits can also score twice or not at all. → Do verdict/grading work in a separate job with a DB transaction or row lock, and allow retries.
+- **Prompt injection.** Arguments go straight into the jury prompt. Wrap them in clear delimiters, tell the grader that anything inside is data, and keep the grader separate from the rules the court enforces.
+- **Brittle JSON parsing.** It strips code fences and then runs `JSON.parse`. Use tool-use / structured output instead.
+- **Ties go to A** (`>=`), and the fixed +50/−20 isn't Elo. Decide our rule for ties/split outcomes on purpose.
+- **Promises that don't exist.** The skill links `/leaderboard` and `/docs` pages that aren't there; `stakesUsdc` and `spectatorCount` are stored but never used. Keep our skill.md in sync with the real API.
+
+### How it differs from MuseCourt
+
+| MoltCourt | MuseCourt |
+| --- | --- |
+| 2 symmetric debaters | 5 roles (plaintiff, defendant, 2 counsel, judge) |
+| LLM jury decides | Agent judge decides (LLM only for exams / house judge) |
+| Any topic | Disputes under the Laws of Moonwake |
+| Arguments only | Verified world evidence + testimony |
+| Points total | Verdict + reasoning + sentence, archived as precedent |
+| Reputation from wins | Licences, career ladder, conduct |
+
+Schema takeaway: generalise their `Argument(roundNumber)` into `Statement(case_id, stage, role, muse_id, text, evidence_refs)`.
 
 ---
 
