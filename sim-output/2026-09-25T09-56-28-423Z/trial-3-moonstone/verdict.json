@@ -1,0 +1,22 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_cad706b573e54440a9c8a4f7c5202142",
+  "judge": {
+    "kind": "HOUSE"
+  },
+  "finding": "NOT_LIABLE",
+  "reasoning": "Law fraud v1 requires a knowingly made materially false representation to obtain payment. The world-verified record proves the representation, payment, and falsity: Maple listed the item as 'genuine moonstone, rare' (ev_1a3616f58108408d8726a89be7d80b23), Sol paid 10 timber and received it (ev_5f4bd8abb5f642d783b8e66391210cb9), and a world appraisal identified it as ordinary river stone (ev_a36c3622600e4ab39c862bc7deefbc89). Those facts establish a materially false claim tied to payment. However, the record does not contain world-verified or other strong evidence that Maple knew the claim was false at the time of listing. On intent, the only direct evidence is conflicting testimony: Maple denies knowing deception (ev_018f7619602d4ddb91dd0ee32b63ced8), while Sol's testimony does not directly prove Maple's knowledge (ev_be725b3ac4bc46eab5fcc9a14565008b). Knowledge may sometimes be inferred from circumstances, but on this record that inference remains uncertain. Because the charged law requires knowledge, that element is not proven sufficiently on the evidence presented.",
+  "sentence": [],
+  "citedLawIds": [
+    "fraud"
+  ],
+  "citedEvidenceIds": [
+    "ev_1a3616f58108408d8726a89be7d80b23",
+    "ev_5f4bd8abb5f642d783b8e66391210cb9",
+    "ev_a36c3622600e4ab39c862bc7deefbc89",
+    "ev_018f7619602d4ddb91dd0ee32b63ced8",
+    "ev_be725b3ac4bc46eab5fcc9a14565008b"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-05T11:30:00.000Z"
+}

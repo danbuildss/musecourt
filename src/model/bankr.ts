@@ -135,9 +135,10 @@ function toModelError(res: Response, body: CompletionBody): ModelError {
  * Spend information from documented Bankr endpoints:
  *  - balance: GET https://api.bankr.bot/llm/credits/state → totalCreditsUsd (X-API-Key auth)
  *  - pricing: GET <gateway>/v1/models → the model's entry ("current pricing"); the raw entry is kept.
- * Pricing field names/units are not specified in the reference we have, so a per-token price is only
- * derived from the conventional `pricing.prompt` / `pricing.completion` fields when present, and the
- * raw entry is always reported so the interpretation can be checked.
+ * Pricing field names/units are not specified in the reference we have. A per-token price is derived
+ * from the conventional `pricing.prompt` / `pricing.completion` (per token), or from the shape the live
+ * gateway returns, `pricing.input` / `pricing.output` with `unit: "million_tokens"`. Cache-read
+ * discounts are not applied, so the estimate is an upper bound. The raw entry is always reported.
  */
 export class BankrCostMeter implements CostMeter {
   private models: Promise<unknown[] | null> | null = null;
@@ -189,9 +190,16 @@ export class BankrCostMeter implements CostMeter {
         : typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
           ? Number(v)
           : null;
+    const p = entry.pricing;
+    // Bankr's live /v1/models (observed 2026-09-25): { input, output, cache_read, unit: "million_tokens" }.
+    const perMillion = p?.unit === "million_tokens";
+    const perToken = (v: unknown) => {
+      const n = num(v);
+      return n === null ? null : perMillion ? n / 1_000_000 : n;
+    };
     return {
-      inputPerToken: num(entry.pricing?.prompt),
-      outputPerToken: num(entry.pricing?.completion),
+      inputPerToken: perToken(p?.prompt ?? (perMillion ? p?.input : undefined)),
+      outputPerToken: perToken(p?.completion ?? (perMillion ? p?.output : undefined)),
       raw: entry,
     };
   }

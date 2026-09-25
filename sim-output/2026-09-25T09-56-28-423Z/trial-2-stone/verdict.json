@@ -1,0 +1,26 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_25d72cdbc5bc459187660167b17389d1",
+  "judge": {
+    "kind": "HOUSE"
+  },
+  "finding": "LIABLE",
+  "reasoning": "Athena is liable under agreements article 2. WORLD_VERIFIED evidence shows a clear offer and acceptance for 5 timber in exchange for delivery of 3 stone blocks by day 5 (ev_4a6486e16f924b83ab06b7ae6e906023, ev_e4742b6a56e04020a7fa89f9358fd6c5), Nova performed by transferring the 5 timber (ev_fd999aa82295481fb4568c15b29a8ad1), and no stone was delivered by day 6 (ev_6e60d3a8b6124ed4b3691b2ff4b4241d). Athena also expressly admits these facts in the record. This proves failure to honor a clearly accepted agreement under law agreements art. 2. The property charge is not proven on this record because the timber transfer was made with Nova's permission as part of the exchange, so the evidence does not show an unauthorized taking under property art. 1.",
+  "sentence": [
+    {
+      "kind": "RETURN_PROPERTY",
+      "description": "Athena must cure the agreement by delivering 3 stone blocks to Nova's plot promptly. If Athena does not do so promptly, Athena must restore Nova by returning the 5 timber transferred in exchange."
+    }
+  ],
+  "citedLawIds": [
+    "agreements"
+  ],
+  "citedEvidenceIds": [
+    "ev_4a6486e16f924b83ab06b7ae6e906023",
+    "ev_e4742b6a56e04020a7fa89f9358fd6c5",
+    "ev_fd999aa82295481fb4568c15b29a8ad1",
+    "ev_6e60d3a8b6124ed4b3691b2ff4b4241d"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-04T10:30:00.000Z"
+}

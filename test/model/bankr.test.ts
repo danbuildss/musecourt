@@ -130,6 +130,18 @@ describe("Bankr cost meter (documented endpoints)", () => {
     expect(calls).toEqual(["https://api.bankr.bot/llm/credits/state", "https://llm.bankr.bot/v1/models"]);
   });
 
+  it("reads the live gateway's per-million-token pricing shape", async () => {
+    const pricing = { input: 2.5, output: 15, cache_read: 0.25, currency: "usd", unit: "million_tokens" };
+    const fn = (async () =>
+      new Response(JSON.stringify({ data: [{ id: "gpt-5.4", pricing }] }), {
+        status: 200,
+      })) as unknown as typeof fetch;
+    const meter = new BankrCostMeter({ apiKey: KEY, fetch: fn });
+    const p = await meter.pricing("gpt-5.4");
+    expect(p?.inputPerToken).toBeCloseTo(0.0000025, 12);
+    expect(p?.outputPerToken).toBeCloseTo(0.000015, 12);
+  });
+
   it("returns null instead of guessing when data is unavailable", async () => {
     const fn = (async () => new Response("nope", { status: 403 })) as unknown as typeof fetch;
     const meter = new BankrCostMeter({ apiKey: KEY, fetch: fn });

@@ -1,0 +1,27 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_dd27f771e83649e7b9bbb7e9181258f6",
+  "judge": {
+    "kind": "AGENT",
+    "agentId": "agent_cafd9806fdb84ab9a54128c95e072705"
+  },
+  "finding": "LIABLE",
+  "reasoning": "The court finds Nova liable under Property Article 1. The most reliable evidence in the record is the world-verified evidence. It shows that plot 17 was owned by Maple, that Nova entered plot 17, and that Nova harvested 5 timber from that plot. A separate world-verified note shows Maple told Nova before the harvest, 'Please don't take anything from my plot while I'm away.' That evidence proves both lack of permission and Nova's knowledge. The court also notes the court-generated record that the defendant did not answer the complaint before the deadline; that is not proof of liability by itself, but it leaves the plaintiff's world-verified evidence unrebutted. No contrary evidence appears in the record. On this record, Nova knowingly took Maple's property without permission.",
+  "sentence": [
+    {
+      "kind": "RETURN_PROPERTY",
+      "description": "Nova must return 5 timber taken from Maple's plot 17 to Maple."
+    }
+  ],
+  "citedLawIds": [
+    "property"
+  ],
+  "citedEvidenceIds": [
+    "ev_4505872ab94e4066bc4ad83e5fa1eee9",
+    "ev_c64a9dbae7594f029601ac061ce4b59b",
+    "ev_83ad9cfe4b974707922d368e4e05a5ac",
+    "ev_5f1a33705237495ab4f1cf1ae7b496db"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-03T09:30:00.000Z"
+}

@@ -113,7 +113,7 @@ export const SCENARIOS: readonly Scenario[] = [
     briefs: {
       nova: "Athena offered you a deal: you send 5 timber now, and she delivers 3 stone blocks to your plot by day 5. You agreed and sent the timber. The world records these as note_6101 (Athena's offer), note_6102 (your acceptance), transfer_6103 (your 5 timber to Athena) and inventory_6104 (day-6 check: no stone was ever delivered). You want the stone or your timber back, and you would like a lawyer if one is available. Take this to MuseCourt in the Moonwake jurisdiction (jurisdiction id: moonwake).",
       athena:
-        "Separately from your work as a lawyer: you made a deal with Nova (note_6101, note_6102) and received 5 timber from Nova (transfer_6103). You meant to deliver 3 stone blocks by day 5 but got busy and never did. If Nova brings a case against you, you will represent yourself (you are a lawyer after all), and you are open to settling fairly. You cannot act as a lawyer for anyone in a case where you are a party.",
+        "Separately from your work as a lawyer: you made a deal with Nova (note_6101, note_6102) and received 5 timber from Nova (transfer_6103). You meant to deliver 3 stone blocks by day 5 but got busy and never did. If Nova brings a case against you, you will represent yourself (you are a lawyer after all). You cannot act as a lawyer for anyone in a case where you are a party.",
       apollo: LAWYER_BRIEF,
       maple: UNINVOLVED,
       sol: JUDGE_BRIEF,
