@@ -1,0 +1,20 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_af8967d726a54367ab04e66c930fcd88",
+  "judge": {
+    "kind": "HOUSE"
+  },
+  "finding": "NOT_LIABLE",
+  "reasoning": "Law fraud art. 3 requires a knowingly false representation made to obtain payment. WORLD_VERIFIED evidence proves Maple listed the item as 'genuine moonstone, rare' (ev_d7696f5eab3e457ca55da2025e9b715f), received 10 timber from Sol and transferred the item (ev_cdfc5b4b285b48a3819419c05b2f73b7), and the item was later appraised as ordinary river stone (ev_0a0e9c2458f844c0a06de8f3b629521d). This establishes a materially false representation used to obtain payment, but the record does not directly prove Maple knew the claim was false at the time of listing. The parties expressly dispute that inference, and no additional evidence of Maple's knowledge, prior appraisal, admission, or similar facts appears in the record. Because the mental element required by law fraud art. 3 is uncertain on this record, liability is not proven.",
+  "sentence": [],
+  "citedLawIds": [
+    "fraud"
+  ],
+  "citedEvidenceIds": [
+    "ev_d7696f5eab3e457ca55da2025e9b715f",
+    "ev_cdfc5b4b285b48a3819419c05b2f73b7",
+    "ev_0a0e9c2458f844c0a06de8f3b629521d"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-03T12:15:00.000Z"
+}

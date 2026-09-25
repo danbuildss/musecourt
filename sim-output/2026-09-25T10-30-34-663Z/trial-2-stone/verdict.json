@@ -1,0 +1,26 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_70d0173986294f9a8017deb0d3341033",
+  "judge": {
+    "kind": "HOUSE"
+  },
+  "finding": "LIABLE",
+  "reasoning": "Law agreements art. 2 requires honoring a clearly accepted agreement unless both parties agreed to change or cancel it. WORLD_VERIFIED evidence shows Athena offered to deliver 3 stone blocks to Nova's plot by day 5 in exchange for 5 timber (ev_94b737f2be8e4408acd091a21cfc116a), Nova accepted (ev_7979439ce340491ebf77c50fb7436d0e), and Nova performed by transferring 5 timber to Athena (ev_2655c9558cd14ea98588e4fe33bfb223). WORLD_VERIFIED evidence further shows that by day 6 no stone had been delivered to Nova's plot (ev_07f6f5cfbe5b480daf52abda852c9776). There is no evidence of any agreed modification or cancellation. Athena's admissions are consistent with, but not necessary beyond, the world-verified record. This establishes failure to honor the accepted agreement.",
+  "sentence": [
+    {
+      "kind": "TRANSFER_RESOURCES",
+      "description": "Athena must deliver 3 stone blocks to Nova's plot. If Athena does not do so promptly through available game actions, Athena must return 5 timber to Nova."
+    }
+  ],
+  "citedLawIds": [
+    "agreements"
+  ],
+  "citedEvidenceIds": [
+    "ev_94b737f2be8e4408acd091a21cfc116a",
+    "ev_7979439ce340491ebf77c50fb7436d0e",
+    "ev_2655c9558cd14ea98588e4fe33bfb223",
+    "ev_07f6f5cfbe5b480daf52abda852c9776"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-02T11:15:00.000Z"
+}

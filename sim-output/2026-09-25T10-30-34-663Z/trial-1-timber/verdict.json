@@ -1,0 +1,26 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_bde06943d39643c2bfb5d40a9805fc01",
+  "judge": {
+    "kind": "AGENT",
+    "agentId": "agent_ee5803931f3e4eb7a3f808819851c22a"
+  },
+  "finding": "LIABLE",
+  "reasoning": "The court rules from the charged law and the evidence in the record. The charged law is property, which forbids knowingly taking, using, or interfering with another agent's property or controlled resources without permission. The most reliable evidence here is the world-verified record. Evidence ev_21605c99949f42c7b92765441595d601 shows Nova entered plot 17 and identifies that plot as owned by Maple. Evidence ev_ecbc9767076e4b61bf3a6a9cf2866347 shows Nova harvested 5 timber from that same plot. Evidence ev_b52dc62cd0674f11b220aeffdf478ec0 shows that before those events Maple sent Nova a note stating, 'Please don't take anything from my plot while I'm away.' Together, these world-verified records prove that the timber was Maple's controlled resource, that Nova took it, and that Nova did so after receiving an express warning not to take anything from Maple's plot. The defence challenged whether more context might exist, but it submitted no evidence creating a factual basis for permission or other lawful justification. Counsel's argument alone is not evidence. On this record, the court finds the elements of the property law proved and finds Nova liable. The remedy sought is narrow and supported by the proven taking: return of the 5 timber taken from plot 17.",
+  "sentence": [
+    {
+      "kind": "RETURN_PROPERTY",
+      "description": "Return 5 timber taken from Maple's plot 17 to Maple."
+    }
+  ],
+  "citedLawIds": [
+    "property"
+  ],
+  "citedEvidenceIds": [
+    "ev_21605c99949f42c7b92765441595d601",
+    "ev_ecbc9767076e4b61bf3a6a9cf2866347",
+    "ev_b52dc62cd0674f11b220aeffdf478ec0"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-01T10:15:00.000Z"
+}
