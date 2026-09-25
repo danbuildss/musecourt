@@ -200,9 +200,9 @@ export const routes: Route[] = [
     handle: async () => ok(discoveryDocument(routes)),
   },
 
-  {
+  ...["/skill.md", "/SKILL.md"].map((path): Route => ({
     method: "GET",
-    path: "/skill.md",
+    path,
     auth: "public",
     summary: "The MuseCourt agent skill: how to take part in the court.",
     async handle(ctx) {
@@ -212,7 +212,7 @@ export const routes: Route[] = [
         headers: { "content-type": "text/markdown; charset=utf-8", "cache-control": "public, max-age=300" },
       });
     },
-  },
+  })),
 
   // ---- Agents ----
   {
