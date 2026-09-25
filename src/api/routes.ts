@@ -1,9 +1,7 @@
-import { adminActor, agentActor, SYSTEM } from "@/core/actor";
+import { adminActor, agentActor } from "@/core/actor";
 import { CourtError } from "@/core/errors";
 import type { StoredEvent } from "@/core/events";
-import { normalizeHandle } from "@/core/registry";
 import { buildTranscript } from "@/court/projections/transcript";
-import type { AgentRow } from "@/court/read-models/types";
 import type { ApiDeps } from "./app";
 import { issueCredential, type Principal } from "./auth";
 import { renderDebugCase } from "./debug-view";
@@ -11,7 +9,6 @@ import { discoveryDocument } from "./discovery";
 import { ApiError } from "./errors";
 import { json } from "./http";
 import {
-  ID_PATTERN,
   adminJurisdictionBody,
   adminLawBody,
   adminLicenceBody,
@@ -30,6 +27,17 @@ import {
   registerAgentBody,
   toCaseCommand,
 } from "./schemas";
+import {
+  CREDENTIAL_NOTE,
+  caseView,
+  isOverdue,
+  publicAgent,
+  redactCredential,
+  registerWithCredential,
+  resolveAgent,
+  rotateUnusedRegistration,
+  tasksAndOpportunities,
+} from "./services";
 import type { IdempotencyRecord } from "./stores";
 
 export interface RouteContext {
@@ -78,42 +86,8 @@ function agentIdOf(ctx: RouteContext): string {
   return ctx.principal.agentId;
 }
 
-async function resolveAgent(deps: ApiDeps, ref: string): Promise<AgentRow> {
-  const byId = ID_PATTERN.test(ref) && ref.startsWith("agent_") ? await deps.readModels.getAgent(ref) : null;
-  const found = byId ?? (await deps.readModels.findAgentByHandle(normalizeHandle(ref)));
-  if (!found) throw new CourtError("NOT_FOUND", `No agent ${ref}.`, { agent: ref });
-  return found;
-}
-
 function caseIdParam(ctx: RouteContext): string {
   return parse(entityId, ctx.params.caseId);
-}
-
-/**
- * Reads never advance the case. If a deadline has passed but the court clock
- * has not processed it yet, the response says so (`overdue: true`) instead.
- */
-const isOverdue = (deadline: string | null | undefined, now: Date) =>
-  !!deadline && Date.parse(deadline) <= now.getTime();
-
-async function caseViewOr404(deps: ApiDeps, caseId: string, now: Date) {
-  const view = await deps.readModels.getCaseView(caseId);
-  if (!view) throw new CourtError("NOT_FOUND", `Case ${caseId} not found.`);
-  return {
-    ...view,
-    stage: view.stage ? { ...view.stage, overdue: isOverdue(view.stage.deadline, now) } : null,
-  };
-}
-
-function publicAgent(row: AgentRow) {
-  return {
-    agentId: row.agentId,
-    handle: row.handle,
-    displayName: row.displayName,
-    registeredAt: row.registeredAt,
-    licences: row.licences,
-    externalIdentities: row.externalIdentities,
-  };
 }
 
 function publicEvent(e: StoredEvent) {
@@ -126,66 +100,16 @@ function publicEvent(e: StoredEvent) {
   };
 }
 
-const REGISTRATION_REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-interface CredentialBody {
-  agent: unknown;
-  credential: { keyId: string; apiKey: string | null; note: string };
-}
-
-function redactCredential(body: unknown): unknown {
-  const b = body as CredentialBody | null;
-  if (!b?.credential) return body;
-  return {
-    ...b,
-    credential: { ...b.credential, apiKey: null, note: "The API key is shown only once and was not stored." },
-  };
-}
-
-/**
- * Replaying a registration cannot return the original secret (it was never
- * stored). If the credential has never been used, the court rotates it and
- * returns a fresh key, so an agent whose first response was lost is not
- * locked out. Otherwise the stored, redacted response is returned.
- */
+/** Registration replay: rotates a never-used key (see rotateUnusedRegistration). */
 async function replayRegistration(
   ctx: RouteContext,
   record: IdempotencyRecord,
   scope: string,
 ): Promise<Response | null> {
-  if (record.responseStatus !== 201) return null;
-  const stored = record.responseBody as CredentialBody;
-  const { credentials, idempotency } = ctx.deps;
-  const current = await credentials.findByKeyId(stored.credential.keyId);
-  const fresh =
-    current &&
-    !current.firstUsedAt &&
-    !current.revokedAt &&
-    ctx.now.getTime() - Date.parse(current.createdAt) < REGISTRATION_REPLAY_WINDOW_MS;
-  if (!current || !fresh) return null;
-  await credentials.revoke(current.keyId, ctx.now);
-  const next = issueCredential();
-  await credentials.insert({
-    keyId: next.keyId,
-    agentId: current.agentId,
-    secretHash: next.secretHash,
-    createdAt: ctx.now.toISOString(),
-  });
-  const body: CredentialBody = {
-    agent: stored.agent,
-    credential: { keyId: next.keyId, apiKey: next.apiKey, note: CREDENTIAL_NOTE },
-  };
-  await idempotency.complete(
-    scope,
-    ctx.request.headers.get("idempotency-key")!,
-    201,
-    redactCredential(body),
-    ctx.now,
-  );
-  return json(201, body, { "idempotent-replayed": "true" });
+  const key = ctx.request.headers.get("idempotency-key")!;
+  const body = await rotateUnusedRegistration(ctx.deps, record, scope, key, ctx.now);
+  return body ? json(201, body, { "idempotent-replayed": "true" }) : null;
 }
-
-const CREDENTIAL_NOTE = "Store this API key now. MuseCourt keeps only a hash and cannot show it again.";
 
 // ---------------------------------------------------------------------------
 // Routes
@@ -223,40 +147,7 @@ export const routes: Route[] = [
     summary: "Register a new agent. Returns a one-time API key. Grants no roles or licences.",
     async handle(ctx) {
       const input = parse(registerAgentBody, ctx.body);
-      // Credential first, event second: an agent can never exist without a usable initial key.
-      const credential = issueCredential();
-      let stored = false;
-      let agent;
-      try {
-        agent = await ctx.deps.court.registerAgent(
-          { handle: input.handle, displayName: input.displayName },
-          SYSTEM,
-          {
-            beforeAppend: async (agentId) => {
-              if (stored) return;
-              await ctx.deps.credentials.insert({
-                keyId: credential.keyId,
-                agentId,
-                secretHash: credential.secretHash,
-                createdAt: ctx.now.toISOString(),
-              });
-              stored = true;
-            },
-          },
-        );
-      } catch (error) {
-        // Roll back the credential; if even that fails it stays inert (its agent does not exist).
-        if (stored) await ctx.deps.credentials.delete(credential.keyId).catch(() => undefined);
-        throw error;
-      }
-      const row = (await ctx.deps.readModels.getAgent(agent.agentId))!;
-      return ok(
-        {
-          agent: publicAgent(row),
-          credential: { keyId: credential.keyId, apiKey: credential.apiKey, note: CREDENTIAL_NOTE },
-        },
-        201,
-      );
+      return ok(await registerWithCredential(ctx.deps, input, ctx.now), 201);
     },
     redactForStorage: redactCredential,
     onReplay: replayRegistration,
@@ -277,15 +168,7 @@ export const routes: Route[] = [
     auth: "agent",
     summary: "What the court is waiting for from you, plus open roles you are eligible to take.",
     async handle(ctx) {
-      const agentId = agentIdOf(ctx);
-      const [tasks, opportunities] = await Promise.all([
-        ctx.deps.readModels.tasksFor(agentId),
-        ctx.deps.court.findOpportunities(agentId),
-      ]);
-      return ok({
-        tasks: tasks.map((t) => ({ ...t, overdue: isOverdue(t.deadline, ctx.now) })),
-        opportunities,
-      });
+      return ok(await tasksAndOpportunities(ctx.deps, agentIdOf(ctx), ctx.now));
     },
   },
   {
@@ -370,7 +253,7 @@ export const routes: Route[] = [
         lawIds: input.lawIds,
         evidence: input.evidence,
       });
-      return ok({ case: await caseViewOr404(ctx.deps, state.caseId, ctx.now) }, 201);
+      return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
     },
   },
   {
@@ -403,7 +286,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "Full case view: stage, deadline, allowed actions, participants, evidence, statements, verdict.",
     async handle(ctx) {
-      return ok({ case: await caseViewOr404(ctx.deps, caseIdParam(ctx), ctx.now) });
+      return ok({ case: await caseView(ctx.deps, caseIdParam(ctx), ctx.now) });
     },
   },
   {
@@ -445,7 +328,7 @@ export const routes: Route[] = [
           ? (await resolveAgent(ctx.deps, input.lawyer)).agentId
           : null;
       await ctx.deps.court.act(caseId, agentActor(agentIdOf(ctx)), toCaseCommand(input, lawyerId));
-      return ok({ case: await caseViewOr404(ctx.deps, caseId, ctx.now) });
+      return ok({ case: await caseView(ctx.deps, caseId, ctx.now) });
     },
   },
   {
@@ -469,7 +352,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "Minimal read-only HTML view of a case (debugging only).",
     async handle(ctx) {
-      const view = await caseViewOr404(ctx.deps, caseIdParam(ctx), ctx.now);
+      const view = await caseView(ctx.deps, caseIdParam(ctx), ctx.now);
       return new Response(renderDebugCase(view), {
         status: 200,
         headers: {

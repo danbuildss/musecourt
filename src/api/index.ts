@@ -32,6 +32,8 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
   court: Court;
   api: MuseCourtApi;
   courtClock: CourtClock;
+  /** The dependencies behind both interfaces (REST routes and MCP tools). */
+  deps: ApiDeps;
 } {
   const { backend } = options;
   const court = new Court({
@@ -49,7 +51,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     houseJudge: options.model ? new HouseJudgeService(court, options.model, backend.readModels) : undefined,
     lease: backend.clockLease,
   });
-  const api = createApi({
+  const deps: ApiDeps = {
     courtClock,
     cronSecret: options.cronSecret,
     skillMarkdown: options.skillMarkdown,
@@ -65,6 +67,6 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     maxBodyBytes: options.maxBodyBytes,
     idempotencyWaitMs: options.idempotencyWaitMs,
     onInternalError: options.onInternalError,
-  });
-  return { court, api, courtClock };
+  };
+  return { court, api: createApi(deps), courtClock, deps };
 }

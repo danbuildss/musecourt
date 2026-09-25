@@ -146,6 +146,31 @@ describe("V1 success condition: a full trial with five agents", () => {
     expect(next.stage).toBe("OPENING_DEFENCE");
   });
 
+  it("accepts addressedTo only for the judge's questions: elsewhere it is rejected, never silently dropped", async () => {
+    const t = await createTestCourt();
+    const { caseId } = await fileStandardCase(t);
+    await driveToTrial(t, caseId);
+    const { apollo, athena, sol } = t.agents;
+    await expectCourtError(
+      t.act(caseId, apollo, { type: "MakeStatement", text: "Opening.", addressedTo: ["DEFENCE"] }),
+      "VALIDATION_FAILED",
+    );
+    await t.act(caseId, apollo, { type: "MakeStatement", text: "Opening." });
+    await t.act(caseId, athena, { type: "ConcludeStage" });
+    await t.act(caseId, apollo, { type: "ConcludeStage" });
+    await t.act(caseId, athena, { type: "ConcludeStage" });
+    const state = await t.act(caseId, sol, {
+      type: "MakeStatement",
+      text: "Was permission recorded?",
+      addressedTo: ["DEFENCE"],
+    });
+    expect(state.stage).toBe("ANSWERS");
+    await expectCourtError(
+      t.act(caseId, athena, { type: "MakeStatement", text: "Verbally.", addressedTo: ["PLAINTIFF"] }),
+      "VALIDATION_FAILED",
+    );
+  });
+
   it("lets the judge conclude without questions, skipping ANSWERS", async () => {
     const t = await createTestCourt();
     const { caseId } = await fileStandardCase(t);
