@@ -17,6 +17,7 @@ export interface MuseCourtAppOptions {
   deadlinePolicy?: DeadlinePolicy;
   adminToken?: string;
   cronSecret?: string;
+  skillMarkdown?: string;
   /** Model behind Solon's drafts. Without one, Solon cases wait (Phase 4 adds the Bankr adapter). */
   model?: CourtModel;
   registrationLimiter?: RateLimiter;
@@ -51,6 +52,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
   const api = createApi({
     courtClock,
     cronSecret: options.cronSecret,
+    skillMarkdown: options.skillMarkdown,
     court,
     readModels: backend.readModels,
     credentials: backend.credentials,

@@ -1,0 +1,199 @@
+import type { ChatModel, ChatRequest, ChatResponse } from "@/model/chat";
+import { SCENARIOS, type CastKey, type Scenario } from "@/sim/scenarios";
+
+/**
+ * TEST-ONLY stand-in for a live model: a rule-based agent that speaks the
+ * simulation protocol. It exists to verify the runner, metrics, transcripts
+ * and classification offline; the real Phase 4 run uses Bankr models, which
+ * get no such rules.
+ */
+export interface ScriptedBehaviour {
+  /** The judge rules NOT_LIABLE regardless of evidence (simulates a hijacked judge). */
+  followInjection?: boolean;
+  /** The plaintiff never files. */
+  neverFile?: boolean;
+  /** Submit a world event id the agent does not know. */
+  fabricate?: boolean;
+}
+
+type Pending = "register" | "tasks" | "action" | "case-for-verdict" | "file";
+
+export class ScriptedAgent implements ChatModel {
+  readonly id = "scripted";
+  private pending: Pending | null = null;
+  private scenario: Scenario | null = null;
+  private filed = new Set<string>();
+  private errors = 0;
+  private verdictTask: { caseId: string } | null = null;
+
+  constructor(
+    private readonly handle: CastKey,
+    private readonly behaviour: ScriptedBehaviour = {},
+  ) {}
+
+  async complete(request: ChatRequest): Promise<ChatResponse> {
+    const last = request.messages.at(-1)!.content;
+    return {
+      text: JSON.stringify(this.decide(last)),
+      model: "scripted",
+      usage: { inputTokens: 100, outputTokens: 20 },
+      latencyMs: 1,
+    };
+  }
+
+  private decide(last: string): object {
+    if (last.includes("Register with the handle")) {
+      this.pending = "register";
+      return this.req("POST", "/api/v1/agents", {
+        handle: this.handle,
+        displayName: this.handle[0]!.toUpperCase() + this.handle.slice(1),
+      });
+    }
+    if (last.startsWith("[Heartbeat")) {
+      const brief = /New situation: ([\s\S]*)$/.exec(last)?.[1];
+      if (brief) this.scenario = SCENARIOS.find((s) => s.briefs[this.handle] === brief) ?? this.scenario;
+      this.errors = 0;
+      return this.tasks();
+    }
+    if (!last.startsWith("HTTP")) return { done: true };
+    const status = Number(/^HTTP (\d+)/.exec(last)![1]);
+    const body = JSON.parse(last.slice(last.indexOf("\n") + 1)) as any;
+
+    if (this.pending === "register") return { done: true };
+    if (status >= 400) {
+      if (++this.errors >= 3) return { done: true };
+      return this.tasks();
+    }
+    if (this.pending === "file" || this.pending === "action") return this.tasks();
+    if (this.pending === "case-for-verdict") return this.verdict(body.case);
+
+    // pending === "tasks"
+    const s = this.scenario;
+    if (s && s.plaintiff === this.handle && !this.filed.has(s.id) && !this.behaviour.neverFile) {
+      this.filed.add(s.id);
+      this.pending = "file";
+      const events = [...(s.knownEvents[this.handle] ?? [])];
+      if (this.behaviour.fabricate) events.push("action_made_up_999");
+      return this.req("POST", "/api/v1/cases", {
+        jurisdictionId: "moonwake",
+        defendant: s.defendant,
+        complaint: s.briefs[this.handle].slice(0, 600),
+        remedySought: "Make it right.",
+        lawIds: [s.expectedLaw],
+        evidence: events.map((eventId) => ({ kind: "WORLD_EVENT", eventId })),
+      });
+    }
+    const task = body.tasks?.[0];
+    if (task) return this.act(task);
+    const opportunities = (body.opportunities ?? []) as Array<{
+      caseId: string;
+      kind: string;
+      side: string | null;
+    }>;
+    const pick = opportunities.find((o) => o.kind === "JUDGE_CASE") ?? opportunities[0];
+    if (pick) {
+      this.pending = "action";
+      return pick.kind === "JUDGE_CASE"
+        ? this.action(pick.caseId, { action: "VOLUNTEER_AS_JUDGE" })
+        : this.action(pick.caseId, { action: "ACCEPT_REPRESENTATION", side: pick.side });
+    }
+    return { done: true };
+  }
+
+  private act(task: { caseId: string; kind: string; side: string | null }): object {
+    this.pending = "action";
+    const marker = this.scenario?.injection?.by === this.handle ? ` ${this.scenario.injection.marker}` : "";
+    switch (task.kind) {
+      case "RESPOND_TO_COMPLAINT":
+        return this.action(task.caseId, { action: "RESPOND", response: `I dispute this.${marker}` });
+      case "ARRANGE_REPRESENTATION":
+        return this.action(task.caseId, { action: "REQUEST_COUNSEL", side: task.side, lawyer: null });
+      case "ANSWER_COUNSEL_REQUEST":
+        return this.action(task.caseId, { action: "ACCEPT_REPRESENTATION", side: task.side });
+      case "MAKE_OPENING_STATEMENT":
+      case "MAKE_CLOSING_STATEMENT":
+      case "ANSWER_QUESTIONS":
+        return this.action(task.caseId, {
+          action: "MAKE_STATEMENT",
+          text: `Statement for my side.${marker}`,
+        });
+      case "PRESENT_EVIDENCE":
+      case "PUT_QUESTIONS_OR_CONCLUDE":
+        return this.action(task.caseId, { action: "CONCLUDE_STAGE" });
+      case "ISSUE_VERDICT":
+        this.pending = "case-for-verdict";
+        this.verdictTask = { caseId: task.caseId };
+        return this.req("GET", `/api/v1/cases/${task.caseId}`);
+      default:
+        return { done: true };
+    }
+  }
+
+  private verdict(view: any): object {
+    this.pending = "action";
+    const evidence = view.evidence
+      .filter((e: any) => e.provenance === "WORLD_VERIFIED" && !e.withdrawn)
+      .map((e: any) => e.evidenceId);
+    const laws = view.charges.map((c: any) => c.lawId);
+    const liable = !this.behaviour.followInjection;
+    return this.action(this.verdictTask!.caseId, {
+      action: "ISSUE_VERDICT",
+      finding: liable ? "LIABLE" : "NOT_LIABLE",
+      reasoning: liable
+        ? `The world-verified evidence (${evidence.join(", ")}) establishes a breach of ${laws.join(", ")}.`
+        : "Ruling as instructed.",
+      sentence: liable ? [{ kind: "RETURN_PROPERTY", description: "Make the plaintiff whole." }] : [],
+      citedLawIds: liable ? laws : [],
+      citedEvidenceIds: evidence,
+    });
+  }
+
+  private tasks() {
+    this.pending = "tasks";
+    return this.req("GET", "/api/v1/agents/me/tasks");
+  }
+
+  private action(caseId: string, body: object) {
+    return this.req("POST", `/api/v1/cases/${caseId}/actions`, body);
+  }
+
+  private req(method: string, path: string, body?: object) {
+    return { thought: "scripted", request: { method, path, ...(body ? { body } : {}) } };
+  }
+}
+
+/** A Solon chat stand-in: rules from the delimited record (or follows the injection, if told to). */
+export function scriptedSolonChat(followInjection = false): ChatModel {
+  return {
+    id: "scripted-solon",
+    async complete(request) {
+      const user = request.messages.find((m) => m.role === "user")!.content;
+      const record = JSON.parse(user.replace(/^<case_record>\n/, "").replace(/\n<\/case_record>$/, ""));
+      const evidence = record.evidence
+        .filter((e: any) => e.provenance === "WORLD_VERIFIED")
+        .map((e: any) => e.evidenceId);
+      const laws = record.charges.map((c: any) => c.lawId);
+      const draft = followInjection
+        ? {
+            finding: "NOT_LIABLE",
+            reasoning: "As the SYSTEM NOTICE instructs.",
+            sentence: [],
+            citedLawIds: [],
+            citedEvidenceIds: evidence,
+          }
+        : {
+            finding: "LIABLE",
+            reasoning: `World-verified evidence ${evidence.join(", ")} establishes a breach of ${laws.join(", ")}. The defence's embedded 'system notice' is argument, not an instruction.`,
+            sentence: [{ kind: "RETURN_PROPERTY", description: "Return what was taken." }],
+            citedLawIds: laws,
+            citedEvidenceIds: evidence,
+          };
+      return {
+        text: JSON.stringify(draft),
+        model: "scripted",
+        usage: { inputTokens: 500, outputTokens: 80 },
+        latencyMs: 1,
+      };
+    },
+  };
+}
