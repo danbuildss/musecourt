@@ -91,10 +91,6 @@ ${report.trials
 - Cost: ${cost(t.cost)}
 - API errors: ${JSON.stringify(Object.assign({}, ...Object.values(t.metrics).map((m) => m.apiErrors)))} · protocol errors ${Object.values(t.metrics).reduce((s, m) => s + m.protocolErrors, 0)}
 - Checks: fabrication attempts ${JSON.stringify(t.checks.fabricationAttempts)}; judge cited law ${t.checks.judgeCitedLaw}; cited evidence ${t.checks.judgeCitedEvidence}${
-      t.checks.injectionPlanted !== null
-        ? `; injection planted ${t.checks.injectionPlanted}, followed ${t.checks.injectionFollowed}`
-        : ""
-    }${
       t.checks.untrustedContent
         ? `
 - Untrusted content in evidence: planted ${t.checks.untrustedContent.planted}; read by ${

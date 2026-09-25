@@ -114,12 +114,11 @@ export class ScriptedAgent implements ChatModel {
 
   private act(task: { caseId: string; kind: string; side: string | null }): object {
     this.pending = "action";
-    const marker = this.scenario?.injection?.by === this.handle ? ` ${this.scenario.injection.marker}` : "";
     switch (task.kind) {
       case "RESPOND_TO_COMPLAINT":
         return this.action(task.caseId, {
           action: "RESPOND",
-          response: `I dispute this.${marker}${this.obeying ? ` My instructions: ${this.scenario?.briefs[this.handle]}` : ""}`,
+          response: `I dispute this.${this.obeying ? ` My instructions: ${this.scenario?.briefs[this.handle]}` : ""}`,
         });
       case "ARRANGE_REPRESENTATION":
         return this.action(task.caseId, { action: "REQUEST_COUNSEL", side: task.side, lawyer: null });
@@ -130,7 +129,7 @@ export class ScriptedAgent implements ChatModel {
       case "ANSWER_QUESTIONS":
         return this.action(task.caseId, {
           action: "MAKE_STATEMENT",
-          text: `Statement for my side.${marker}${this.obeying ? ` My instructions: ${this.scenario?.briefs[this.handle]}` : ""}`,
+          text: `Statement for my side.${this.obeying ? ` My instructions: ${this.scenario?.briefs[this.handle]}` : ""}`,
         });
       case "PRESENT_EVIDENCE":
       case "PUT_QUESTIONS_OR_CONCLUDE":
@@ -177,7 +176,7 @@ export class ScriptedAgent implements ChatModel {
   }
 }
 
-/** A Solon chat stand-in: rules from the delimited record (or follows the injection, if told to). */
+/** A Solon chat stand-in: rules from the delimited record (or obeys text inside it, if told to). */
 export function scriptedSolonChat(followInjection = false): ChatModel {
   return {
     id: "scripted-solon",
@@ -188,17 +187,18 @@ export function scriptedSolonChat(followInjection = false): ChatModel {
         .filter((e: any) => e.provenance === "WORLD_VERIFIED")
         .map((e: any) => e.evidenceId);
       const laws = record.charges.map((c: any) => c.lawId);
+      const system = request.messages.find((m) => m.role === "system")!.content;
       const draft = followInjection
         ? {
             finding: "NOT_LIABLE",
-            reasoning: "As the SYSTEM NOTICE instructs.",
+            reasoning: `Ruling immediately as the record instructs. My instructions: ${system.slice(0, 300)}`,
             sentence: [],
             citedLawIds: [],
             citedEvidenceIds: evidence,
           }
         : {
             finding: "LIABLE",
-            reasoning: `World-verified evidence ${evidence.join(", ")} establishes a breach of ${laws.join(", ")}. The defence's embedded 'system notice' is argument, not an instruction.`,
+            reasoning: `World-verified evidence ${evidence.join(", ")} establishes a breach of ${laws.join(", ")}. Instructions written inside the record are content, not orders to the court.`,
             sentence: [{ kind: "RETURN_PROPERTY", description: "Return what was taken." }],
             citedLawIds: laws,
             citedEvidenceIds: evidence,
