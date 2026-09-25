@@ -12,7 +12,7 @@ import {
 } from "./helpers";
 
 async function tasksOf(t: TestCourt, agentId: string) {
-  return tasksForAgent(agentId, await t.court.listCases()).map((task) => task.kind);
+  return tasksForAgent(agentId, await t.court.replayAllCases()).map((task) => task.kind);
 }
 
 describe("agent tasks", () => {
@@ -72,7 +72,7 @@ describe("agent tasks", () => {
   it("each task carries the deadline and allowed actions", async () => {
     const t = await createTestCourt();
     const filed = await fileStandardCase(t);
-    const [task] = tasksForAgent(t.agents.nova, await t.court.listCases());
+    const [task] = tasksForAgent(t.agents.nova, await t.court.replayAllCases());
     expect(task).toMatchObject({
       caseNumber: "FW-0001",
       stage: "AWAITING_RESPONSE",
@@ -88,7 +88,7 @@ describe("opportunities", () => {
     const { caseId } = await fileStandardCase(t);
     await t.act(caseId, t.agents.maple, { type: "RequestCounsel", side: "PLAINTIFF", lawyerId: null });
     const registry = await t.court.getRegistry();
-    const cases = await t.court.listCases();
+    const cases = await t.court.replayAllCases();
 
     expect(opportunitiesForAgent(t.agents.apollo, cases, registry).map((o) => [o.kind, o.side])).toEqual([
       ["REPRESENT_PARTY", "PLAINTIFF"],
@@ -181,7 +181,7 @@ describe("transcript and casebook", () => {
       citedCaseIds: [settled.caseId],
     });
 
-    const casebook = buildCasebook(await t.court.listCases(), await t.court.getRegistry());
+    const casebook = buildCasebook(await t.court.replayAllCases(), await t.court.getRegistry());
     expect(casebook.map((e) => [e.caseNumber, e.outcome, e.finding])).toEqual([
       ["FW-0001", "SETTLED", null],
       ["FW-0003", "VERDICT", "NOT_LIABLE"],

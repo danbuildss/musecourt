@@ -31,16 +31,31 @@ function toStored(row: EventRow): StoredEvent {
 
 const UNIQUE_VIOLATION = "23505";
 
+export interface PostgresEventStoreOptions {
+  /** Runs inside the append transaction, after the events are inserted. Throwing rolls everything back. */
+  onAppend?: (written: StoredEvent[], client: PoolClient) => Promise<void>;
+}
+
+/** Reads a stream through a specific client (e.g. inside the append transaction). */
+export async function readStreamWith(
+  client: Pick<PoolClient, "query">,
+  streamId: string,
+): Promise<StoredEvent[]> {
+  const { rows } = await client.query<EventRow>(`${SELECT} WHERE stream_id = $1 ORDER BY stream_version`, [
+    streamId,
+  ]);
+  return rows.map(toStored);
+}
+
 /** Postgres event store. Optimistic concurrency per stream; multi-stream appends share one transaction. */
 export class PostgresEventStore implements EventStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly options: PostgresEventStoreOptions = {},
+  ) {}
 
-  async readStream(streamId: string): Promise<StoredEvent[]> {
-    const { rows } = await this.pool.query<EventRow>(
-      `${SELECT} WHERE stream_id = $1 ORDER BY stream_version`,
-      [streamId],
-    );
-    return rows.map(toStored);
+  readStream(streamId: string): Promise<StoredEvent[]> {
+    return readStreamWith(this.pool, streamId);
   }
 
   async readAll(afterPosition = 0): Promise<StoredEvent[]> {
@@ -65,8 +80,11 @@ export class PostgresEventStore implements EventStore {
       for (const batch of batches) {
         written.push(...(await this.appendBatch(client, batch, options)));
       }
+      written.sort((a, b) => a.globalPosition - b.globalPosition);
+      // Read models are projected in the same transaction, so they never lag or diverge.
+      await this.options.onAppend?.(written, client);
       await client.query("COMMIT");
-      return written.sort((a, b) => a.globalPosition - b.globalPosition);
+      return written;
     } catch (error) {
       await client.query("ROLLBACK");
       if ((error as { code?: string }).code === UNIQUE_VIOLATION) {

@@ -77,7 +77,7 @@ describe("evidence provenance", () => {
         type: "SubmitEvidence",
         evidence: { kind: forged, title: "Totally real", content: "Trust me." },
       } as unknown as CaseCommand;
-      await expectCourtError(t.act(caseId, t.agents.apollo, command), "VALIDATION_FAILED");
+      await expectCourtError(t.act(caseId, t.agents.apollo, command), "INVALID_EVIDENCE");
     }
     expect((await t.court.getCase(caseId))!.evidence).toHaveLength(0);
   });
@@ -106,7 +106,7 @@ describe("evidence provenance", () => {
       fileStandardCase(t, { evidence: [{ kind: "WORLD_EVENT", eventId: "action_made_up" }] }),
       "WORLD_EVIDENCE_NOT_FOUND",
     );
-    expect(await t.court.listCases()).toHaveLength(0);
+    expect(await t.court.replayAllCases()).toHaveLength(0);
   });
 
   it("reports an unreachable world as retryable and records nothing", async () => {
@@ -138,7 +138,7 @@ describe("evidence provenance", () => {
         type: "SubmitEvidence",
         evidence: { kind: "WORLD_EVENT", eventId: "action_72882" },
       }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -188,7 +188,7 @@ describe("evidence provenance", () => {
         type: "SubmitEvidence",
         evidence: { kind: "TESTIMONY", content: "I saw it." },
       }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -200,7 +200,7 @@ describe("evidence provenance", () => {
         type: "SubmitEvidence",
         evidence: { kind: "DOCUMENT", title: "Doc", content: "Content." },
       }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -212,7 +212,7 @@ describe("evidence provenance", () => {
         type: "SubmitEvidence",
         evidence: { kind: "TESTIMONY", content: "Me!" },
       }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -269,7 +269,7 @@ describe("evidence provenance", () => {
         reasoning: "x",
         citedEvidenceIds: ["ev_1"],
       }),
-      "NOT_FOUND",
+      "INVALID_EVIDENCE",
     );
   });
 
@@ -278,7 +278,7 @@ describe("evidence provenance", () => {
     const { caseId } = await fileStandardCase(t);
     await expectCourtError(
       t.act(caseId, t.agents.nova, { type: "WithdrawEvidence", evidenceId: "ev_1", reason: "Not mine." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     t.clock.advanceHours(48);
     await t.court.expireDeadline(caseId); // creates a court record of non-response
@@ -291,7 +291,7 @@ describe("evidence provenance", () => {
         evidenceId: courtRecord.evidenceId,
         reason: "No.",
       }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -301,7 +301,7 @@ describe("evidence provenance", () => {
     await driveToTrial(t, caseId);
     await expectCourtError(
       t.act(caseId, t.agents.apollo, { type: "MakeStatement", text: "See ev_99.", evidenceIds: ["ev_99"] }),
-      "NOT_FOUND",
+      "INVALID_EVIDENCE",
     );
   });
 

@@ -99,7 +99,7 @@ describe("V1 success condition: a full trial with five agents", () => {
     expect(state.outcome).toBe("VERDICT");
     expect(state.verdict).toMatchObject({ finding: "LIABLE", judge: { kind: "AGENT", agentId: sol } });
 
-    const casebook = buildCasebook(await t.court.listCases(), await t.court.getRegistry());
+    const casebook = buildCasebook(await t.court.replayAllCases(), await t.court.getRegistry());
     expect(casebook).toHaveLength(1);
     expect(casebook[0]).toMatchObject({ caseNumber: "FW-0001", outcome: "VERDICT", finding: "LIABLE" });
 
@@ -129,7 +129,7 @@ describe("V1 success condition: a full trial with five agents", () => {
       expect(closed.outcome).toBe("VERDICT");
     }
     expect(
-      buildCasebook(await t.court.listCases(), await t.court.getRegistry()).map((e) => e.caseNumber),
+      buildCasebook(await t.court.replayAllCases(), await t.court.getRegistry()).map((e) => e.caseNumber),
     ).toEqual(["FW-0001", "FW-0002", "FW-0003"]);
   });
 

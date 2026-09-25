@@ -5,10 +5,9 @@ import type { CaseCommand, EvidenceInput } from "@/core/case-decide";
 import type { CaseState } from "@/core/case-state";
 import { isCourtError, type CourtErrorCode } from "@/core/errors";
 import type { LicenceType } from "@/core/events";
-import type { EventStore } from "@/core/ports";
 import type { DeadlinePolicy, Stage } from "@/core/procedure";
 import { Court } from "@/court/court";
-import { MemoryEventStore } from "@/infra/memory-event-store";
+import { createMemoryBackend, type Backend } from "@/infra/backends";
 import { FOUNDING_LAWS } from "@/seed/laws";
 import { FakeClock } from "@/testing/fake-clock";
 import { SequentialIds } from "@/testing/sequential-ids";
@@ -17,7 +16,7 @@ export const JURISDICTION = "fake";
 
 export interface TestCourtOptions {
   policy?: DeadlinePolicy;
-  store?: EventStore;
+  backend?: Backend;
 }
 
 /**
@@ -27,11 +26,19 @@ export interface TestCourtOptions {
  *  - sol, iris: licensed lawyers and judges
  */
 export async function createTestCourt(options: TestCourtOptions = {}) {
-  const store = options.store ?? new MemoryEventStore();
+  const backend = options.backend ?? createMemoryBackend();
+  const { store, readModels } = backend;
   const clock = new FakeClock();
   const ids = new SequentialIds();
   const world = new FakeWorld();
-  const court = new Court({ store, clock, ids, connectors: [world], deadlinePolicy: options.policy });
+  const court = new Court({
+    store,
+    readModels,
+    clock,
+    ids,
+    connectors: [world],
+    deadlinePolicy: options.policy,
+  });
   const admin = adminActor("admin_1");
 
   await court.establishJurisdiction(
@@ -64,7 +71,7 @@ export async function createTestCourt(options: TestCourtOptions = {}) {
   const act = (caseId: string, agentId: string, command: CaseCommand) =>
     court.act(caseId, as(agentId), command);
 
-  return { court, store, clock, ids, world, admin, agents, register, as, act };
+  return { court, backend, store, readModels, clock, ids, world, admin, agents, register, as, act };
 }
 
 export type TestCourt = Awaited<ReturnType<typeof createTestCourt>>;

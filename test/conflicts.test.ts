@@ -233,15 +233,15 @@ describe("permissions: the right agent must act", () => {
     const { caseId } = await fileStandardCase(t);
     await expectCourtError(
       t.act(caseId, t.agents.maple, { type: "RespondToComplaint", response: "x" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.act(caseId, t.agents.bob, { type: "RespondToComplaint", response: "x" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.court.act(caseId, SYSTEM, { type: "RespondToComplaint", response: "x" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -250,11 +250,11 @@ describe("permissions: the right agent must act", () => {
     const { caseId } = await fileStandardCase(t);
     await expectCourtError(
       t.act(caseId, t.agents.nova, { type: "RequestCounsel", side: "PLAINTIFF" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.act(caseId, t.agents.bob, { type: "DeclareSelfRepresentation", side: "DEFENCE" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -268,7 +268,7 @@ describe("permissions: the right agent must act", () => {
     });
     await expectCourtError(
       t.act(caseId, t.agents.athena, { type: "AcceptRepresentation", side: "PLAINTIFF" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.act(caseId, t.agents.athena, { type: "DeclineRepresentation", side: "PLAINTIFF" }),
@@ -288,15 +288,15 @@ describe("permissions: the right agent must act", () => {
     await driveToTrial(t, caseId);
     await expectCourtError(
       t.act(caseId, t.agents.maple, { type: "MakeStatement", text: "Let me speak." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.act(caseId, t.agents.athena, { type: "MakeStatement", text: "Out of turn." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.act(caseId, t.agents.sol, { type: "MakeStatement", text: "Judge interjects." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -321,16 +321,16 @@ describe("permissions: the right agent must act", () => {
       await t.act(caseId, i % 2 ? t.agents.athena : t.agents.apollo, { type: "ConcludeStage" });
     await expectCourtError(
       t.act(caseId, t.agents.iris, { type: "MakeStatement", text: "Q?", addressedTo: ["PLAINTIFF"] }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
-    await expectCourtError(t.act(caseId, t.agents.apollo, { type: "ConcludeStage" }), "NOT_PERMITTED");
+    await expectCourtError(t.act(caseId, t.agents.apollo, { type: "ConcludeStage" }), "NOT_AUTHORIZED");
     await expectCourtError(
       t.act(caseId, t.agents.iris, { type: "DismissCase", reason: "No." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.court.act(caseId, SYSTEM, { type: "DismissCase", reason: "No." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -351,7 +351,7 @@ describe("permissions: the right agent must act", () => {
     });
     await expectCourtError(
       t.act(caseId, t.agents.athena, { type: "MakeStatement", text: "Me too." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 
@@ -360,7 +360,7 @@ describe("permissions: the right agent must act", () => {
     const { caseId } = await fileStandardCase(t);
     await expectCourtError(
       t.act(caseId, t.agents.nova, { type: "WithdrawCase", reason: "Please." }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     const state = await t.act(caseId, t.agents.maple, { type: "WithdrawCase", reason: "We sorted it out." });
     expect(state.outcome).toBe("WITHDRAWN");
@@ -377,10 +377,10 @@ describe("permissions: the right agent must act", () => {
   it("agents cannot register agents, grant licences, enact law or correct the record", async () => {
     const t = await createTestCourt();
     const agent = t.as(t.agents.maple);
-    await expectCourtError(t.court.registerAgent({ handle: "sneaky" }, agent), "NOT_PERMITTED");
+    await expectCourtError(t.court.registerAgent({ handle: "sneaky" }, agent), "NOT_AUTHORIZED");
     await expectCourtError(
       t.court.grantLicence({ agentId: t.agents.maple, licence: "LAWYER" }, agent),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     await expectCourtError(
       t.court.enactLaw(
@@ -388,12 +388,12 @@ describe("permissions: the right agent must act", () => {
         { lawId: "new", article: 9, title: "New", text: "A brand new law text." },
         agent,
       ),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
     const { caseId } = await fileStandardCase(t);
     await expectCourtError(
       t.act(caseId, t.agents.maple, { type: "CorrectRecord", targetStreamVersion: 1, note: "x" }),
-      "NOT_PERMITTED",
+      "NOT_AUTHORIZED",
     );
   });
 });

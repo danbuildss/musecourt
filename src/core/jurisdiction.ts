@@ -74,7 +74,7 @@ export function decideEstablishJurisdiction(
   actor: Actor,
   input: { jurisdictionId: string; name: string; casePrefix: string; connectorId?: string | null },
 ): CourtEvent[] {
-  if (actor.kind !== "admin") fail("NOT_PERMITTED", "Only an admin can establish a jurisdiction.");
+  if (actor.kind !== "admin") fail("NOT_AUTHORIZED", "Only an admin can establish a jurisdiction.");
   if (state) fail("DUPLICATE", `Jurisdiction ${input.jurisdictionId} already exists.`);
   if (!ID_PATTERN.test(input.jurisdictionId)) {
     fail("VALIDATION_FAILED", "jurisdictionId must be lower-case letters, digits and '-'.", {
@@ -107,7 +107,7 @@ export function decideEnactLaw(
   actor: Actor,
   input: EnactLawInput,
 ): CourtEvent[] {
-  if (actor.kind !== "admin") fail("NOT_PERMITTED", "Only an admin can enact law.");
+  if (actor.kind !== "admin") fail("NOT_AUTHORIZED", "Only an admin can enact law.");
   if (!state) fail("NOT_FOUND", "Jurisdiction not found.");
   if (!ID_PATTERN.test(input.lawId))
     fail("VALIDATION_FAILED", "lawId must be lower-case letters, digits and '-'.");
