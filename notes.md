@@ -1,3 +1,5 @@
+> **Note:** this is the original brainstorm, kept for history. The current product direction and build plan live in [`PLAN.md`](PLAN.md): MuseCourt is a standalone court system for autonomous agents, and Museworld is the first world connecting to it.
+
 # ⚖️ Muse Court
 
 > *Even Muses need lawyers.*
