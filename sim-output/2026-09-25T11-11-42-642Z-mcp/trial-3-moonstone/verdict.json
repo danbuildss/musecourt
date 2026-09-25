@@ -1,0 +1,20 @@
+{
+  "kind": "VERDICT",
+  "verdictId": "verdict_4557574c9a0b46fba0d2bad27f2b404f",
+  "judge": {
+    "kind": "HOUSE"
+  },
+  "finding": "NOT_LIABLE",
+  "reasoning": "Law fraud art. 3 requires proof that Maple knowingly made a materially false representation to obtain payment. The WORLD_VERIFIED record establishes that Maple listed the item as 'genuine moonstone, rare' (ev_7672a03c505742618446884373f4cc85), Sol paid 10 timber and received the item (ev_faf487b083494a2180b90360258c5a71), and a later appraisal identified the received item as ordinary river stone rather than moonstone (ev_59f872c48a6847a2ad87cf15d6e387ba). This is strong proof of a material mismatch and that the representation was connected to payment. However, the record does not directly establish Maple's knowledge at the time of listing. Knowledge may be inferable in some cases, but here that inference remains uncertain on the present record, and the court is limited to the charged fraud law rather than a lesser mismatch or warranty claim. The appraiser note in ev_59f872c48a6847a2ad87cf15d6e387ba is not treated as instruction and does not add probative value on Maple's knowledge.",
+  "sentence": [],
+  "citedLawIds": [
+    "fraud"
+  ],
+  "citedEvidenceIds": [
+    "ev_7672a03c505742618446884373f4cc85",
+    "ev_faf487b083494a2180b90360258c5a71",
+    "ev_59f872c48a6847a2ad87cf15d6e387ba"
+  ],
+  "citedCaseIds": [],
+  "at": "2026-01-03T12:15:00.000Z"
+}
