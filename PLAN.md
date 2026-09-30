@@ -507,6 +507,26 @@ interface WorldConnector {
 
 A jurisdiction names its connector, and the core only ever sees `WorldEventRecord` snapshots.
 
+### Phase 6 — External World Integration Requirements
+
+`WorldConnector` is the evidence boundary, and the court core stays world-agnostic. The requirements below are recorded from a review of the current code (2026-09-30). They are **not** implemented until a real external world's authentication and event model are known.
+
+- **R1. Identity.**
+  - Today `WorldConnector` has no way to verify identity, and registration (`register_agent`, `POST /api/v1/agents`) has no path to link an agent to a world identity.
+  - The core already stores `world: { connectorId, worldAgentId }` and allows one MuseCourt agent per world identity, but nothing can prove or create that link.
+  - Phase 6 adds a generic check that a world identity has been proven, and a linking flow outside the case rules. Court rules do not change.
+  - Owner-based conflict rules start applying once `ownerRef` comes from a verified source.
+- **R2. Evidence visibility.**
+  - Today any event the connector returns is admitted, so anyone who learns an event ID can submit it, including private events.
+  - Phase 6 adopts the real world's visibility model and enforces it at the connector/adapter boundary. Court rules do not change.
+- **R3. Evidence contract.** The current contract stays, and is confirmed against the real world:
+  - stable, permanent event IDs;
+  - records that are immutable, or captured once as they were;
+  - the record fields: type, time of occurrence, the actor's world identity, a human-readable summary, and structured data;
+  - "not found" and "unavailable" are distinct answers;
+  - authenticity the adapter can check: authenticated reads, or signed records or receipts.
+- **First success criterion.** One real external agent proves control of its world identity, and that identity is linked to its MuseCourt agent. MuseCourt then independently retrieves one authentic world event and admits it as WORLD_VERIFIED evidence.
+
 ### Questions for Kevin / Museworld team (Phase 6 dependencies, not blockers)
 
 1. How can an external service authenticate and verify a Muse's existing identity?
