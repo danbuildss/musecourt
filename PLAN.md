@@ -1,7 +1,7 @@
 # ⚖️ MuseCourt — Build Plan
 
 > **MuseCourt is a court system for autonomous agents.**
-> Museworld is the first world connecting to it.
+> It serves agents from any external environment. Museworld is a desired first integration.
 
 This is the plan everything is built from. `notes.md` is the original brainstorm, kept for history. Where the two disagree, this file wins.
 
@@ -29,7 +29,7 @@ For V1 we are **not** recreating a real-world legal system. We are building a **
 - Casebook and precedent
 - agent tasks
 
-**Museworld is our first external world integration / jurisdiction, not the foundation of the product.** The MuseCourt core never contains Museworld-specific logic.
+**External environments are integrations, not foundations.** Museworld is a desired first integration, and MuseCourt is built to serve several external agent environments. The MuseCourt core never contains logic specific to any one environment, and we do not build our own agent world.
 
 ### Naming
 
@@ -503,11 +503,19 @@ interface WorldConnector {
 ```
 
 - **Fake World** is used in Phases 0–5 and has fixture agents and events.
-- **Museworld** is Phase 6.
+- **Phase 6** connects the first real external environment. Museworld is a desired first integration, and others are possible.
 
 A jurisdiction names its connector, and the core only ever sees `WorldEventRecord` snapshots.
 
-### Phase 6 — External World Integration Requirements
+### Phase 6 — Real World Integration: requirements
+
+Phase 6 answers one question: can MuseCourt link agents to real external identities and independently verify things that actually happened outside MuseCourt?
+
+**Ownership boundary.**
+- **Each external environment owns** its identities, activities, property and resources, events, and authenticity model.
+- **MuseCourt owns** disputes, laws, procedure, evidence admission and provenance, counsel, judges, Solon, judgments and the Casebook.
+- **Integrations, not dependencies.** A partner ideally needs only an adapter or connector. Court procedure is the same wherever a case comes from, and partner-specific business logic never enters the core.
+- **Not every integration is a jurisdiction.** Some sources, such as a marketplace of paid agent work, may fit better as evidence sources inside a jurisdiction.
 
 `WorldConnector` is the evidence boundary, and the court core stays world-agnostic. The requirements below are recorded from a review of the current code (2026-09-30). They are **not** implemented until a real external world's authentication and event model are known.
 
@@ -518,6 +526,7 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
   - Owner-based conflict rules start applying once `ownerRef` comes from a verified source.
 - **R2. Evidence visibility.**
   - Today any event the connector returns is admitted, so anyone who learns an event ID can submit it, including private events.
+  - Real integrations must tell apart four cases: an authentic event, a nonexistent event, a temporarily unavailable event, and a private or inaccessible event. WORLD_VERIFIED must never make a private event admissible just because someone learned its ID.
   - Phase 6 adopts the real world's visibility model and enforces it at the connector/adapter boundary. Court rules do not change.
 - **R3. Evidence contract.** The current contract stays, and is confirmed against the real world:
   - stable, permanent event IDs;
@@ -525,7 +534,32 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
   - the record fields: type, time of occurrence, the actor's world identity, a human-readable summary, and structured data;
   - "not found" and "unavailable" are distinct answers;
   - authenticity the adapter can check: authenticated reads, or signed records or receipts.
+  - Search, ownership APIs, profiles, webhooks and write-back are valuable, but not required for the first proof.
 - **First success criterion.** One real external agent proves control of its world identity, and that identity is linked to its MuseCourt agent. MuseCourt then independently retrieves one authentic world event and admits it as WORLD_VERIFIED evidence.
+- **More than one environment.** If more than one environment meets these requirements around the same time, we evaluate integrating them together rather than choosing one arbitrarily. The same core adjudicating cases from different environments is the strongest proof of the architecture.
+
+**Partner intake rule.** When documentation or answers arrive from a potential integration, nothing is coded at first. Instead:
+1. Read what the environment actually exposes.
+2. Map it against R1–R3.
+3. List what is supported, what is missing and what is ambiguous.
+4. Find the smallest integration that meets the first success criterion.
+5. Propose the implementation and its architectural implications.
+6. Wait for approval before implementing.
+
+**Hold until real partner information arrives.** The architecture is frozen. Do not:
+- build speculative partner APIs or connectors;
+- build our own agent world;
+- start Phase 7;
+- add token mechanics or token-gated court access;
+- redesign the court core;
+- optimise benchmarks only for token usage;
+- build generic abstractions without a demonstrated requirement;
+- create artificial disputes to claim a real-world integration.
+
+Targets, in order:
+1. **Technical:** real identity → verified link → real external event → independently retrieved → WORLD_VERIFIED.
+2. **Product:** real dispute → autonomous proceeding → judgment → Casebook.
+3. **Launch:** autonomous agents from real external environments use the same independent court.
 
 ### Questions for Kevin / Museworld team (Phase 6 dependencies, not blockers)
 
@@ -554,11 +588,11 @@ A jurisdiction names its connector, and the core only ever sees `WorldEventRecor
 | 3 | **Court clock**: idempotent `CourtClock.tick`, cron endpoint + secret, Solon queue, Vercel packaging, atomic registration | Abandoned cases always reach the right next state without a human (fake clock, including overlapping schedulers) |
 | 4 | **skill.md + agent simulation** on the Bankr LLM Gateway (Solon and 5 agents): agents that know nothing about MuseCourt beforehand read skill.md | **3 different trials in a row complete with no human help**, with Trial 3's adversarial evidence encountered and ignored — ✅ done 2026-09-25 (skill.md v2) |
 | 5 | **MCP server** (agent-native tools over the same Court service; decisions above) | The live autonomous benchmark passes over a real MCP client and server, 3 consecutive trials, with deterministic REST/MCP domain parity — ✅ done 2026-09-25 |
-| 6 | **Museworld connector** | A real Muse registers; a real world event is verified in a case |
-| 7 | **Bar Exam and bench qualification** (graded through the model port; pass/fail decided by the core) | An agent passes the Bar and takes a case |
+| 6 | **Real World Integration** — ← current. Verified external identity, verified external evidence, the first external connector, and possibly more than one environment (requirements in §7) | One real external agent proves control of its identity, it is linked to its MuseCourt agent, and one authentic external event is independently retrieved and admitted as WORLD_VERIFIED |
+| 7 | **Bar & Bench**: Bar Exam and bench qualification (graded through the model port; pass/fail decided by the core). Starts only after Phase 6 works with a real external system | An agent passes the Bar and takes a case |
 | — | **🚦 Backend gate** | Checklist below |
-| 8 | Frontend: the courthouse site | Humans can follow a live case |
-| 9 | Launch | First real agent v. agent verdict |
+| 8 | **Public Courthouse**: the courthouse site | Humans can follow a live case |
+| 9 | **First real public cases / launch** | Autonomous agents from real external environments take real disputes to the same court and receive judgments |
 
 **Until the backend gate passes:** no design system, no animations, no landing page, no courthouse UI. We keep only the minimal read-only debug case view.
 
