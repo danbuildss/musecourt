@@ -79,6 +79,7 @@ No Bankr payments, x402, tokens, lawyer payments, filing fees or financial penal
    - **Product first.** Real cases create the dataset naturally. Never change the architecture, add friction for agents, or fabricate disputes just to collect more data.
    - **Keep facts, not surveillance.** Record what happened in the case. Never record secrets, agents' private reasoning, or data that isn't needed.
    - **Privacy and security outrank completeness,** especially once external worlds connect.
+   - **The court comes first.** This principle shapes the architecture; it does not turn MuseCourt into a data-collection project. The valuable dataset emerges from real court activity.
 
    The audit and the rules are in §4, "The case record as a long-term asset".
 
@@ -134,7 +135,7 @@ Every event records its stream, its version within the stream, a global position
 
 Every event carries its actor, `occurredAt` (court time) and its stream and global position; Postgres also stores `recorded_at`. Replaying a stream up to any version reproduces exactly what the court knew at that point. Laws and world evidence are snapshotted, so later changes to a law or a world cannot rewrite history. All views are derived and rebuildable from the log.
 
-**What we still lose.** These are recorded so they aren't forgotten. Each is built only when a real need arrives, and with approval:
+**What we still lose.** These are documented future requirements, recorded so they aren't forgotten. Each is triggered only by actual need, and built with approval:
 1. **Enforcement and outcome after judgment.** Sentences are recorded, but not whether they were carried out. This is the missing last step of the lifecycle, and it needs an external world that can report it (Phase 6+).
 2. **Solon's provenance.** A House verdict doesn't record which model or prompt version drafted it, and rejected or failed Solon drafts leave no trace in the record.
 3. **Event schema evolution.** `court_events.schema_version` exists but is always 1, and the code doesn't use it. Before any event payload changes shape, adopt versioned upcasting, so every historical event stays readable forever.
@@ -149,9 +150,9 @@ Every event carries its actor, `occurredAt` (court time) and its stream and glob
 - Anything about the humans behind agents beyond an opaque `ownerRef`.
 - Partners' confidential information.
 
-**Privacy and security rules (required before real external worlds go live).**
+**Privacy and security rules.** The first two are part of the **Phase 6 record-visibility gate** (§7).
 - **The record is public by default.** `/events`, `/transcript` and case views expose every case. So anything admitted becomes public. That is why R2 must stop private world events from being admitted, unless a case-level access model is agreed first.
-- **A redaction mechanism is needed.** Append-only means sensitive content a party submits (a leaked key, personal data) can't be removed today; `RecordCorrected` only annotates. A design is needed and must be decided before Phase 6 goes live. Options include a redaction event that every projection and public endpoint honours while recording that a redaction happened, or encrypting content so it can be erased by deleting the key.
+- **A redaction mechanism is needed.** Append-only means sensitive content a party submits (a leaked key, personal data) can't be removed today; `RecordCorrected` only annotates. Options include a redaction event that every projection and public endpoint honours while recording that a redaction happened, or encrypting content so it can be erased by deleting the key. The choice is made at the gate.
 - **Real and simulated stay separate.** Simulations, benchmarks and tests never write into a production record or the real Casebook.
 - **Datasets are derived, never edited in.** Any dataset or export is built from read models and the log without altering them, and respects redactions, world visibility and partner agreements.
 
@@ -582,6 +583,13 @@ Phase 6 answers one question: can MuseCourt link agents to real external identit
   - authenticity the adapter can check: authenticated reads, or signed records or receipts.
   - Search, ownership APIs, profiles, webhooks and write-back are valuable, but not required for the first proof.
 - **First success criterion.** One real external agent proves control of its world identity, and that identity is linked to its MuseCourt agent. MuseCourt then independently retrieves one authentic world event and admits it as WORLD_VERIFIED evidence.
+- **Gate before going live: record visibility.** This is a hard requirement. No real external world sends evidence into MuseCourt until there is an explicit, approved design for **public record vs protected/private material vs redacted material**.
+  - The canonical court history stays append-only and reconstructable. But immutable internally must not mean that every piece of submitted material is permanently public.
+  - The design must cover:
+    - which material is public, which is protected (and who may see it), and how material is redacted while recording that a redaction happened;
+    - how admitted private world events are handled (R2);
+    - how every projection, the REST and MCP endpoints, the Casebook and any derived dataset honour these rules.
+  - The design is brought for a decision when the first integration is ready. It is not implemented earlier, unless that integration requires it.
 - **More than one environment.** If more than one environment meets these requirements around the same time, we evaluate integrating them together rather than choosing one arbitrarily. The same core adjudicating cases from different environments is the strongest proof of the architecture.
 
 **Partner intake rule.** When documentation or answers arrive from a potential integration, nothing is coded at first. Instead:
@@ -634,7 +642,7 @@ Targets, in order:
 | 3 | **Court clock**: idempotent `CourtClock.tick`, cron endpoint + secret, Solon queue, Vercel packaging, atomic registration | Abandoned cases always reach the right next state without a human (fake clock, including overlapping schedulers) |
 | 4 | **skill.md + agent simulation** on the Bankr LLM Gateway (Solon and 5 agents): agents that know nothing about MuseCourt beforehand read skill.md | **3 different trials in a row complete with no human help**, with Trial 3's adversarial evidence encountered and ignored — ✅ done 2026-09-25 (skill.md v2) |
 | 5 | **MCP server** (agent-native tools over the same Court service; decisions above) | The live autonomous benchmark passes over a real MCP client and server, 3 consecutive trials, with deterministic REST/MCP domain parity — ✅ done 2026-09-25 |
-| 6 | **Real World Integration** — ← current. Verified external identity, verified external evidence, the first external connector, and possibly more than one environment (requirements in §7) | One real external agent proves control of its identity, it is linked to its MuseCourt agent, and one authentic external event is independently retrieved and admitted as WORLD_VERIFIED |
+| 6 | **Real World Integration** — ← current. Verified external identity, verified external evidence, the first external connector, and possibly more than one environment (requirements in §7) | One real external agent proves control of its identity, it is linked to its MuseCourt agent, and one authentic external event is independently retrieved and admitted as WORLD_VERIFIED. **Gate:** the record-visibility design (public / protected / redacted) is approved before any real world sends evidence |
 | 7 | **Bar & Bench**: Bar Exam and bench qualification (graded through the model port; pass/fail decided by the core). Starts only after Phase 6 works with a real external system | An agent passes the Bar and takes a case |
 | — | **🚦 Backend gate** | Checklist below |
 | 8 | **Public Courthouse**: the courthouse site | Humans can follow a live case |
