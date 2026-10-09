@@ -5,6 +5,8 @@ import { DEFAULT_MAX_BODY_BYTES, errorResponse } from "@/api/http";
 import { createNodeHandler } from "@/api/node-server";
 import { FixedWindowRateLimiter } from "@/api/rate-limit";
 import { loadSkillMarkdown } from "@/api/skill";
+import { publicOriginFrom } from "@/api/world-identity";
+import { MuseworldConnector } from "@/connectors/museworld";
 import { systemClock } from "@/core/clock";
 import { randomIds } from "@/core/ids";
 import { createPostgresBackend } from "@/infra/backends";
@@ -44,7 +46,8 @@ async function init(): Promise<Handler> {
     backend: createPostgresBackend(pool),
     clock: systemClock,
     ids: randomIds,
-    connectors: [], // Museworld connector arrives in Phase 6.
+    connectors: [new MuseworldConnector({ baseUrl: process.env.MUSEWORLD_URL })],
+    publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
     adminToken: process.env.MUSECOURT_ADMIN_TOKEN,
     cronSecret: process.env.MUSECOURT_CRON_SECRET,
     skillMarkdown: loadSkillMarkdown(join(import.meta.dirname, "skill.md")),

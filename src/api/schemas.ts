@@ -29,6 +29,15 @@ export const evidenceInput = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("TESTIMONY"), content: text }),
 ]);
 
+export const connectorId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "must be a world connector ID");
+
+export const worldChallengeBody = z.strictObject({ connectorId });
+
+export const linkWorldIdentityBody = z.strictObject({
+  connectorId,
+  proof: z.string().min(1).max(16_384),
+});
+
 export const registerAgentBody = z.strictObject({
   handle: z.string().max(200),
   displayName: z.string().max(200).optional(),

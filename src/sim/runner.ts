@@ -245,7 +245,8 @@ export async function runSimulation(options: SimulationOptions): Promise<Simulat
   // ---- A fresh court: in-memory backend, fake clock, FakeWorld standing in for Moonwake's world. ----
   const clock = new FakeClock("2026-01-01T09:00:00.000Z");
   const backend = createMemoryBackend();
-  const world = new FakeWorld(MOONWAKE_JURISDICTION.connectorId);
+  // FakeWorld keeps its own id: it must never be mistaken for the real Museworld connector.
+  const world = new FakeWorld();
   const { court, api } = createMuseCourtApp({
     backend,
     clock,
@@ -256,7 +257,7 @@ export async function runSimulation(options: SimulationOptions): Promise<Simulat
     model: solonModel,
     skillMarkdown: options.skillMarkdown,
   });
-  await seedJurisdiction(court, MOONWAKE_JURISDICTION);
+  await seedJurisdiction(court, { ...MOONWAKE_JURISDICTION, connectorId: world.id });
   const server = createNodeServer(api, { maxBodyBytes: DEFAULT_MAX_BODY_BYTES });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

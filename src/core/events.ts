@@ -98,6 +98,18 @@ export interface CourtEventMap {
     note: string;
   };
   LicenceRevoked: { agentId: string; licence: LicenceType; reason: string };
+  /** The agent proved control of a world identity through that world's connector. */
+  WorldIdentityLinked: {
+    agentId: string;
+    connectorId: string;
+    worldAgentId: string;
+    /** The world's id for the verified proof. */
+    proofId: string;
+    /** Owner reference adopted by this link (null if the agent already had one or the world gave none). */
+    ownerRef: string | null;
+    /** Public facts the world vouched for when the link was made. */
+    attributes: Record<string, unknown>;
+  };
 
   // jurisdiction stream
   JurisdictionEstablished: {

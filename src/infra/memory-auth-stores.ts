@@ -4,6 +4,9 @@ import type {
   CredentialStore,
   IdempotencyRecord,
   IdempotencyStore,
+  ClaimResult,
+  WorldChallengeRecord,
+  WorldChallengeStore,
 } from "@/api/stores";
 
 export class MemoryCredentialStore implements CredentialStore {
@@ -94,5 +97,24 @@ export class MemoryIdempotencyStore implements IdempotencyStore {
   async get(principal: string, key: string): Promise<IdempotencyRecord | null> {
     const record = this.records.get(this.id(principal, key));
     return record ? structuredClone(record) : null;
+  }
+}
+
+export class MemoryWorldChallengeStore implements WorldChallengeStore {
+  private readonly records = new Map<string, WorldChallengeRecord>();
+
+  async insert(record: Omit<WorldChallengeRecord, "usedAt">): Promise<void> {
+    if (this.records.has(record.nonce)) throw new Error("Duplicate challenge nonce");
+    this.records.set(record.nonce, { ...record, usedAt: null });
+  }
+
+  async claim(nonce: string, agentId: string, connectorId: string, now: Date): Promise<ClaimResult> {
+    const record = this.records.get(nonce);
+    if (!record || record.agentId !== agentId || record.connectorId !== connectorId)
+      return { kind: "NOT_FOUND" };
+    if (record.usedAt) return { kind: "USED" };
+    if (Date.parse(record.expiresAt) <= now.getTime()) return { kind: "EXPIRED" };
+    record.usedAt = now.toISOString();
+    return { kind: "CLAIMED", record: { ...record } };
   }
 }

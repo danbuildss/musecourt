@@ -91,6 +91,11 @@ export const ERROR_CATALOGUE: Record<ApiErrorCode, ErrorSpec> = {
     retryable: true,
     meaning: "The world could not be reached. Retry later.",
   },
+  WORLD_UNAVAILABLE: {
+    status: 503,
+    retryable: true,
+    meaning: "The external world could not be reached (e.g. to check an identity proof). Retry later.",
+  },
   PAYLOAD_TOO_LARGE: { status: 413, retryable: false, meaning: "The request body is too large." },
   UNSUPPORTED_MEDIA_TYPE: {
     status: 415,

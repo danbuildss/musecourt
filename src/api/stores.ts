@@ -57,3 +57,31 @@ export interface IdempotencyStore {
   release(principal: string, key: string): Promise<void>;
   get(principal: string, key: string): Promise<IdempotencyRecord | null>;
 }
+
+/**
+ * One-time challenges for linking a world identity (Phase 6). Operational state, like idempotency
+ * keys: a challenge attempt is not a court fact, so it never goes into the event log.
+ */
+export interface WorldChallengeRecord {
+  nonce: string;
+  agentId: string;
+  connectorId: string;
+  /** The exact origin the proof must name. */
+  audience: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+}
+
+export type ClaimResult =
+  { kind: "CLAIMED"; record: WorldChallengeRecord } | { kind: "USED" | "EXPIRED" | "NOT_FOUND" };
+
+export interface WorldChallengeStore {
+  insert(record: Omit<WorldChallengeRecord, "usedAt">): Promise<void>;
+  /**
+   * Atomically marks the challenge used, if it was issued to this agent for this connector, is
+   * unused and has not expired. Concurrent claims of one challenge: exactly one succeeds.
+   * A challenge issued to another agent answers NOT_FOUND.
+   */
+  claim(nonce: string, agentId: string, connectorId: string, now: Date): Promise<ClaimResult>;
+}

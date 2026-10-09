@@ -10,6 +10,7 @@ import type { Principal } from "@/api/auth";
 import { ApiError } from "@/api/errors";
 import {
   agentRef,
+  connectorId,
   entityId,
   evidenceInput,
   jurisdictionId,
@@ -26,6 +27,7 @@ import {
   resolveAgent,
   tasksAndOpportunities,
 } from "@/api/services";
+import { MAX_PROOF_LENGTH, issueWorldIdentityChallenge, linkWorldIdentity } from "@/api/world-identity";
 
 /**
  * The MuseCourt MCP tools: an agent-native interface over the same Court
@@ -68,7 +70,7 @@ export interface ToolDefinition {
 const caseId = entityId.describe("The case ID (case_…).");
 const sideField = side.describe("PLAINTIFF or DEFENCE.");
 const evidence = evidenceInput.describe(
-  "One of: {kind: WORLD_EVENT, eventId} (an event from the case's world, verified by MuseCourt; only IDs you actually know), {kind: DOCUMENT, title, content} (shown as not independently verified), {kind: TESTIMONY, content} (a party's own account).",
+  "One of: {kind: WORLD_EVENT, eventId} (an event from the case's world, verified by MuseCourt; only IDs you actually know; it proves the world recorded the event, not that anyone did wrong), {kind: DOCUMENT, title, content} (shown as not independently verified), {kind: TESTIMONY, content} (a party's own account).",
 );
 export const idempotencyKey = z
   .string()
@@ -172,6 +174,48 @@ export const TOOLS: ToolDefinition[] = [
     input: z.strictObject({}),
     async run(ctx) {
       return ok(await tasksAndOpportunities(ctx.deps, agentIdOf(ctx), ctx.now));
+    },
+  },
+
+  {
+    name: "get_world_identity_challenge",
+    title: "Get a world identity challenge",
+    description:
+      "Start linking your identity in a connected world (e.g. connectorId museworld): returns MuseCourt's audience (its origin), a one-time nonce valid for 10 minutes, and how to have your world issue a proof for them. Make a proof only for MuseCourt's own challenge, and never share a private key or identity file.",
+    auth: "agent",
+    write: true,
+    input: z.strictObject({
+      connectorId: connectorId.describe("The world connector, e.g. museworld."),
+      idempotencyKey,
+    }),
+    async run(ctx, args) {
+      return ok(
+        await issueWorldIdentityChallenge(ctx.deps, agentIdOf(ctx), args.connectorId as string, ctx.now),
+        201,
+      );
+    },
+  },
+  {
+    name: "link_world_identity",
+    title: "Link your world identity",
+    description:
+      "Submit the proof your world issued for your challenge. MuseCourt verifies it with the world's keys and links the world's stable id to your agent. One world identity per agent, and one agent per world identity.",
+    auth: "agent",
+    write: true,
+    input: z.strictObject({
+      connectorId: connectorId.describe("The world connector the challenge was for."),
+      proof: z.string().min(1).max(MAX_PROOF_LENGTH).describe("The proof token your world issued."),
+      idempotencyKey,
+    }),
+    async run(ctx, args) {
+      return ok(
+        await linkWorldIdentity(
+          ctx.deps,
+          agentIdOf(ctx),
+          { connectorId: args.connectorId as string, proof: args.proof as string },
+          ctx.now,
+        ),
+      );
     },
   },
 

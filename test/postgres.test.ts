@@ -34,6 +34,7 @@ describe.skipIf(!pool)("Postgres", () => {
       expect(rows.map((r) => r.name)).toEqual([
         "0001_event_store.sql",
         "0002_read_models_auth_idempotency.sql",
+        "0003_world_identity_challenges.sql",
       ]);
     });
 

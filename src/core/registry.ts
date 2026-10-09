@@ -1,6 +1,7 @@
 import type { Actor } from "./actor";
 import { fail } from "./errors";
 import { event, type CourtEvent, type LicenceType, type StoredEvent } from "./events";
+import type { VerifiedWorldIdentity } from "./ports";
 import { LIMITS } from "./procedure";
 import { requireText } from "./validate";
 
@@ -66,6 +67,15 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
       });
       state.handles.set(normalizeHandle(d.handle), d.agentId);
       if (d.world) state.worldIdentities.set(worldKey(d.world.connectorId, d.world.worldAgentId), d.agentId);
+      break;
+    }
+    case "WorldIdentityLinked": {
+      const agent = state.agents.get(e.data.agentId);
+      if (agent) {
+        agent.world = { connectorId: e.data.connectorId, worldAgentId: e.data.worldAgentId };
+        if (!agent.ownerRef && e.data.ownerRef) agent.ownerRef = e.data.ownerRef;
+      }
+      state.worldIdentities.set(worldKey(e.data.connectorId, e.data.worldAgentId), e.data.agentId);
       break;
     }
     case "LicenceGranted": {
@@ -195,6 +205,49 @@ export function decideRegisterAgent(
     }
   }
   return [event("AgentRegistered", { agentId: input.agentId, handle, displayName, ownerRef, world })];
+}
+
+export interface LinkWorldIdentityInput {
+  agentId: string;
+  connectorId: string;
+  /** Already verified by the world's connector (the application layer does the IO, as for evidence). */
+  verified: VerifiedWorldIdentity;
+}
+
+/**
+ * Links an agent to a world identity it has proven it controls. An agent acts only for itself,
+ * holds at most one world identity for now, and a world identity belongs to one agent.
+ */
+export function decideLinkWorldIdentity(
+  state: RegistryState,
+  actor: Actor,
+  input: LinkWorldIdentityInput,
+): CourtEvent[] {
+  if (actor.kind !== "agent" || actor.agentId !== input.agentId) {
+    fail("NOT_AUTHORIZED", "An agent can only link a world identity to itself.");
+  }
+  const agent = requireAgent(state, input.agentId);
+  const connectorId = requireText(input.connectorId, "connectorId", 1, 100);
+  const worldAgentId = requireText(input.verified.worldAgentId, "worldAgentId", 1, 200);
+  if (agent.world) {
+    fail("DUPLICATE", "This agent is already linked to a world identity.", { world: agent.world });
+  }
+  if (state.worldIdentities.has(worldKey(connectorId, worldAgentId))) {
+    fail("DUPLICATE", "That world identity is already linked to another MuseCourt agent.", {
+      connectorId,
+    });
+  }
+  const offered = input.verified.ownerRef ? requireText(input.verified.ownerRef, "ownerRef", 1, 200) : null;
+  return [
+    event("WorldIdentityLinked", {
+      agentId: agent.agentId,
+      connectorId,
+      worldAgentId,
+      proofId: requireText(input.verified.proofId, "proofId", 1, 200),
+      ownerRef: agent.ownerRef ? null : offered,
+      attributes: input.verified.attributes,
+    }),
+  ];
 }
 
 export interface GrantLicenceInput {

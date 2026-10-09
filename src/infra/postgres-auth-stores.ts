@@ -5,6 +5,9 @@ import type {
   CredentialStore,
   IdempotencyRecord,
   IdempotencyStore,
+  ClaimResult,
+  WorldChallengeRecord,
+  WorldChallengeStore,
 } from "@/api/stores";
 
 interface CredentialRow {
@@ -144,5 +147,59 @@ export class PostgresIdempotencyStore implements IdempotencyStore {
       [principal, key],
     );
     return rows[0] ? toRecord(rows[0]) : null;
+  }
+}
+
+interface ChallengeRow {
+  nonce: string;
+  agent_id: string;
+  connector_id: string;
+  audience: string;
+  created_at: Date;
+  expires_at: Date;
+  used_at: Date | null;
+}
+
+const toChallenge = (r: ChallengeRow): WorldChallengeRecord => ({
+  nonce: r.nonce,
+  agentId: r.agent_id,
+  connectorId: r.connector_id,
+  audience: r.audience,
+  createdAt: r.created_at.toISOString(),
+  expiresAt: r.expires_at.toISOString(),
+  usedAt: r.used_at ? r.used_at.toISOString() : null,
+});
+
+export class PostgresWorldChallengeStore implements WorldChallengeStore {
+  constructor(private readonly pool: Pool) {}
+
+  async insert(record: Omit<WorldChallengeRecord, "usedAt">): Promise<void> {
+    // Housekeeping: challenges are useless a day after they expire.
+    await this.pool.query(
+      "DELETE FROM musecourt.world_identity_challenges WHERE expires_at < $1::timestamptz - interval '1 day'",
+      [record.createdAt],
+    );
+    await this.pool.query(
+      `INSERT INTO musecourt.world_identity_challenges (nonce, agent_id, connector_id, audience, created_at, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [record.nonce, record.agentId, record.connectorId, record.audience, record.createdAt, record.expiresAt],
+    );
+  }
+
+  async claim(nonce: string, agentId: string, connectorId: string, now: Date): Promise<ClaimResult> {
+    const claimed = await this.pool.query<ChallengeRow>(
+      `UPDATE musecourt.world_identity_challenges SET used_at = $4
+       WHERE nonce = $1 AND agent_id = $2 AND connector_id = $3 AND used_at IS NULL AND expires_at > $4
+       RETURNING *`,
+      [nonce, agentId, connectorId, now.toISOString()],
+    );
+    if (claimed.rows[0]) return { kind: "CLAIMED", record: toChallenge(claimed.rows[0]) };
+    const existing = await this.pool.query<ChallengeRow>(
+      "SELECT * FROM musecourt.world_identity_challenges WHERE nonce = $1 AND agent_id = $2 AND connector_id = $3",
+      [nonce, agentId, connectorId],
+    );
+    const row = existing.rows[0];
+    if (!row) return { kind: "NOT_FOUND" };
+    return { kind: row.used_at ? "USED" : "EXPIRED" };
   }
 }
