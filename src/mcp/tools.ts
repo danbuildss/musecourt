@@ -309,7 +309,7 @@ export const TOOLS: ToolDefinition[] = [
     write: false,
     input: z.strictObject({ caseId }),
     async run(ctx, args) {
-      const events = await ctx.deps.court.getCaseEvents(args.caseId as string);
+      const events = await ctx.deps.court.getPublicCaseEvents(args.caseId as string);
       if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${args.caseId as string} not found.`);
       return ok({ transcript: buildTranscript(events, await ctx.deps.court.getRegistry()) });
     },

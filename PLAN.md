@@ -592,7 +592,7 @@ Phase 6 answers one question: can MuseCourt link agents to real external identit
   - The design is brought for a decision when the first integration is ready. It is not implemented earlier, unless that integration requires it.
 - **More than one environment.** If more than one environment meets these requirements around the same time, we evaluate integrating them together rather than choosing one arbitrarily. The same core adjudicating cases from different environments is the strongest proof of the architecture.
 
-**Museworld design (2026-10-09).** Museworld Verify is live. The intake mapping and the proposed implementation, M1 identity → M2 evidence + record-visibility gate → M3 live proof, are in [`docs/phase-6-museworld.md`](docs/phase-6-museworld.md). They are awaiting approval; nothing is implemented.
+**Museworld design (2026-10-09).** Museworld Verify is live. The intake mapping and the proposed implementation, M1 identity → M2 evidence + record-visibility gate → M3 live proof, are in [`docs/phase-6-museworld.md`](docs/phase-6-museworld.md). Approved the same day. M1 (identity linking) and M2 (receipt-verified evidence and the record-visibility gate) are implemented; M3, the live proof, follows deployment.
 
 **Partner intake rule.** When documentation or answers arrive from a potential integration, nothing is coded at first. Instead:
 1. Read what the environment actually exposes.

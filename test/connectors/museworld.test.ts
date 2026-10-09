@@ -174,9 +174,4 @@ describe("MuseworldConnector.verifyIdentityProof (Museworld Verify, offline)", (
     expect(text).toContain(`node agent-client.mjs prove ${MUSECOURT} ${NONCE}`);
     expect(text).toMatch(/never share/);
   });
-
-  it("event retrieval is not enabled before Phase 6 M2", async () => {
-    const { connector } = await setup();
-    await expect(connector.getEvent("452053")).rejects.toThrow(/not enabled yet/);
-  });
 });

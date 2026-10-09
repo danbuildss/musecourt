@@ -35,6 +35,10 @@ export interface WorldEventRecord {
   actorWorldId: string | null;
   summary: string;
   data: Record<string, unknown>;
+  /** The world's own signed attestation of this record, kept verbatim so it can be re-verified. */
+  proof?: { format: "jws"; token: string; keyId: string };
+  /** True when the world had already taken down this event's words: only the redacted form exists. */
+  redacted?: boolean;
 }
 
 export interface WorldEvidenceSource {
@@ -43,6 +47,13 @@ export interface WorldEvidenceSource {
   retrievedAt: string;
   snapshot: WorldEventRecord;
 }
+
+/** What a redaction hides: one piece of evidence or one statement in a case. */
+export type RedactionTarget =
+  { kind: "EVIDENCE"; evidenceId: string } | { kind: "STATEMENT"; statementId: string };
+
+/** WORLD_TAKEDOWN: the world removed the words. OPERATOR: MuseCourt's operators removed them. */
+export type RedactionSource = "WORLD_TAKEDOWN" | "OPERATOR";
 
 export type EvidenceSubmitter = { kind: "AGENT"; agentId: string; role: CaseRole } | { kind: "COURT" };
 
@@ -198,6 +209,17 @@ export interface CourtEventMap {
   };
   DefaultJudgmentEntered: { finding: "LIABLE"; reasoning: string; sentence: SentenceItem[] };
   CaseClosed: { outcome: CaseOutcome };
+  /**
+   * Words removed from every public surface. The original event stays in the log (append-only,
+   * reconstructable); every view, transcript and public event listing shows the redacted form.
+   */
+  RecordRedacted: {
+    target: RedactionTarget;
+    reason: string;
+    source: RedactionSource;
+    /** The operator who redacted, or null for a world takedown found by the court. */
+    byAdminId: string | null;
+  };
   /** Appended annotation on an earlier event in the same stream; the original is never changed. */
   RecordCorrected: { targetStreamVersion: number; note: string; byAdminId: string };
 }

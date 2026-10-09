@@ -7,7 +7,7 @@ export function renderDebugCase(view: CaseView): string {
   const evidence = view.evidence
     .map(
       (x) =>
-        `<li><b>${e(x.evidenceId)}</b> ${e(x.title)} <i>[${e(x.provenanceLabel)}]</i>${x.withdrawn ? " (withdrawn)" : ""}<br>${e(x.content)}</li>`,
+        `<li><b>${e(x.evidenceId)}</b> ${e(x.title)} <i>[${e(x.provenanceLabel)}]</i>${x.withdrawn ? " (withdrawn)" : ""}${x.redaction ? " (redacted)" : ""}<br>${e(x.content)}</li>`,
     )
     .join("");
   const statements = view.statements

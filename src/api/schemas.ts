@@ -238,6 +238,13 @@ export const adminRevokeBody = z.strictObject({
   licence: z.enum(["LAWYER", "JUDGE"]),
   reason: z.string().max(2000),
 });
+export const adminRedactionBody = z.strictObject({
+  target: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("EVIDENCE"), evidenceId: z.string().regex(ID_PATTERN) }),
+    z.strictObject({ kind: z.literal("STATEMENT"), statementId: z.string().regex(ID_PATTERN) }),
+  ]),
+  reason: z.string().min(1).max(1000),
+});
 export const emptyBody = z.strictObject({});
 
 // ---------------------------------------------------------------------------

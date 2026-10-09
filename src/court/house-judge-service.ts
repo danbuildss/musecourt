@@ -47,6 +47,8 @@ export class HouseJudgeService {
   ) {}
 
   async deliberate(caseId: string): Promise<CaseState> {
+    // Words a world has taken down never reach the model.
+    await this.court.recheckWorldEvidence(caseId);
     const state = await this.court.getCase(caseId);
     if (!state) fail("NOT_FOUND", "Case not found.");
     if (state.status !== "OPEN" || state.stage !== "DELIBERATION" || state.judge?.kind !== "HOUSE") {

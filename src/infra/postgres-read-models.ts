@@ -60,14 +60,15 @@ export class PostgresReadModelWriter implements ReadModelWriter {
     const s = p.row.summary;
     await this.db.query(
       `INSERT INTO musecourt.rm_cases (case_id, case_number, jurisdiction_id, status, stage, deadline, outcome, finding,
-         judge_kind, needs_judge, open_counsel_sides, filed_at, closed_at, stream_version, summary, view, casebook_entry)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         judge_kind, needs_judge, open_counsel_sides, filed_at, closed_at, stream_version, summary, view, casebook_entry,
+         world_recheck_until)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        ON CONFLICT (case_id) DO UPDATE SET status = EXCLUDED.status, stage = EXCLUDED.stage,
          deadline = EXCLUDED.deadline, outcome = EXCLUDED.outcome, finding = EXCLUDED.finding,
          judge_kind = EXCLUDED.judge_kind, needs_judge = EXCLUDED.needs_judge,
          open_counsel_sides = EXCLUDED.open_counsel_sides, closed_at = EXCLUDED.closed_at,
          stream_version = EXCLUDED.stream_version, summary = EXCLUDED.summary, view = EXCLUDED.view,
-         casebook_entry = EXCLUDED.casebook_entry`,
+         casebook_entry = EXCLUDED.casebook_entry, world_recheck_until = EXCLUDED.world_recheck_until`,
       [
         s.caseId,
         s.caseNumber,
@@ -86,6 +87,7 @@ export class PostgresReadModelWriter implements ReadModelWriter {
         JSON.stringify(s),
         JSON.stringify(p.row.view),
         p.row.casebookEntry ? JSON.stringify(p.row.casebookEntry) : null,
+        p.row.worldRecheckUntil,
       ],
     );
     await this.db.query("DELETE FROM musecourt.rm_case_participants WHERE case_id = $1", [s.caseId]);
@@ -182,6 +184,14 @@ export class PostgresReadModels implements ReadModels {
     return rows.map((r) => r.summary);
   }
 
+  async worldRecheckCandidates(now: Date, limit: number): Promise<string[]> {
+    const { rows } = await this.db.query<{ case_id: string }>(
+      `SELECT case_id FROM musecourt.rm_cases WHERE world_recheck_until > $1 ORDER BY case_id LIMIT $2`,
+      [now, limit],
+    );
+    return rows.map((r) => r.case_id);
+  }
+
   async dueCaseIds(now: Date, limit: number): Promise<string[]> {
     const { rows } = await this.db.query<{ case_id: string }>(
       `SELECT case_id FROM musecourt.rm_cases WHERE status = 'OPEN' AND deadline <= $1
@@ -263,8 +273,8 @@ export class PostgresReadModels implements ReadModels {
     const jurisdictions = await this.listJurisdictions();
     const cases = (
       await this.db.query(
-        `SELECT summary, judge_kind, needs_judge, open_counsel_sides, stream_version, view, casebook_entry
-         FROM musecourt.rm_cases ORDER BY case_id`,
+        `SELECT summary, judge_kind, needs_judge, open_counsel_sides, stream_version, view, casebook_entry,
+           world_recheck_until FROM musecourt.rm_cases ORDER BY case_id`,
       )
     ).rows;
     const participants = (

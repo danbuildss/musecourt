@@ -3,6 +3,7 @@ import type { IdGenerator } from "@/core/ids";
 import type { CourtModel, WorldConnector } from "@/core/ports";
 import { CourtClock } from "@/court/court-clock";
 import { HouseJudgeService } from "@/court/house-judge-service";
+import { WorldEvidenceSweep } from "@/court/world-recheck";
 import type { DeadlinePolicy } from "@/core/procedure";
 import { Court } from "@/court/court";
 import type { Backend } from "@/infra/backends";
@@ -52,6 +53,12 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     clock: options.clock,
     houseJudge: options.model ? new HouseJudgeService(court, options.model, backend.readModels) : undefined,
     lease: backend.clockLease,
+    worldRecheck: new WorldEvidenceSweep({
+      court,
+      readModels: backend.readModels,
+      log: backend.worldRechecks,
+      clock: options.clock,
+    }),
   });
   const deps: ApiDeps = {
     courtClock,

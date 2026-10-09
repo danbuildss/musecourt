@@ -7,6 +7,7 @@ import type { WorldConnector } from "@/core/ports";
  */
 export class FakeWorld implements WorldConnector {
   private readonly events = new Map<string, WorldEventRecord>();
+  private readonly takenDown = new Set<string>();
   /** When true, every call fails as if the world were unreachable. */
   offline = false;
 
@@ -24,7 +25,26 @@ export class FakeWorld implements WorldConnector {
   async getEvent(eventId: string): Promise<WorldEventRecord | null> {
     if (this.offline) throw new Error(`${this.id} is offline`);
     const found = this.events.get(eventId);
-    return found ? structuredClone(found) : null;
+    if (!found) return null;
+    if (this.takenDown.has(eventId)) {
+      return {
+        ...structuredClone(found),
+        summary: "Removed by the world's operators.",
+        data: {},
+        redacted: true,
+      };
+    }
+    return structuredClone(found);
+  }
+
+  /** The world's operators remove an event's words (a takedown). */
+  takeDown(eventId: string): void {
+    this.takenDown.add(eventId);
+  }
+
+  async recheckEvent(record: WorldEventRecord): Promise<{ redacted: boolean }> {
+    if (this.offline) throw new Error(`${this.id} is offline`);
+    return { redacted: this.takenDown.has(record.eventId) };
   }
 }
 

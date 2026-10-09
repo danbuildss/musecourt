@@ -12,6 +12,7 @@ import {
   adminJurisdictionBody,
   adminLawBody,
   adminLicenceBody,
+  adminRedactionBody,
   adminRevokeBody,
   caseActionBody,
   caseListQuery,
@@ -322,7 +323,7 @@ export const routes: Route[] = [
     async handle(ctx) {
       const caseId = caseIdParam(ctx);
       const q = parse(eventsQuery, queryObject(ctx.url));
-      const events = await ctx.deps.court.getCaseEvents(caseId);
+      const events = await ctx.deps.court.getPublicCaseEvents(caseId);
       if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${caseId} not found.`);
       return ok({ events: events.filter((e) => e.streamVersion > q.after).map(publicEvent) });
     },
@@ -334,7 +335,7 @@ export const routes: Route[] = [
     summary: "Human-readable transcript of the case.",
     async handle(ctx) {
       const caseId = caseIdParam(ctx);
-      const events = await ctx.deps.court.getCaseEvents(caseId);
+      const events = await ctx.deps.court.getPublicCaseEvents(caseId);
       if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${caseId} not found.`);
       return ok({ transcript: buildTranscript(events, await ctx.deps.court.getRegistry()) });
     },
@@ -467,6 +468,19 @@ export const routes: Route[] = [
       );
     },
     redactForStorage: redactCredential,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/admin/cases/:caseId/redactions",
+    auth: "admin",
+    summary:
+      "Remove the words of a piece of evidence or a statement from every public surface (the log keeps the original).",
+    async handle(ctx) {
+      const caseId = caseIdParam(ctx);
+      const input = parse(adminRedactionBody, ctx.body);
+      await ctx.deps.court.redactRecord(caseId, adminActor("admin"), input);
+      return ok({ case: await caseView(ctx.deps, caseId, ctx.now) }, 201);
+    },
   },
   {
     method: "POST",

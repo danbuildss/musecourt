@@ -65,6 +65,8 @@ export interface CaseRow {
   streamVersion: number;
   view: CaseView;
   casebookEntry: CasebookEntry | null;
+  /** Until when unredacted world evidence in this case is re-checked for takedowns (null: none). */
+  worldRecheckUntil: string | null;
 }
 
 export interface ParticipantRow {
@@ -107,6 +109,8 @@ export interface CaseQuery {
 export interface ReadModels {
   getCaseView(caseId: string): Promise<CaseView | null>;
   listCases(query: CaseQuery): Promise<CaseSummary[]>;
+  /** Cases with unredacted world evidence still inside the re-check window at `now`. */
+  worldRecheckCandidates(now: Date, limit: number): Promise<string[]>;
   /** Open cases whose current deadline is at or before `now`, oldest deadline first. */
   dueCaseIds(now: Date, limit: number): Promise<string[]>;
   participants(caseId: string): Promise<ParticipantRow[]>;

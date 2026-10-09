@@ -6,7 +6,7 @@ import { createNodeServer } from "@/api/node-server";
 import { FixedWindowRateLimiter } from "@/api/rate-limit";
 import { loadSkillMarkdown } from "@/api/skill";
 import { publicOriginFrom } from "@/api/world-identity";
-import { MuseworldConnector } from "@/connectors/museworld";
+import { museworldConnectorFromEnv } from "@/connectors/museworld";
 import { FakeWorld } from "@/connectors/fake-world";
 import { systemClock } from "@/core/clock";
 import { randomIds } from "@/core/ids";
@@ -34,7 +34,7 @@ const { court, api } = createMuseCourtApp({
   backend,
   clock: systemClock,
   ids: randomIds,
-  connectors: [new FakeWorld(), new MuseworldConnector({ baseUrl: process.env.MUSEWORLD_URL })],
+  connectors: [new FakeWorld(), museworldConnectorFromEnv()],
   publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
   adminToken,
   cronSecret: process.env.MUSECOURT_CRON_SECRET,

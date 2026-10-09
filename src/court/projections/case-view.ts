@@ -67,6 +67,7 @@ export function toCaseView(state: CaseState, registry: RegistryState) {
       world: e.world,
       at: e.at,
       withdrawn: e.withdrawn,
+      redaction: e.redaction,
     })),
     statements: state.statements.map((s) => ({ ...s, speakerLabel: speakerLabel(s.speaker) })),
     offers: state.offers.map((o) => ({ ...o, by: agentRef(registry, o.byAgentId) })),
