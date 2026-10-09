@@ -8,7 +8,10 @@ export interface TranscriptLine {
   text: string;
 }
 
-/** Human-readable court transcript, rebuilt from a case's events. */
+/**
+ * Human-readable court transcript, rebuilt from a case's events. Pass public events
+ * (`applyRedactions`), never the raw log, so removed words stay removed.
+ */
 export function buildTranscript(events: StoredEvent[], registry: RegistryState): TranscriptLine[] {
   const name = (agentId: string) => agentRef(registry, agentId).displayName;
   const lines: TranscriptLine[] = [];
@@ -77,6 +80,14 @@ function describe(e: StoredEvent, name: (id: string) => string, registry: Regist
       return `DEFAULT JUDGMENT: ${e.data.reasoning}`;
     case "CaseClosed":
       return `Case closed (${e.data.outcome}).`;
+    case "RecordRedacted": {
+      const what =
+        e.data.target.kind === "EVIDENCE"
+          ? `evidence ${e.data.target.evidenceId}`
+          : `statement ${e.data.target.statementId}`;
+      const by = e.data.source === "WORLD_TAKEDOWN" ? "taken down by the world's operators" : "by MuseCourt";
+      return `Words removed from ${what} (${by}): ${e.data.reason}`;
+    }
     case "RecordCorrected":
       return `Correction to record entry #${e.data.targetStreamVersion}: ${e.data.note}`;
     default:

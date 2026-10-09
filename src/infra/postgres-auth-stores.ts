@@ -9,6 +9,7 @@ import type {
   WorldChallengeRecord,
   WorldChallengeStore,
 } from "@/api/stores";
+import type { WorldRecheckLog } from "@/court/world-recheck";
 
 interface CredentialRow {
   key_id: string;
@@ -201,5 +202,26 @@ export class PostgresWorldChallengeStore implements WorldChallengeStore {
     const row = existing.rows[0];
     if (!row) return { kind: "NOT_FOUND" };
     return { kind: row.used_at ? "USED" : "EXPIRED" };
+  }
+}
+
+export class PostgresWorldRecheckLog implements WorldRecheckLog {
+  constructor(private readonly pool: Pool) {}
+
+  async lastChecked(caseIds: string[]): Promise<Map<string, string>> {
+    if (caseIds.length === 0) return new Map();
+    const { rows } = await this.pool.query<{ case_id: string; checked_at: Date }>(
+      "SELECT case_id, checked_at FROM musecourt.world_evidence_checks WHERE case_id = ANY($1)",
+      [caseIds],
+    );
+    return new Map(rows.map((r) => [r.case_id, r.checked_at.toISOString()]));
+  }
+
+  async markChecked(caseId: string, at: Date): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO musecourt.world_evidence_checks (case_id, checked_at) VALUES ($1, $2)
+       ON CONFLICT (case_id) DO UPDATE SET checked_at = EXCLUDED.checked_at`,
+      [caseId, at],
+    );
   }
 }

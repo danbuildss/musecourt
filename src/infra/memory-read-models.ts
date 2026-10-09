@@ -88,6 +88,14 @@ export class MemoryReadModels implements ReadModels, ReadModelWriter {
     return structuredClone(rows.slice(q.offset, q.offset + q.limit).map((r) => r.summary));
   }
 
+  async worldRecheckCandidates(now: Date, limit: number): Promise<string[]> {
+    return [...this.cases.values()]
+      .filter((r) => r.worldRecheckUntil && Date.parse(r.worldRecheckUntil) > now.getTime())
+      .map((r) => r.summary.caseId)
+      .sort()
+      .slice(0, limit);
+  }
+
   async dueCaseIds(now: Date, limit: number): Promise<string[]> {
     return [...this.cases.values()]
       .filter(

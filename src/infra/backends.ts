@@ -2,12 +2,14 @@ import type { Pool } from "pg";
 import type { CredentialStore, IdempotencyStore, WorldChallengeStore } from "@/api/stores";
 import type { EventStore } from "@/core/ports";
 import type { ClockLease } from "@/court/court-clock";
+import type { WorldRecheckLog } from "@/court/world-recheck";
 import { projectEvents, rebuildFromLog } from "@/court/read-models/projector";
 import type { ReadModels } from "@/court/read-models/types";
 import {
   MemoryCredentialStore,
   MemoryIdempotencyStore,
   MemoryWorldChallengeStore,
+  MemoryWorldRecheckLog,
 } from "./memory-auth-stores";
 import { MemoryEventStore } from "./memory-event-store";
 import { MemoryReadModels } from "./memory-read-models";
@@ -15,6 +17,7 @@ import {
   PostgresCredentialStore,
   PostgresIdempotencyStore,
   PostgresWorldChallengeStore,
+  PostgresWorldRecheckLog,
 } from "./postgres-auth-stores";
 import { PostgresEventStore, readStreamWith } from "./postgres-event-store";
 import { PostgresReadModelWriter, PostgresReadModels } from "./postgres-read-models";
@@ -27,6 +30,8 @@ export interface Backend {
   idempotency: IdempotencyStore;
   /** One-time challenges for linking world identities. */
   worldChallenges: WorldChallengeStore;
+  /** When each case's world evidence was last re-checked for takedowns. */
+  worldRechecks: WorldRecheckLog;
   /** Best-effort lease so overlapping clock runs don't duplicate work. */
   clockLease: ClockLease;
   /** Drops all read models and rebuilds them from the event log. */
@@ -46,6 +51,7 @@ export function createMemoryBackend(): Backend & { credentials: MemoryCredential
     credentials: new MemoryCredentialStore(),
     idempotency: new MemoryIdempotencyStore(),
     worldChallenges: new MemoryWorldChallengeStore(),
+    worldRechecks: new MemoryWorldRecheckLog(),
     clockLease: memoryLease(),
     rebuildReadModels: async () => rebuildFromLog(await store.readAll(), readModels),
     dumpReadModels: async () => readModels.dump(),
@@ -68,6 +74,7 @@ export function createPostgresBackend(pool: Pool): Backend {
     credentials: new PostgresCredentialStore(pool),
     idempotency: new PostgresIdempotencyStore(pool),
     worldChallenges: new PostgresWorldChallengeStore(pool),
+    worldRechecks: new PostgresWorldRecheckLog(pool),
     clockLease: postgresLease(pool),
     async rebuildReadModels() {
       const client = await pool.connect();

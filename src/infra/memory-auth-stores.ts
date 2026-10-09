@@ -8,6 +8,7 @@ import type {
   WorldChallengeRecord,
   WorldChallengeStore,
 } from "@/api/stores";
+import type { WorldRecheckLog } from "@/court/world-recheck";
 
 export class MemoryCredentialStore implements CredentialStore {
   private readonly records = new Map<string, CredentialRecord>();
@@ -116,5 +117,17 @@ export class MemoryWorldChallengeStore implements WorldChallengeStore {
     if (Date.parse(record.expiresAt) <= now.getTime()) return { kind: "EXPIRED" };
     record.usedAt = now.toISOString();
     return { kind: "CLAIMED", record: { ...record } };
+  }
+}
+
+export class MemoryWorldRecheckLog implements WorldRecheckLog {
+  private readonly checked = new Map<string, string>();
+
+  async lastChecked(caseIds: string[]): Promise<Map<string, string>> {
+    return new Map(caseIds.flatMap((id) => (this.checked.has(id) ? [[id, this.checked.get(id)!]] : [])));
+  }
+
+  async markChecked(caseId: string, at: Date): Promise<void> {
+    this.checked.set(caseId, at.toISOString());
   }
 }

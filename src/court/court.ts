@@ -6,7 +6,7 @@ import {
   type EvidenceInput,
   type FileCaseInput,
 } from "@/core/case-decide";
-import { buildCase, type CaseState } from "@/core/case-state";
+import { buildCase, isSeatedJudgeAgent, type CaseState } from "@/core/case-state";
 import type { Clock } from "@/core/clock";
 import { CourtError, fail, isCourtError } from "@/core/errors";
 import {
@@ -15,6 +15,7 @@ import {
   jurisdictionStream,
   type CourtEvent,
   type LicenceType,
+  type RedactionTarget,
   type StoredEvent,
   type WorldEvidenceSource,
 } from "@/core/events";
@@ -26,7 +27,9 @@ import {
   type EnactLawInput,
   type JurisdictionState,
 } from "@/core/jurisdiction";
+import { applyRedactions } from "@/core/redaction";
 import {
+  WorldEventNotKept,
   WorldIdentityProofRejected,
   type EventStore,
   type WorldConnector,
@@ -272,6 +275,15 @@ export class Court {
 
   /** Every case action goes through here: the core decides, the store records. */
   async act(caseId: string, actor: Actor, command: CaseCommand): Promise<CaseState> {
+    // A verdict is when the record is most likely to be read and republished: check for takedowns
+    // first. Only for the seated judge in deliberation, so nobody else can make MuseCourt call a
+    // world (Solon's service re-checks before it drafts).
+    if (command.type === "IssueVerdict" && actor.kind === "agent") {
+      const state = await this.getCase(caseId);
+      if (state?.stage === "DELIBERATION" && isSeatedJudgeAgent(state, actor.agentId)) {
+        await this.recheckWorldEvidence(caseId);
+      }
+    }
     await this.retrying(async () => {
       const streamId = caseStream(caseId);
       const events = await this.deps.store.readStream(streamId);
@@ -291,6 +303,50 @@ export class Court {
       await this.append([{ streamId, expectedVersion: events.length, events: decided }], actor);
     });
     return (await this.getCase(caseId))!;
+  }
+
+  /** An operator removes the words of a piece of evidence or a statement (record-visibility gate). */
+  redactRecord(
+    caseId: string,
+    actor: Actor,
+    input: { target: RedactionTarget; reason: string },
+  ): Promise<CaseState> {
+    return this.act(caseId, actor, { type: "RedactRecord", ...input });
+  }
+
+  /**
+   * Asks each world whether it has since taken down the words of evidence admitted from it, and
+   * records a WORLD_TAKEDOWN redaction for each one it has. Best effort: a world that cannot answer
+   * now is counted as failed and checked again later; it never blocks the case.
+   */
+  async recheckWorldEvidence(caseId: string): Promise<{ checked: number; redacted: number; failed: number }> {
+    const result = { checked: 0, redacted: 0, failed: 0 };
+    const state = await this.getCase(caseId);
+    for (const item of state?.evidence ?? []) {
+      if (!item.world || item.redaction) continue;
+      const connector = this.connectors.get(item.world.connectorId);
+      if (!connector?.recheckEvent) continue;
+      result.checked += 1;
+      let redacted: boolean;
+      try {
+        ({ redacted } = await connector.recheckEvent(item.world.snapshot));
+      } catch {
+        result.failed += 1;
+        continue;
+      }
+      if (!redacted) continue;
+      try {
+        await this.act(caseId, SYSTEM, {
+          type: "RedactRecord",
+          target: { kind: "EVIDENCE", evidenceId: item.evidenceId },
+          reason: `${connector.id} took down the words of event ${item.world.eventId}.`,
+        });
+        result.redacted += 1;
+      } catch (error) {
+        if (!isCourtError(error, "DUPLICATE")) throw error;
+      }
+    }
+    return result;
   }
 
   expireDeadline(caseId: string): Promise<CaseState> {
@@ -329,8 +385,14 @@ export class Court {
     return buildCase(await this.deps.store.readStream(caseStream(caseId)));
   }
 
+  /** The raw log, originals included. Internal use only: public surfaces use getPublicCaseEvents. */
   getCaseEvents(caseId: string): Promise<StoredEvent[]> {
     return this.deps.store.readStream(caseStream(caseId));
+  }
+
+  /** The case's events as the public may see them: every redaction applied. */
+  async getPublicCaseEvents(caseId: string): Promise<StoredEvent[]> {
+    return applyRedactions(await this.getCaseEvents(caseId));
   }
 
   /**
@@ -399,6 +461,12 @@ export class Court {
       try {
         snapshot = await connector.getEvent(eventId);
       } catch (error) {
+        if (error instanceof WorldEventNotKept) {
+          fail("WORLD_EVIDENCE_NOT_FOUND", `${connector.id} no longer keeps event ${eventId}.`, {
+            eventId,
+            reason: "NOT_KEPT",
+          });
+        }
         throw new CourtError(
           "WORLD_EVIDENCE_UNAVAILABLE",
           `The ${connector.id} world could not be reached. Try again later.`,

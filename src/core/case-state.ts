@@ -12,6 +12,7 @@ import type {
   WorldEvidenceSource,
 } from "./events";
 import type { DeadlinePolicy, Side, Stage, StatementKind } from "./procedure";
+import { redactEvidenceFields, removedText, type Redaction } from "./redaction";
 
 /**
  * CaseState is a pure projection of a case stream. It is rebuilt from events
@@ -38,6 +39,8 @@ export interface StatementRecord {
   addressedTo: Side[];
   at: string;
   streamVersion: number;
+  /** Set when the statement's words were removed from public view. */
+  redaction: Redaction | null;
 }
 
 export interface EvidenceRecord {
@@ -51,6 +54,8 @@ export interface EvidenceRecord {
   world: WorldEvidenceSource | null;
   at: string;
   withdrawn: { byAgentId: string; reason: string; at: string } | null;
+  /** Set when the evidence's words were removed from public view (or the world had already removed them). */
+  redaction: Redaction | null;
 }
 
 export interface SettlementOfferRecord {
@@ -238,15 +243,38 @@ export function evolveCase(state: CaseState | null, e: StoredEvent): CaseState |
       break;
     case "StatementMade": {
       const d = e.data;
-      state.statements.push({ ...d, at: e.occurredAt, streamVersion: e.streamVersion });
+      state.statements.push({ ...d, at: e.occurredAt, streamVersion: e.streamVersion, redaction: null });
       if (d.side) state.activity.statementsBySide[d.side] += 1;
       else state.activity.judgeStatements += 1;
       if (d.kind === "QUESTION") state.questionsAddressedTo = [...d.addressedTo];
       break;
     }
     case "EvidenceRecorded":
-      state.evidence.push({ ...e.data, at: e.occurredAt, withdrawn: null });
+      state.evidence.push({
+        ...e.data,
+        at: e.occurredAt,
+        withdrawn: null,
+        // Admitted already redacted: the world served only the redacted form, which is what we hold.
+        redaction: e.data.world?.snapshot.redacted
+          ? { reason: "removed by the world before admission", source: "WORLD_TAKEDOWN", at: e.occurredAt }
+          : null,
+      });
       break;
+    case "RecordRedacted": {
+      const r = { reason: e.data.reason, source: e.data.source, at: e.occurredAt };
+      const t = e.data.target;
+      if (t.kind === "EVIDENCE") {
+        const i = state.evidence.findIndex((x) => x.evidenceId === t.evidenceId);
+        if (i >= 0) state.evidence[i] = { ...redactEvidenceFields(state.evidence[i]!, r), redaction: r };
+      } else {
+        const statement = state.statements.find((x) => x.statementId === t.statementId);
+        if (statement) {
+          statement.text = removedText(r);
+          statement.redaction = r;
+        }
+      }
+      break;
+    }
     case "EvidenceWithdrawn": {
       const item = state.evidence.find((x) => x.evidenceId === e.data.evidenceId);
       if (item) item.withdrawn = { byAgentId: e.data.byAgentId, reason: e.data.reason, at: e.occurredAt };

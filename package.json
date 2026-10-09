@@ -20,7 +20,8 @@
     "build:vercel": "tsx scripts/build-vercel.ts",
     "simulate": "tsx scripts/simulate.ts",
     "mcp:stdio": "tsx scripts/mcp-stdio.ts",
-    "smoke:mcp": "tsx scripts/smoke-mcp.ts"
+    "smoke:mcp": "tsx scripts/smoke-mcp.ts",
+    "smoke:museworld": "tsx scripts/smoke-museworld.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.1",

@@ -72,6 +72,7 @@ describe.each(BACKENDS)("internal court-clock endpoint (%s)", (backend) => {
       failed: 0,
       failures: [],
       solon: { pending: 0, ruled: 0, failed: 0, awaitingModel: 0 },
+      worldRecheck: { cases: 0, checked: 0, redacted: 0, failed: 0 },
       moreDue: false,
     });
     const get = await h.cronTick("GET");

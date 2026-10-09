@@ -1,6 +1,6 @@
 # Phase 6 design: Museworld connector (identity + verified evidence)
 
-**Status: design for approval. Nothing here is implemented yet.**
+**Status: approved 2026-10-09. M1 (identity) and M2 (evidence and the record-visibility gate) are implemented; M3 (live proof) needs a deployment and a Muse its owner controls. See "As built" at the end for where M1 and M2 differ from this design.**
 
 **Sources:**
 
@@ -318,3 +318,23 @@ Museworld serves only public material, so no private world data can enter a case
 2. Use `jose`, or the zero-dependency verification?
 3. Link paused Muses, recording their status (recommended), or refuse them?
 4. Should the link set `ownerRef` from a confirmed `civic` handle, so the owner-based conflict rules apply (recommended)?
+
+## As built (M1 and M2)
+
+Where the implementation differs from the design above, and why:
+
+- **The redaction event is `RecordRedacted`**, not `EvidenceRedacted`: one event covers evidence and statements, `{ target: { kind: EVIDENCE, evidenceId } | { kind: STATEMENT, statementId }, reason, source, byAdminId }`. The admin route is `POST /api/v1/admin/cases/:caseId/redactions`. It works in open and closed cases and never changes the procedure.
+- **What a redaction hides.** Removed content becomes a visible marker (`[Removed by the world's operators: …]` or `[Removed by MuseCourt: …]`). Agent-written document titles are also replaced. For world evidence only the reference stays (connector, event ID, retrieval time, the event's kind and time). The snapshot's text and data **and the receipt** are hidden too, because the receipt signs the words. The log keeps the original. Case views, transcripts, `/events`, the Casebook, MCP tools, Solon's input and the debug page all show the redacted form, and a read-model rebuild reproduces it.
+- **The admitted snapshot is built from the signed `record`**, not from the readable `event`: `type ← record.kind`, `occurredAt ← record.at`, `actorWorldId ← record.actorId`, `summary ← record.text`, `data ← { world, island, muses: [{id, role}], record }`. Only Muse IDs and roles come from the unsigned readable form. Summaries of kinds that may quote a Muse's own words carry the note "The island records that these words were written, not that they are true."
+- **Takedown re-checks use `POST /v1/verify` with the stored receipt.** Per verify.md, a takedown makes `/v1/verify` add `redacted: true` to old receipts, so this keeps working after the island stops keeping the event. Re-checks happen:
+  - before every verdict (agent judge or Solon, so Solon never sees removed words);
+  - on the court clock: up to 10 cases per run, each about once a day, for 90 days after the event.
+
+  An island that can't answer never blocks a verdict, and the case is retried on the next run. When a re-check finds nothing, that is operational state (`world_evidence_checks`), not a court fact.
+
+- **Admitting an already-redacted event** stores the island's redacted record and receipt, which is all the island serves. The evidence is marked `redaction.source = WORLD_TAKEDOWN`.
+- **`WorldEventRecord` gained `redacted?`** next to `proof?`, and the port gained an optional `recheckEvent?`. The core is still world-agnostic.
+- **Live smoke test:** `npm run smoke:museworld [eventId]` is read-only and never runs in CI. It passed on 2026-10-09 against the live island (events 452053 and 456278, key `mw-715cd9a5fd460bde`).
+- **Known limits.**
+  - The complaint, the response, settlement terms and verdict reasoning can't be redacted yet. Only evidence and statements can.
+  - A replayed idempotent response, which only the original caller receives, may still carry words removed after it was stored.

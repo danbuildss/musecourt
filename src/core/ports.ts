@@ -44,8 +44,18 @@ export interface EventStore {
  */
 export interface WorldConnector {
   readonly id: string;
-  /** Returns the event, or null if the world has no such event. Throws if the world is unreachable. */
+  /**
+   * Returns the event, or null if the world has no such event. Throws `WorldEventNotKept` if the
+   * world no longer keeps it, and any other error if the world is unreachable or its answer could
+   * not be authenticated.
+   */
   getEvent(eventId: string): Promise<WorldEventRecord | null>;
+  /**
+   * Present when the world can take down words after the fact. Re-checks an admitted event (using
+   * its stored proof where needed) and says whether the world has since removed its words.
+   * Throws if the world cannot answer now.
+   */
+  recheckEvent?(record: WorldEventRecord): Promise<{ redacted: boolean }>;
   /**
    * Present when the world can prove identities (Phase 6, R1). Verifies a proof that the presenter
    * controls a world identity, issued for exactly this `audience` and `nonce`. Throws
@@ -76,6 +86,14 @@ export interface VerifiedWorldIdentity {
   ownerRef: string | null;
   /** Public facts the world vouched for at verification time (username, standing, status…). */
   attributes: Record<string, unknown>;
+}
+
+/** The world had this event but no longer keeps it (e.g. past its retention window). */
+export class WorldEventNotKept extends Error {
+  constructor(message = "The world no longer keeps this event.") {
+    super(message);
+    this.name = "WorldEventNotKept";
+  }
 }
 
 /** An identity proof that failed verification. `reason` is a short machine-readable cause. */

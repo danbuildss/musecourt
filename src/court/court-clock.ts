@@ -3,6 +3,7 @@ import type { Clock } from "@/core/clock";
 import type { Court } from "./court";
 import type { HouseJudgeService } from "./house-judge-service";
 import type { ReadModels } from "./read-models/types";
+import type { WorldEvidenceSweep, WorldRecheckSummary } from "./world-recheck";
 
 /**
  * Best-effort mutual exclusion between overlapping clock runs. It only avoids
@@ -26,6 +27,8 @@ export interface TickSummary {
   failed: number;
   failures: Array<{ caseId: string; code: string }>;
   solon: { pending: number; ruled: number; failed: number; awaitingModel: number };
+  /** Takedown re-checks of admitted world evidence (absent when no sweep is configured). */
+  worldRecheck?: WorldRecheckSummary;
   /** True if more due cases remain than this run's batch size; run again. */
   moreDue: boolean;
 }
@@ -38,6 +41,8 @@ export interface CourtClockDeps {
   houseJudge?: Pick<HouseJudgeService, "deliberate">;
   lease?: ClockLease;
   batchSize?: number;
+  /** Re-checks admitted world evidence for takedowns, a few cases per run. */
+  worldRecheck?: Pick<WorldEvidenceSweep, "run">;
 }
 
 /** "Already moved on" outcomes of a race: not failures. */
@@ -69,6 +74,11 @@ export class CourtClock {
     try {
       await this.expireDue(now, summary);
       await this.runSolon(summary);
+      if (this.deps.worldRecheck) {
+        summary.worldRecheck = await this.deps.worldRecheck
+          .run()
+          .catch(() => ({ cases: 0, checked: 0, redacted: 0, failed: 1 }));
+      }
     } finally {
       await release?.();
     }

@@ -17,6 +17,8 @@ import {
   type CourtEvent,
   type Finding,
   type JudgeSeat,
+  type RedactionSource,
+  type RedactionTarget,
   type SentenceItem,
   type StoredEvent,
   type WorldEvidenceSource,
@@ -81,7 +83,8 @@ export type CaseCommand =
       citedCaseIds?: string[];
     }
   | { type: "ExpireDeadline" }
-  | { type: "CorrectRecord"; targetStreamVersion: number; note: string };
+  | { type: "CorrectRecord"; targetStreamVersion: number; note: string }
+  | { type: "RedactRecord"; target: RedactionTarget; reason: string };
 
 export type CaseCommandType = CaseCommand["type"];
 
@@ -106,6 +109,7 @@ const COMMAND_ACTION: Record<CaseCommandType, CaseAction | null> = {
   IssueVerdict: "ISSUE_VERDICT",
   ExpireDeadline: null,
   CorrectRecord: null,
+  RedactRecord: null,
 };
 
 export interface CaseContext {
@@ -652,11 +656,66 @@ function handle(draft: Draft, command: CaseCommand): void {
       return;
     }
 
+    case "RedactRecord":
+      return redactRecord(draft, command);
+
     default: {
       const unknown: never = command;
       fail("VALIDATION_FAILED", `Unknown command ${(unknown as { type: string }).type}.`);
     }
   }
+}
+
+/**
+ * The record-visibility gate. An operator (admin) may remove the words of any evidence or
+ * statement, in an open or closed case. The court itself (SYSTEM) records a world takedown, and
+ * only for evidence the world verified. Nothing is deleted: the log keeps the original.
+ */
+function redactRecord(draft: Draft, command: Extract<CaseCommand, { type: "RedactRecord" }>): void {
+  const state = draft.case;
+  const actor = draft.ctx.actor;
+  const source: RedactionSource =
+    actor.kind === "admin"
+      ? "OPERATOR"
+      : actor.kind === "system"
+        ? "WORLD_TAKEDOWN"
+        : fail("NOT_AUTHORIZED", "Only MuseCourt's operators can redact the record.");
+  const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
+  const t = command.target as RedactionTarget | undefined;
+  let target: RedactionTarget;
+  if (t?.kind === "EVIDENCE") {
+    const item =
+      state.evidence.find((x) => x.evidenceId === t.evidenceId) ??
+      fail("NOT_FOUND", `Evidence ${String(t.evidenceId)} is not in this case.`, {
+        evidenceId: t.evidenceId,
+      });
+    if (item.redaction) fail("DUPLICATE", `Evidence ${item.evidenceId} is already redacted.`);
+    if (source === "WORLD_TAKEDOWN" && !item.world) {
+      fail("VALIDATION_FAILED", "A world takedown applies only to world-verified evidence.");
+    }
+    target = { kind: "EVIDENCE", evidenceId: item.evidenceId };
+  } else if (t?.kind === "STATEMENT") {
+    if (source === "WORLD_TAKEDOWN") {
+      fail("VALIDATION_FAILED", "A world takedown applies only to world-verified evidence.");
+    }
+    const statement =
+      state.statements.find((x) => x.statementId === t.statementId) ??
+      fail("NOT_FOUND", `Statement ${String(t.statementId)} is not in this case.`, {
+        statementId: t.statementId,
+      });
+    if (statement.redaction) fail("DUPLICATE", `Statement ${statement.statementId} is already redacted.`);
+    target = { kind: "STATEMENT", statementId: statement.statementId };
+  } else {
+    fail("VALIDATION_FAILED", "target.kind must be EVIDENCE or STATEMENT.", { field: "target" });
+  }
+  draft.emit(
+    event("RecordRedacted", {
+      target,
+      reason,
+      source,
+      byAdminId: actor.kind === "admin" ? actor.adminId : null,
+    }),
+  );
 }
 
 function requireSide(side: unknown): Side {

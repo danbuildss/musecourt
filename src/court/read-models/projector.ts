@@ -7,6 +7,7 @@ import { toCaseView } from "../projections/case-view";
 import { buildCasebook } from "../projections/casebook";
 import { agentRef, judgeView } from "../projections/labels";
 import { tasksForCase } from "../projections/tasks";
+import { worldRecheckUntil } from "../world-recheck";
 import type { AgentRow, CaseProjection, JurisdictionRow, ReadModelWriter, StreamReader } from "./types";
 
 export function jurisdictionRow(state: JurisdictionState): JurisdictionRow {
@@ -98,6 +99,7 @@ export function caseProjection(state: CaseState, registry: RegistryState): CaseP
       streamVersion: state.version,
       view: toCaseView(state, registry),
       casebookEntry: buildCasebook([state], registry)[0] ?? null,
+      worldRecheckUntil: worldRecheckUntil(state),
     },
     participants: state.roles.map((r) => ({
       caseId: state.caseId,
