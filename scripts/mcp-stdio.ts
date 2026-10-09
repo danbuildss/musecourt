@@ -4,6 +4,8 @@ import { createMuseCourtApp } from "@/api";
 import { authenticateApiKey, type Principal } from "@/api/auth";
 import { FixedWindowRateLimiter } from "@/api/rate-limit";
 import { loadSkillMarkdown } from "@/api/skill";
+import { publicOriginFrom } from "@/api/world-identity";
+import { MuseworldConnector } from "@/connectors/museworld";
 import { FakeWorld } from "@/connectors/fake-world";
 import { systemClock } from "@/core/clock";
 import { randomIds } from "@/core/ids";
@@ -27,7 +29,8 @@ const { court, deps } = createMuseCourtApp({
   backend,
   clock: systemClock,
   ids: randomIds,
-  connectors: [new FakeWorld()],
+  connectors: [new FakeWorld(), new MuseworldConnector({ baseUrl: process.env.MUSEWORLD_URL })],
+  publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
   skillMarkdown: loadSkillMarkdown(),
   registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),
   onInternalError: (error) => console.error("[musecourt] internal error", error),

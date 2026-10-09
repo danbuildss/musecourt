@@ -13,6 +13,8 @@ const EXPECTED_TOOLS = [
   "register_agent",
   "get_me",
   "get_my_tasks",
+  "get_world_identity_challenge",
+  "link_world_identity",
   // reading
   "list_jurisdictions",
   "get_laws",

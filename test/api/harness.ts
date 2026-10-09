@@ -6,7 +6,7 @@ import { createNodeServer } from "@/api/node-server";
 import { loadSkillMarkdown } from "@/api/skill";
 import type { RateLimiter } from "@/api/rate-limit";
 import { FakeWorld } from "@/connectors/fake-world";
-import type { CourtModel } from "@/core/ports";
+import type { CourtModel, WorldConnector } from "@/core/ports";
 import type { DeadlinePolicy } from "@/core/procedure";
 import { createMemoryBackend, createPostgresBackend, type Backend } from "@/infra/backends";
 import { migrate } from "@/infra/migrate";
@@ -62,6 +62,10 @@ export async function startApi(
     breakReadModels?: boolean;
     model?: CourtModel;
     cronSecret?: string | null;
+    /** Extra world connectors (built with the harness's fake clock). */
+    connectors?: (clock: FakeClock) => WorldConnector[];
+    /** MuseCourt's public origin for world identity proofs (null disables linking). */
+    publicOrigin?: string | null;
   } = {},
 ) {
   const backend = options.backend === "postgres" ? await freshPostgres() : createMemoryBackend();
@@ -77,7 +81,9 @@ export async function startApi(
     backend,
     clock,
     ids: new SequentialIds(),
-    connectors: [world],
+    connectors: [world, ...(options.connectors?.(clock) ?? [])],
+    publicOrigin:
+      options.publicOrigin === null ? undefined : (options.publicOrigin ?? "https://musecourt.test"),
     deadlinePolicy: options.policy,
     adminToken: ADMIN_TOKEN,
     cronSecret: options.cronSecret === null ? undefined : (options.cronSecret ?? CRON_SECRET),

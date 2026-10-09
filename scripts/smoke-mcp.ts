@@ -36,7 +36,7 @@ record("MCP initialize", true, `connected to ${new URL(MCP_PATH, baseUrl).href}`
 
 await step("tool discovery (tools/list)", async () => {
   const tools = await anon.listTools();
-  if (tools.length !== 30) throw new Error(`expected 30 tools, got ${tools.length}`);
+  if (tools.length !== 32) throw new Error(`expected 32 tools, got ${tools.length}`);
   if (tools.some((t) => /admin|cron/.test(t.name))) throw new Error("an admin/cron tool is exposed");
   return `${tools.length} tools, no admin/cron tools`;
 });
@@ -44,7 +44,7 @@ await step("tool discovery (tools/list)", async () => {
 await step("skill.md resource (musecourt://skill.md)", async () => {
   const skill = await anon.readSkill();
   const version = /^version: (\d+)$/m.exec(skill)?.[1];
-  if (!skill.includes("## 14. Using MCP")) throw new Error("resource is not skill.md v3");
+  if (!skill.includes("## 14. Using MCP")) throw new Error("resource is not skill.md v3 or later");
   return `${skill.length} characters, version ${version}`;
 });
 

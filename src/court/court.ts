@@ -26,13 +26,19 @@ import {
   type EnactLawInput,
   type JurisdictionState,
 } from "@/core/jurisdiction";
-import type { EventStore, WorldConnector } from "@/core/ports";
+import {
+  WorldIdentityProofRejected,
+  type EventStore,
+  type WorldConnector,
+  type WorldProofExpectation,
+} from "@/core/ports";
 import { opportunitiesForAgent, type Opportunity } from "./projections/tasks";
 import type { ReadModels } from "./read-models/types";
 import { DEFAULT_DEADLINE_POLICY, validateDeadlinePolicy, type DeadlinePolicy } from "@/core/procedure";
 import {
   buildRegistry,
   decideGrantLicence,
+  decideLinkWorldIdentity,
   decideRegisterAgent,
   decideRevokeLicence,
   type AgentRecord,
@@ -113,6 +119,64 @@ export class Court {
   ): Promise<AgentRecord> {
     await this.decideRegistry(actor, (registry) => decideRevokeLicence(registry, actor, input));
     return (await this.getRegistry()).agents.get(input.agentId)!;
+  }
+
+  /** Whether the connector can verify identity proofs (Phase 6, R1). */
+  supportsWorldIdentity(connectorId: string): boolean {
+    return typeof this.connectors.get(connectorId)?.verifyIdentityProof === "function";
+  }
+
+  /** How an agent obtains a proof from this world, if the connector says. */
+  worldIdentityInstructions(connectorId: string, expected: WorldProofExpectation): string | null {
+    return this.connectors.get(connectorId)?.identityProofInstructions?.(expected) ?? null;
+  }
+
+  /**
+   * Verifies a world identity proof through its connector, then links the identity to the acting
+   * agent. The connector does the IO; the core decides (one identity per agent, one agent per
+   * identity, agents act only for themselves).
+   */
+  async linkWorldIdentity(
+    actor: Actor,
+    input: { connectorId: string; proof: string } & WorldProofExpectation,
+  ): Promise<AgentRecord> {
+    if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can link a world identity.");
+    const connector = this.connectors.get(input.connectorId);
+    if (!connector?.verifyIdentityProof) {
+      fail("VALIDATION_FAILED", `World ${input.connectorId} cannot verify identities here.`, {
+        connectorId: input.connectorId,
+      });
+    }
+    let verified;
+    try {
+      verified = await connector.verifyIdentityProof(input.proof, {
+        audience: input.audience,
+        nonce: input.nonce,
+      });
+    } catch (error) {
+      if (error instanceof WorldIdentityProofRejected) {
+        fail("VALIDATION_FAILED", `The identity proof was rejected: ${error.message}`, {
+          field: "proof",
+          reason: error.reason,
+        });
+      }
+      throw new CourtError(
+        "WORLD_UNAVAILABLE",
+        `The ${connector.id} world could not be reached. Try again later.`,
+        {
+          connectorId: connector.id,
+          cause: (error as Error).message,
+        },
+      );
+    }
+    await this.decideRegistry(actor, (registry) =>
+      decideLinkWorldIdentity(registry, actor, {
+        agentId: actor.agentId,
+        connectorId: input.connectorId,
+        verified,
+      }),
+    );
+    return (await this.getRegistry()).agents.get(actor.agentId)!;
   }
 
   private async decideRegistry(

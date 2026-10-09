@@ -39,13 +39,54 @@ export interface EventStore {
 // ---------------------------------------------------------------------------
 
 /**
- * A world MuseCourt can verify evidence against. Implementations live in
- * src/connectors. Identity, ownership and search come later.
+ * A world MuseCourt can verify evidence (and, optionally, identities) against.
+ * Implementations live in src/connectors. Ownership and search come later.
  */
 export interface WorldConnector {
   readonly id: string;
   /** Returns the event, or null if the world has no such event. Throws if the world is unreachable. */
   getEvent(eventId: string): Promise<WorldEventRecord | null>;
+  /**
+   * Present when the world can prove identities (Phase 6, R1). Verifies a proof that the presenter
+   * controls a world identity, issued for exactly this `audience` and `nonce`. Throws
+   * `WorldIdentityProofRejected` for an invalid proof; any other error means the world could not
+   * be reached.
+   */
+  verifyIdentityProof?(proof: string, expected: WorldProofExpectation): Promise<VerifiedWorldIdentity>;
+  /** How an agent obtains a proof for this challenge from its world (shown with the challenge). */
+  identityProofInstructions?(expected: WorldProofExpectation): string;
+}
+
+export interface WorldProofExpectation {
+  /** MuseCourt's exact public origin, which the proof must name. */
+  audience: string;
+  /** The one-time challenge MuseCourt issued. */
+  nonce: string;
+}
+
+/** A world identity whose proof checked out. */
+export interface VerifiedWorldIdentity {
+  /** The world's stable id for the agent (never a renameable username). */
+  worldAgentId: string;
+  /** The world's id for this proof (e.g. a JWT id), kept for the record. */
+  proofId: string;
+  issuedAt: string;
+  expiresAt: string;
+  /** Opaque owner reference vouched for by the world, if any (feeds conflict-of-interest rules). */
+  ownerRef: string | null;
+  /** Public facts the world vouched for at verification time (username, standing, status…). */
+  attributes: Record<string, unknown>;
+}
+
+/** An identity proof that failed verification. `reason` is a short machine-readable cause. */
+export class WorldIdentityProofRejected extends Error {
+  constructor(
+    readonly reason: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "WorldIdentityProofRejected";
+  }
 }
 
 // ---------------------------------------------------------------------------

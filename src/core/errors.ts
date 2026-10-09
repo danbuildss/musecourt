@@ -20,6 +20,8 @@ export type CourtErrorCode =
   | "CONCURRENCY_CONFLICT"
   | "WORLD_EVIDENCE_NOT_FOUND"
   | "WORLD_EVIDENCE_UNAVAILABLE"
+  /** A world connector could not be reached for something other than evidence (e.g. identity keys). */
+  | "WORLD_UNAVAILABLE"
   | "INVARIANT_VIOLATION";
 
 export class CourtError extends Error {

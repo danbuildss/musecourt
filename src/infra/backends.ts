@@ -1,13 +1,21 @@
 import type { Pool } from "pg";
-import type { CredentialStore, IdempotencyStore } from "@/api/stores";
+import type { CredentialStore, IdempotencyStore, WorldChallengeStore } from "@/api/stores";
 import type { EventStore } from "@/core/ports";
 import type { ClockLease } from "@/court/court-clock";
 import { projectEvents, rebuildFromLog } from "@/court/read-models/projector";
 import type { ReadModels } from "@/court/read-models/types";
-import { MemoryCredentialStore, MemoryIdempotencyStore } from "./memory-auth-stores";
+import {
+  MemoryCredentialStore,
+  MemoryIdempotencyStore,
+  MemoryWorldChallengeStore,
+} from "./memory-auth-stores";
 import { MemoryEventStore } from "./memory-event-store";
 import { MemoryReadModels } from "./memory-read-models";
-import { PostgresCredentialStore, PostgresIdempotencyStore } from "./postgres-auth-stores";
+import {
+  PostgresCredentialStore,
+  PostgresIdempotencyStore,
+  PostgresWorldChallengeStore,
+} from "./postgres-auth-stores";
 import { PostgresEventStore, readStreamWith } from "./postgres-event-store";
 import { PostgresReadModelWriter, PostgresReadModels } from "./postgres-read-models";
 
@@ -17,6 +25,8 @@ export interface Backend {
   readModels: ReadModels;
   credentials: CredentialStore;
   idempotency: IdempotencyStore;
+  /** One-time challenges for linking world identities. */
+  worldChallenges: WorldChallengeStore;
   /** Best-effort lease so overlapping clock runs don't duplicate work. */
   clockLease: ClockLease;
   /** Drops all read models and rebuilds them from the event log. */
@@ -35,6 +45,7 @@ export function createMemoryBackend(): Backend & { credentials: MemoryCredential
     readModels,
     credentials: new MemoryCredentialStore(),
     idempotency: new MemoryIdempotencyStore(),
+    worldChallenges: new MemoryWorldChallengeStore(),
     clockLease: memoryLease(),
     rebuildReadModels: async () => rebuildFromLog(await store.readAll(), readModels),
     dumpReadModels: async () => readModels.dump(),
@@ -56,6 +67,7 @@ export function createPostgresBackend(pool: Pool): Backend {
     readModels,
     credentials: new PostgresCredentialStore(pool),
     idempotency: new PostgresIdempotencyStore(pool),
+    worldChallenges: new PostgresWorldChallengeStore(pool),
     clockLease: postgresLease(pool),
     async rebuildReadModels() {
       const client = await pool.connect();

@@ -9,13 +9,17 @@ import type { RateLimiter } from "./rate-limit";
 import { routes, type Route, type RouteResult } from "./routes";
 import { MCP_PATH, handleMcpHttp } from "@/mcp/server";
 import { assertIdempotencyKey, runIdempotent } from "./services";
-import type { CredentialStore, IdempotencyRecord, IdempotencyStore } from "./stores";
+import type { CredentialStore, IdempotencyRecord, IdempotencyStore, WorldChallengeStore } from "./stores";
 
 export interface ApiDeps {
   court: Court;
   readModels: ReadModels;
   credentials: CredentialStore;
   idempotency: IdempotencyStore;
+  /** One-time challenges for linking world identities. */
+  worldChallenges: WorldChallengeStore;
+  /** MuseCourt's exact public origin (e.g. https://musecourt.example). World identity proofs must name it. */
+  publicOrigin?: string;
   clock: Clock;
   rebuildReadModels: () => Promise<void>;
   /** The court clock, run by the internal cron route and the admin tick. */

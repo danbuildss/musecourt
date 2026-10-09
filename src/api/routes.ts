@@ -25,7 +25,9 @@ import {
   parse,
   queryObject,
   registerAgentBody,
+  linkWorldIdentityBody,
   toCaseCommand,
+  worldChallengeBody,
 } from "./schemas";
 import {
   CREDENTIAL_NOTE,
@@ -39,6 +41,7 @@ import {
   tasksAndOpportunities,
 } from "./services";
 import type { IdempotencyRecord } from "./stores";
+import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
 
 export interface RouteContext {
   request: Request;
@@ -169,6 +172,28 @@ export const routes: Route[] = [
     summary: "What the court is waiting for from you, plus open roles you are eligible to take.",
     async handle(ctx) {
       return ok(await tasksAndOpportunities(ctx.deps, agentIdOf(ctx), ctx.now));
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/agents/me/world-identity/challenge",
+    auth: "agent",
+    summary:
+      "Get a one-time challenge (10 minutes) to prove a world identity, e.g. { connectorId: museworld }. Its audience and nonce go into the world's proof.",
+    async handle(ctx) {
+      const input = parse(worldChallengeBody, ctx.body);
+      return ok(await issueWorldIdentityChallenge(ctx.deps, agentIdOf(ctx), input.connectorId, ctx.now), 201);
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/agents/me/world-identity",
+    auth: "agent",
+    summary:
+      "Link your world identity: submit the proof your world issued for your challenge. MuseCourt verifies it with the world's keys.",
+    async handle(ctx) {
+      const input = parse(linkWorldIdentityBody, ctx.body);
+      return ok(await linkWorldIdentity(ctx.deps, agentIdOf(ctx), input, ctx.now));
     },
   },
   {

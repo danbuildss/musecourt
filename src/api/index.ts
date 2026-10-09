@@ -25,6 +25,8 @@ export interface MuseCourtAppOptions {
   maxBodyBytes?: number;
   idempotencyWaitMs?: number;
   onInternalError?: ApiDeps["onInternalError"];
+  /** MuseCourt's exact public origin; required to link world identities. */
+  publicOrigin?: string;
 }
 
 /** Composition root: one Court and one API over a backend. */
@@ -59,6 +61,8 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     readModels: backend.readModels,
     credentials: backend.credentials,
     idempotency: backend.idempotency,
+    worldChallenges: backend.worldChallenges,
+    publicOrigin: options.publicOrigin,
     clock: options.clock,
     rebuildReadModels: () => backend.rebuildReadModels(),
     adminToken: options.adminToken,
