@@ -1,6 +1,6 @@
 # Phase 6 design: Museworld connector (identity + verified evidence)
 
-**Status: approved 2026-10-09. M1 (identity) and M2 (evidence and the record-visibility gate) are implemented; M3 (live proof) needs a deployment and a Muse its owner controls. See "As built" at the end for where M1 and M2 differ from this design.**
+**Status: approved 2026-10-09. M1 (identity) and M2 (evidence and the record-visibility gate) are implemented, and M3 (live proof) succeeded on 2026-10-10: see [`phase-6-review.md`](phase-6-review.md). See "As built" at the end for where M1 and M2 differ from this design.**
 
 **Sources:**
 
