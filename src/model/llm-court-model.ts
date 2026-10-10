@@ -6,6 +6,7 @@ import type {
   HouseJudgmentDraft,
   HouseJudgmentRequest,
 } from "@/core/ports";
+import { BankrChatModel } from "./bankr";
 import { extractJsonObject, ModelError, type ChatModel } from "./chat";
 
 /**
@@ -58,4 +59,14 @@ export class LlmCourtModel implements CourtModel {
   async gradeBarExam(_request: BarExamGradingRequest): Promise<BarExamGrade> {
     throw new ModelError("BAD_REQUEST", "Bar Exam grading arrives in Phase 7.");
   }
+}
+
+/**
+ * Solon's model as deployed: present only when a Bankr key is configured (BANKR_LLM_KEY or
+ * BANKR_API_KEY; MUSECOURT_MODEL and MUSECOURT_LLM_BASE_URL optional). Without one, Solon
+ * cases wait in deliberation and the clock reports them as awaiting a model.
+ */
+export function courtModelFromEnv(env: NodeJS.ProcessEnv = process.env): CourtModel | undefined {
+  if (!env.BANKR_LLM_KEY && !env.BANKR_API_KEY) return undefined;
+  return new LlmCourtModel(BankrChatModel.fromEnv(env));
 }

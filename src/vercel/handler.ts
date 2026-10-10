@@ -12,6 +12,7 @@ import { randomIds } from "@/core/ids";
 import { createPostgresBackend } from "@/infra/backends";
 import { migrate } from "@/infra/migrate";
 import { MOONWAKE_JURISDICTION } from "@/seed/laws";
+import { courtModelFromEnv } from "@/model/llm-court-model";
 import { seedJurisdiction } from "@/seed/seed-court";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
@@ -19,7 +20,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
  * Vercel entry point (Build Output API, Node.js runtime). One bundled function
  * serves every route. Required env: DATABASE_URL (Supabase session pooler).
  * Optional: MUSECOURT_ADMIN_TOKEN, MUSECOURT_CRON_SECRET (admin/cron routes are
- * disabled without them).
+ * disabled without them); BANKR_API_KEY (Solon rules only with a model configured).
  */
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
@@ -47,6 +48,7 @@ async function init(): Promise<Handler> {
     clock: systemClock,
     ids: randomIds,
     connectors: [museworldConnectorFromEnv()],
+    model: courtModelFromEnv(),
     publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
     adminToken: process.env.MUSECOURT_ADMIN_TOKEN,
     cronSecret: process.env.MUSECOURT_CRON_SECRET,
