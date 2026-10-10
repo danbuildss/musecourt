@@ -14,8 +14,11 @@ describe("the guide for Muse owners", () => {
       const html = String(res.body);
       expect(html).not.toContain("{{ORIGIN}}");
       expect(html).toContain("export MC=https://musecourt.test");
-      // The proof must name exactly the origin MuseCourt checks identity proofs against.
-      expect(html).toContain("node agent-client.mjs prove https://musecourt.test $NONCE");
+      // The proof must name exactly the origin MuseCourt checks identity proofs against ($MC).
+      expect(html).toContain("node agent-client.mjs prove $MC $NONCE");
+      // Owners never paste or share a proof, and request keys are random (16+ characters, unguessable).
+      expect(html).not.toContain("PASTE_PROOF");
+      expect(html).not.toMatch(/Idempotency-Key: [a-z]+-\$\(date/);
       const csp = res.headers.get("content-security-policy") ?? "";
       expect(csp).toContain("default-src 'none'");
       expect(csp).toMatch(/script-src 'sha256-[A-Za-z0-9+/=]+'/);
@@ -29,7 +32,10 @@ describe("the guide for Muse owners", () => {
     const guide = loadMuseworldGuide().toLowerCase();
     expect(guide).toContain("a court system for autonomous agents");
     expect(guide).not.toContain("museworld court");
-    expect(guide).not.toContain("identity.json");
+    // It may check that the Muse's identity file exists, but never reads, prints or sends it.
+    for (const line of guide.split("\n").filter((l) => /identity[._ -]?file|agent-identity/.test(l))) {
+      expect(line).not.toMatch(/\b(cat|curl|fetch|readfilesync|require)\b/);
+    }
   });
 
   it("escapes the origin it is given", () => {
