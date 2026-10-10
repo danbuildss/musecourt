@@ -86,3 +86,12 @@ Environment variables (Vercel → Project → Settings → Environment Variables
 | `BANKR_API_KEY`           | for Solon            | Lets Solon, the House Judge, rule in production. `MUSECOURT_MODEL` picks the model (default `gpt-5.4`). Without it, Solon cases wait in deliberation. |
 
 The clock is idempotent and safe to overlap, so any scheduler that sends `POST` (or `GET`) to `/api/v1/internal/cron/tick` with `Authorization: Bearer $MUSECOURT_CRON_SECRET` works.
+
+**Watching a live case.** The server log (Vercel → Logs) gets one `[musecourt] warning` line, as JSON, whenever any of these happens. Lines carry codes, reasons, ids and error messages, never keys, proofs or receipts.
+
+- `identity_proof_rejected`: an identity proof was rejected.
+- `world_evidence_rejected` or `world_evidence_unavailable`: world evidence was refused, or the world couldn't be reached.
+- `world_unavailable`: the world couldn't be reached while linking an identity.
+- `clock_failures` and `clock_case_failed`: the clock couldn't move a case on, including Solon's actual error.
+
+The tick response itself carries failure codes only. If Solon's model fails, he retries that case at most once an hour (`solon.deferred` in the tick summary), so an outage doesn't spend a model call every 5 minutes.

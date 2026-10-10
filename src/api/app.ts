@@ -5,6 +5,7 @@ import type { CourtClock } from "@/court/court-clock";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
 import { ApiError, toErrorBody } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFingerprint } from "./http";
+import { warningForError, type OpsWarning } from "./ops";
 import type { RateLimiter } from "./rate-limit";
 import { routes, type Route, type RouteResult } from "./routes";
 import { MCP_PATH, handleMcpHttp } from "@/mcp/server";
@@ -43,6 +44,8 @@ export interface ApiDeps {
   idempotencyStaleMs?: number;
   /** Receives unexpected errors (never sent to clients). */
   onInternalError?: (error: unknown) => void;
+  /** Receives operational warnings (rejected proofs and world evidence, clock failures). */
+  onWarning?: (warning: OpsWarning) => void;
 }
 
 export interface RequestInfo {
@@ -114,6 +117,8 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
       const { status, body } = toErrorBody(error);
       if (body.error.code === "INTERNAL_ERROR" || body.error.code === "INVARIANT_VIOLATION")
         deps.onInternalError?.(error);
+      const warning = warningForError(body.error, `${route.method} ${route.path}`, ctx.principal);
+      if (warning) deps.onWarning?.(warning);
       return { response: errorResponse(error), status, body, code: body.error.code };
     }
   }

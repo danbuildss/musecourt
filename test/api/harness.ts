@@ -4,6 +4,7 @@ import { createMuseCourtApp } from "@/api";
 import { DEFAULT_MAX_BODY_BYTES } from "@/api/http";
 import { createNodeServer } from "@/api/node-server";
 import { loadMuseworldGuide } from "@/api/guides";
+import type { OpsWarning } from "@/api/ops";
 import { loadSkillMarkdown } from "@/api/skill";
 import type { RateLimiter } from "@/api/rate-limit";
 import { FakeWorld } from "@/connectors/fake-world";
@@ -78,6 +79,7 @@ export async function startApi(
   const clock = new FakeClock();
   const world = options.world ?? new FakeWorld();
   const internalErrors: unknown[] = [];
+  const warnings: OpsWarning[] = [];
   const { court, api } = createMuseCourtApp({
     backend,
     clock,
@@ -95,6 +97,7 @@ export async function startApi(
     maxBodyBytes: options.maxBodyBytes,
     idempotencyWaitMs: 3000,
     onInternalError: (e) => internalErrors.push(e),
+    onWarning: (w) => warnings.push(w),
   });
   await seedJurisdiction(court, {
     jurisdictionId: JURISDICTION,
@@ -194,6 +197,7 @@ export async function startApi(
     clock,
     world,
     internalErrors,
+    warnings,
     request,
     get,
     post,

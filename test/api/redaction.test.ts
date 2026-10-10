@@ -263,6 +263,15 @@ describe.each(BACKENDS)("record-visibility gate with Museworld evidence (%s)", (
       });
       expect(missing.body.error.code).toBe("WORLD_EVIDENCE_NOT_FOUND");
       expect(missing.body.error.details.reason).toBeUndefined();
+      // Each rejection also reaches the operator's log, by code, reason and event id.
+      expect(h.warnings).toEqual([
+        expect.objectContaining({ event: "world_evidence_rejected", eventId: EVENT_ID, reason: "NOT_KEPT" }),
+        expect.objectContaining({ event: "world_evidence_unavailable", code: "WORLD_EVIDENCE_UNAVAILABLE" }),
+        expect.objectContaining({ event: "world_evidence_rejected", eventId: "999999", reason: null }),
+      ]);
+      expect(h.warnings.every((w) => w.agentId === maple.agentId && w.where === "POST /api/v1/cases")).toBe(
+        true,
+      );
     } finally {
       await h.close();
     }

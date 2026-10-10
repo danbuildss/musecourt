@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CaseCommand } from "@/core/case-decide";
 import { CourtError } from "@/core/errors";
 import type { HouseJudgmentDraft } from "@/core/ports";
-import { CourtClock } from "@/court/court-clock";
+import { CourtClock, type ClockFailure } from "@/court/court-clock";
 import { FakeModel } from "@/model/fake-model";
 import {
   createTestCourt,
@@ -137,6 +137,49 @@ describe("court clock: abandoned cases always reach the right next state", () =>
     expect(summary.solon).toMatchObject({ pending: 1, failed: 1 });
     expect(summary.failures).toEqual([{ caseId, code: "MODEL_ERROR" }]);
     expect((await t.court.getCase(caseId))!.status).toBe("OPEN");
+  });
+
+  it("5c. a failing model is retried at most once an hour; its error goes to the operator's log only", async () => {
+    const t = await createTestCourt();
+    const { caseId } = await fileStandardCase(t);
+    for (let i = 0; i < 12; i++) {
+      if ((await t.court.getCase(caseId))!.stage === "DELIBERATION") break;
+      await jumpToDeadline(t, caseId);
+      await t.courtClock().tick();
+    }
+    let outage = true;
+    const model = new FakeModel({
+      judgment: (req) => {
+        if (outage) throw new Error("upstream model outage");
+        return {
+          finding: "NOT_LIABLE",
+          reasoning: "The record does not show a taking without permission.",
+          sentence: [],
+          citedLawIds: [req.charges[0]!.lawId],
+          citedEvidenceIds: [],
+        };
+      },
+    });
+    const failures: ClockFailure[] = [];
+    const clock = () => t.courtClock({ model, solonAttempts: true, onFailure: (f) => failures.push(f) });
+
+    const first = await clock().tick();
+    expect(first.solon).toMatchObject({ pending: 1, failed: 1, deferred: 0 });
+    expect(first.failures).toEqual([{ caseId, code: "MODEL_ERROR" }]);
+    expect(failures).toEqual([{ caseId, step: "solon", code: "MODEL_ERROR", error: expect.any(Error) }]);
+    expect((failures[0]!.error as Error).message).toBe("upstream model outage");
+
+    // Half an hour later the case waits instead of making another paid call.
+    t.clock.advance(30 * 60 * 1000);
+    expect((await clock().tick()).solon).toMatchObject({ pending: 1, failed: 0, deferred: 1 });
+    expect(model.judgmentRequests).toHaveLength(1);
+
+    // After an hour Solon tries again, and rules once the model is back.
+    t.clock.advance(31 * 60 * 1000);
+    outage = false;
+    expect((await clock().tick()).solon).toMatchObject({ ruled: 1, deferred: 0 });
+    expect(model.judgmentRequests).toHaveLength(2);
+    expect((await t.court.getCase(caseId))!).toMatchObject({ status: "CLOSED", outcome: "VERDICT" });
   });
 
   it("6. settlement offers survive stage timeouts, are frozen while overdue, and lapse at closure", async () => {

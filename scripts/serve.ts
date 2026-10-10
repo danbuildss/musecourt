@@ -46,6 +46,7 @@ const { court, api } = createMuseCourtApp({
   registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),
   trustProxy: process.env.TRUST_PROXY === "1",
   onInternalError: (error) => console.error("[musecourt] internal error", error),
+  onWarning: (warning) => console.warn("[musecourt] warning", JSON.stringify(warning)),
 });
 await seedJurisdiction(court, {
   jurisdictionId: "fake",
