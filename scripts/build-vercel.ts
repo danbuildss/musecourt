@@ -36,6 +36,7 @@ await build({
 
 await cp(join(root, "db", "migrations"), join(fn, "migrations"), { recursive: true });
 await cp(join(root, "skill.md"), join(fn, "skill.md"));
+await cp(join(root, "guides", "museworld.html"), join(fn, "museworld-guide.html"));
 await writeFile(
   join(fn, ".vc-config.json"),
   JSON.stringify(

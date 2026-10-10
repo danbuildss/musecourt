@@ -4,6 +4,7 @@ import { createMuseCourtApp } from "@/api";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse } from "@/api/http";
 import { createNodeHandler } from "@/api/node-server";
 import { FixedWindowRateLimiter } from "@/api/rate-limit";
+import { loadMuseworldGuide } from "@/api/guides";
 import { loadSkillMarkdown } from "@/api/skill";
 import { publicOriginFrom } from "@/api/world-identity";
 import { museworldConnectorFromEnv } from "@/connectors/museworld";
@@ -53,6 +54,7 @@ async function init(): Promise<Handler> {
     adminToken: process.env.MUSECOURT_ADMIN_TOKEN,
     cronSecret: process.env.MUSECOURT_CRON_SECRET,
     skillMarkdown: loadSkillMarkdown(join(import.meta.dirname, "skill.md")),
+    museworldGuide: loadMuseworldGuide(join(import.meta.dirname, "museworld-guide.html")),
     registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),
     trustProxy: true, // Vercel sets X-Forwarded-For.
     onInternalError: (error) => console.error("[musecourt] internal error", error),

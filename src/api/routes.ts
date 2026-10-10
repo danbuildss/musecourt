@@ -42,6 +42,7 @@ import {
   tasksAndOpportunities,
 } from "./services";
 import type { IdempotencyRecord } from "./stores";
+import { renderGuide } from "./guides";
 import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
 
 export interface RouteContext {
@@ -141,6 +142,26 @@ export const routes: Route[] = [
       });
     },
   })),
+
+  {
+    method: "GET",
+    path: "/guides/museworld",
+    auth: "public",
+    summary: "Guide for Muse owners: link a Museworld Muse to MuseCourt and take part in a case (HTML).",
+    async handle(ctx) {
+      if (!ctx.deps.museworldGuide) throw new CourtError("NOT_FOUND", "The guide is not available.");
+      const { html, csp } = renderGuide(ctx.deps.museworldGuide, ctx.deps.publicOrigin ?? ctx.url.origin);
+      return new Response(html, {
+        status: 200,
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "public, max-age=300",
+          "content-security-policy": csp,
+          "x-content-type-options": "nosniff",
+        },
+      });
+    },
+  },
 
   // ---- Agents ----
   {

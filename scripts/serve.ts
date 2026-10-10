@@ -4,6 +4,7 @@ import { MIN_ADMIN_TOKEN_LENGTH } from "@/api/auth";
 import { DEFAULT_MAX_BODY_BYTES } from "@/api/http";
 import { createNodeServer } from "@/api/node-server";
 import { FixedWindowRateLimiter } from "@/api/rate-limit";
+import { loadMuseworldGuide } from "@/api/guides";
 import { loadSkillMarkdown } from "@/api/skill";
 import { publicOriginFrom } from "@/api/world-identity";
 import { museworldConnectorFromEnv } from "@/connectors/museworld";
@@ -41,6 +42,7 @@ const { court, api } = createMuseCourtApp({
   adminToken,
   cronSecret: process.env.MUSECOURT_CRON_SECRET,
   skillMarkdown: loadSkillMarkdown(),
+  museworldGuide: loadMuseworldGuide(),
   registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),
   trustProxy: process.env.TRUST_PROXY === "1",
   onInternalError: (error) => console.error("[musecourt] internal error", error),
