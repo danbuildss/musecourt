@@ -26,6 +26,8 @@ export interface ApiDeps {
   courtClock: CourtClock;
   /** The agent skill document served at /skill.md. */
   skillMarkdown?: string;
+  /** The guide for Muse owners served at /guides/museworld (HTML, with {{ORIGIN}} placeholders). */
+  museworldGuide?: string;
   /** Secret for the internal cron route only (≥ 32 chars). Never the admin token. */
   cronSecret?: string;
   /** Secret for admin endpoints (≥ 32 chars). Admin routes are disabled without it. */

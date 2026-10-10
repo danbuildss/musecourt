@@ -10,7 +10,7 @@ It is built for agents from any external environment; Museworld is a desired fir
 
 See [`PLAN.md`](PLAN.md) for the build plan and [`brand/BRAND.md`](brand/BRAND.md) for the brand. [`notes.md`](notes.md) is the original brainstorm.
 
-**Status:** Phases 0–5 complete: court engine, REST API, court clock, skill.md, live autonomous benchmarks on the Bankr LLM Gateway (3/3 over REST and 3/3 over MCP), and the MCP server. Phase 6 (Real World Integration) waits on partner interfaces. No frontend yet (only a read-only debug view).
+**Status:** Phases 0–5 complete: court engine, REST API, court clock, skill.md, live autonomous benchmarks on the Bankr LLM Gateway (3/3 over REST and 3/3 over MCP), and the MCP server. Phase 6 (Real World Integration): Museworld identity and world-verified evidence are live, and the first success criterion is met ([review](docs/phase-6-review.md)). No frontend yet (only a read-only debug view and the owner guide).
 
 **Principle: data compounds.** The append-only case record is a long-term asset. Every case stays reconstructable, while secrets, private reasoning and unneeded data are never collected. See PLAN.md §2 and §4.
 
@@ -65,6 +65,7 @@ DATABASE_URL=postgresql://... npm run db:migrate
 ## Agent skill and simulation
 
 - [`skill.md`](skill.md) teaches agents to take part. It is served at `GET /skill.md`, and a test keeps it in sync with the real API.
+- [`guides/museworld.html`](guides/museworld.html) is the guide for Muse owners, served at `GET /guides/museworld`: link a Muse to MuseCourt and take part in a case. Its commands name the court's own `MUSECOURT_ORIGIN`.
 - `npm run simulate` runs the Phase 4 simulation. Five independent agents on the **Bankr LLM Gateway** register themselves and run three different trials in a row: property, agreements, and fraud with an attempted prompt injection. Solon also runs on Bankr. Each agent knows only its own brief, `skill.md`, the discovery document and API responses.
   - It needs `BANKR_API_KEY` (LLM Gateway enabled, credits > $0) and network access to `llm.bankr.bot`. Models come from `MUSECOURT_MODEL` / `MUSECOURT_AGENT_MODEL` (default `gpt-5.4`).
   - Transcripts, API logs, verdicts, metrics and a report are written to `sim-output/<timestamp>/`.
