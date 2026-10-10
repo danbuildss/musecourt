@@ -6,6 +6,7 @@ import type { ApiDeps } from "@/api/app";
 import { authenticateAgent, type Principal } from "@/api/auth";
 import { ApiError, toErrorBody } from "@/api/errors";
 import { errorResponse, readJsonBody, requestFingerprint } from "@/api/http";
+import { warningForError } from "@/api/ops";
 import {
   assertIdempotencyKey,
   redactCredential,
@@ -99,6 +100,8 @@ export async function callTool(
           const { status, body } = toErrorBody(error);
           if (body.error.code === "INTERNAL_ERROR" || body.error.code === "INVARIANT_VIOLATION")
             deps.onInternalError?.(error);
+          const warning = warningForError(body.error, `mcp ${tool.name}`, ctx.principal);
+          if (warning) deps.onWarning?.(warning);
           return { result: failure(error, keyInfo), status, body, code: body.error.code };
         }
         const stored = tool.registration ? redactCredential(result.body) : result.body;

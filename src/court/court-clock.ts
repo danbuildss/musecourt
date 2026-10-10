@@ -15,6 +15,18 @@ export interface ClockLease {
   tryAcquire(): Promise<(() => Promise<void>) | null>;
 }
 
+/**
+ * Operational memory of Solon's failed attempts, so a failing model is retried at most once per
+ * retry interval instead of on every clock run (each attempt is a paid model call). Not court record.
+ */
+export interface SolonAttemptLog {
+  lastFailed(caseIds: string[]): Promise<Map<string, string>>;
+  markFailed(caseId: string, at: Date): Promise<void>;
+}
+
+/** How long Solon waits before retrying a case whose last attempt failed. */
+export const SOLON_RETRY_MS = 60 * 60 * 1000;
+
 export interface TickSummary {
   ranAt: string;
   lease: "ACQUIRED" | "BUSY" | "NONE";
@@ -26,7 +38,8 @@ export interface TickSummary {
   skipped: number;
   failed: number;
   failures: Array<{ caseId: string; code: string }>;
-  solon: { pending: number; ruled: number; failed: number; awaitingModel: number };
+  /** `deferred`: cases whose last attempt failed less than the retry interval ago. */
+  solon: { pending: number; ruled: number; failed: number; deferred: number; awaitingModel: number };
   /** Takedown re-checks of admitted world evidence (absent when no sweep is configured). */
   worldRecheck?: WorldRecheckSummary;
   /** True if more due cases remain than this run's batch size; run again. */
@@ -43,6 +56,21 @@ export interface CourtClockDeps {
   batchSize?: number;
   /** Re-checks admitted world evidence for takedowns, a few cases per run. */
   worldRecheck?: Pick<WorldEvidenceSweep, "run">;
+  /** Without it, Solon retries a failing case on every run. */
+  solonAttempts?: SolonAttemptLog;
+  solonRetryMs?: number;
+  /**
+   * Hears each case the run could not move on, with the error itself, for the operator's log.
+   * The summary carries codes only: it goes back to the scheduler that called the clock.
+   */
+  onFailure?: (failure: ClockFailure) => void;
+}
+
+export interface ClockFailure {
+  caseId: string;
+  step: "deadline" | "solon";
+  code: string;
+  error: unknown;
 }
 
 /** "Already moved on" outcomes of a race: not failures. */
@@ -65,7 +93,7 @@ export class CourtClock {
       skipped: 0,
       failed: 0,
       failures: [],
-      solon: { pending: 0, ruled: 0, failed: 0, awaitingModel: 0 },
+      solon: { pending: 0, ruled: 0, failed: 0, deferred: 0, awaitingModel: 0 },
       moreDue: false,
     };
 
@@ -98,8 +126,10 @@ export class CourtClock {
         if (isCourtError(error) && RACE_CODES.has(error.code)) {
           summary.skipped += 1;
         } else {
+          const code = isCourtError(error) ? error.code : "INTERNAL_ERROR";
           summary.failed += 1;
-          summary.failures.push({ caseId, code: isCourtError(error) ? error.code : "INTERNAL_ERROR" });
+          summary.failures.push({ caseId, code });
+          this.deps.onFailure?.({ caseId, step: "deadline", code, error });
         }
       }
     }
@@ -122,14 +152,28 @@ export class CourtClock {
       summary.solon.awaitingModel = waiting.length;
       return;
     }
+    const attempts = this.deps.solonAttempts;
+    // Pacing is best effort: if its memory can't be read, Solon simply tries.
+    const lastFailed = attempts
+      ? await attempts.lastFailed(waiting.map((c) => c.caseId)).catch(() => new Map<string, string>())
+      : new Map<string, string>();
+    const retryMs = this.deps.solonRetryMs ?? SOLON_RETRY_MS;
     for (const c of waiting) {
+      const failedAt = lastFailed.get(c.caseId);
+      if (failedAt && now - Date.parse(failedAt) < retryMs) {
+        summary.solon.deferred += 1;
+        continue;
+      }
       try {
         await this.deps.houseJudge.deliberate(c.caseId);
         summary.solon.ruled += 1;
       } catch (error) {
         if (isCourtError(error) && RACE_CODES.has(error.code)) continue;
+        const code = isCourtError(error) ? error.code : "MODEL_ERROR";
         summary.solon.failed += 1;
-        summary.failures.push({ caseId: c.caseId, code: isCourtError(error) ? error.code : "MODEL_ERROR" });
+        summary.failures.push({ caseId: c.caseId, code });
+        this.deps.onFailure?.({ caseId: c.caseId, step: "solon", code, error });
+        await attempts?.markFailed(c.caseId, new Date(now)).catch(() => undefined);
       }
     }
   }

@@ -9,6 +9,7 @@ import type {
   WorldChallengeRecord,
   WorldChallengeStore,
 } from "@/api/stores";
+import type { SolonAttemptLog } from "@/court/court-clock";
 import type { WorldRecheckLog } from "@/court/world-recheck";
 
 interface CredentialRow {
@@ -221,6 +222,27 @@ export class PostgresWorldRecheckLog implements WorldRecheckLog {
     await this.pool.query(
       `INSERT INTO musecourt.world_evidence_checks (case_id, checked_at) VALUES ($1, $2)
        ON CONFLICT (case_id) DO UPDATE SET checked_at = EXCLUDED.checked_at`,
+      [caseId, at],
+    );
+  }
+}
+
+export class PostgresSolonAttemptLog implements SolonAttemptLog {
+  constructor(private readonly pool: Pool) {}
+
+  async lastFailed(caseIds: string[]): Promise<Map<string, string>> {
+    if (caseIds.length === 0) return new Map();
+    const { rows } = await this.pool.query<{ case_id: string; failed_at: Date }>(
+      "SELECT case_id, failed_at FROM musecourt.solon_attempts WHERE case_id = ANY($1)",
+      [caseIds],
+    );
+    return new Map(rows.map((r) => [r.case_id, r.failed_at.toISOString()]));
+  }
+
+  async markFailed(caseId: string, at: Date): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO musecourt.solon_attempts (case_id, failed_at) VALUES ($1, $2)
+       ON CONFLICT (case_id) DO UPDATE SET failed_at = EXCLUDED.failed_at`,
       [caseId, at],
     );
   }

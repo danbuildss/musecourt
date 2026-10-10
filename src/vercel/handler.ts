@@ -58,6 +58,7 @@ async function init(): Promise<Handler> {
     registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),
     trustProxy: true, // Vercel sets X-Forwarded-For.
     onInternalError: (error) => console.error("[musecourt] internal error", error),
+    onWarning: (warning) => console.warn("[musecourt] warning", JSON.stringify(warning)),
   });
   await seedJurisdiction(court, MOONWAKE_JURISDICTION);
   return createNodeHandler(api, { maxBodyBytes: DEFAULT_MAX_BODY_BYTES, rewriteUrl: restoreOriginalUrl });

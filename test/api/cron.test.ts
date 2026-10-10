@@ -71,7 +71,7 @@ describe.each(BACKENDS)("internal court-clock endpoint (%s)", (backend) => {
       skipped: 0,
       failed: 0,
       failures: [],
-      solon: { pending: 0, ruled: 0, failed: 0, awaitingModel: 0 },
+      solon: { pending: 0, ruled: 0, failed: 0, deferred: 0, awaitingModel: 0 },
       worldRecheck: { cases: 0, checked: 0, redacted: 0, failed: 0 },
       moreDue: false,
     });
@@ -152,6 +152,47 @@ describe.each(BACKENDS)("internal court-clock endpoint (%s)", (backend) => {
         caseId,
         outcome: "VERDICT",
       });
+    } finally {
+      await judged.close();
+    }
+  });
+
+  it("a failing Solon is reported to the operator's log with its error, and paced to once an hour", async () => {
+    const model = new FakeModel({
+      judgment: () => {
+        throw new Error("gateway answered 402: out of credits");
+      },
+    });
+    const judged = await startApi({ backend, model });
+    try {
+      const { maple, nova } = await castOfFive(judged);
+      const caseId = (await judged.fileCase(maple, nova)).body.case.caseId;
+      let view = (await judged.get(`/api/v1/cases/${caseId}`)).body.case;
+      const ticks = [];
+      for (let i = 0; i < 15 && view.stage.name !== "DELIBERATION"; i++) {
+        judged.clock.set(view.stage.deadline);
+        ticks.push((await judged.cronTick()).body);
+        view = (await judged.get(`/api/v1/cases/${caseId}`)).body.case;
+      }
+      // Solon tries in the same run that opens deliberation.
+      const tick = ticks.at(-1);
+      // The scheduler that called gets codes only; the error itself goes to the server log.
+      expect(tick.failures).toEqual([{ caseId, code: "MODEL_ERROR" }]);
+      expect(JSON.stringify(tick)).not.toContain("out of credits");
+      expect(judged.warnings).toContainEqual({
+        event: "clock_case_failed",
+        caseId,
+        step: "solon",
+        code: "MODEL_ERROR",
+        message: "gateway answered 402: out of credits",
+      });
+      expect(judged.warnings).toContainEqual(
+        expect.objectContaining({ event: "clock_failures", solonFailed: 1 }),
+      );
+      // Five minutes later the case waits rather than spending another model call.
+      judged.clock.advance(5 * 60 * 1000);
+      expect((await judged.cronTick()).body.solon).toMatchObject({ failed: 0, deferred: 1 });
+      expect(model.judgmentRequests).toHaveLength(1);
     } finally {
       await judged.close();
     }

@@ -128,8 +128,16 @@ describe.each(BACKENDS)("linking a Museworld identity (%s)", (backend) => {
         "challenge_used",
       );
       const n2 = (await challenge(maple)).body.challenge.nonce;
-      const retired = await link(maple, await island.prove({ nonce: n2, key: island.keys.retired }));
+      const retiredProof = await island.prove({ nonce: n2, key: island.keys.retired });
+      const retired = await link(maple, retiredProof);
       expect(retired.body.error.details.reason).toBe("retired_key");
+      // Each rejection reaches the operator's log with its reason, never the proof itself.
+      expect(h.warnings.map((w) => [w.event, w.reason, w.agentId])).toEqual([
+        ["identity_proof_rejected", "wrong_audience", maple.agentId],
+        ["identity_proof_rejected", "challenge_used", maple.agentId],
+        ["identity_proof_rejected", "retired_key", maple.agentId],
+      ]);
+      expect(JSON.stringify(h.warnings)).not.toContain(retiredProof.split(".")[2]);
     } finally {
       await h.close();
     }

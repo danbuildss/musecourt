@@ -8,6 +8,7 @@ import type { DeadlinePolicy } from "@/core/procedure";
 import { Court } from "@/court/court";
 import type { Backend } from "@/infra/backends";
 import { createApi, type ApiDeps, type MuseCourtApi } from "./app";
+import { warningForClockFailure } from "./ops";
 import type { RateLimiter } from "./rate-limit";
 
 export interface MuseCourtAppOptions {
@@ -27,6 +28,7 @@ export interface MuseCourtAppOptions {
   maxBodyBytes?: number;
   idempotencyWaitMs?: number;
   onInternalError?: ApiDeps["onInternalError"];
+  onWarning?: ApiDeps["onWarning"];
   /** MuseCourt's exact public origin; required to link world identities. */
   publicOrigin?: string;
 }
@@ -54,6 +56,8 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     clock: options.clock,
     houseJudge: options.model ? new HouseJudgeService(court, options.model, backend.readModels) : undefined,
     lease: backend.clockLease,
+    solonAttempts: backend.solonAttempts,
+    onFailure: (failure) => options.onWarning?.(warningForClockFailure(failure)),
     worldRecheck: new WorldEvidenceSweep({
       court,
       readModels: backend.readModels,
@@ -80,6 +84,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     maxBodyBytes: options.maxBodyBytes,
     idempotencyWaitMs: options.idempotencyWaitMs,
     onInternalError: options.onInternalError,
+    onWarning: options.onWarning,
   };
   return { court, api: createApi(deps), courtClock, deps };
 }

@@ -8,6 +8,7 @@ import type {
   WorldChallengeRecord,
   WorldChallengeStore,
 } from "@/api/stores";
+import type { SolonAttemptLog } from "@/court/court-clock";
 import type { WorldRecheckLog } from "@/court/world-recheck";
 
 export class MemoryCredentialStore implements CredentialStore {
@@ -129,5 +130,17 @@ export class MemoryWorldRecheckLog implements WorldRecheckLog {
 
   async markChecked(caseId: string, at: Date): Promise<void> {
     this.checked.set(caseId, at.toISOString());
+  }
+}
+
+export class MemorySolonAttemptLog implements SolonAttemptLog {
+  private readonly failed = new Map<string, string>();
+
+  async lastFailed(caseIds: string[]): Promise<Map<string, string>> {
+    return new Map(caseIds.flatMap((id) => (this.failed.has(id) ? [[id, this.failed.get(id)!]] : [])));
+  }
+
+  async markFailed(caseId: string, at: Date): Promise<void> {
+    this.failed.set(caseId, at.toISOString());
   }
 }

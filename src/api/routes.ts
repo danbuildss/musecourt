@@ -43,6 +43,7 @@ import {
 } from "./services";
 import type { IdempotencyRecord } from "./stores";
 import { renderGuide } from "./guides";
+import { warningForTick } from "./ops";
 import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
 
 export interface RouteContext {
@@ -510,7 +511,7 @@ export const routes: Route[] = [
     summary: "Run the court clock now (operator use). Same operation as the internal cron tick.",
     async handle(ctx) {
       parse(emptyBody, ctx.body);
-      return ok(await ctx.deps.courtClock.tick());
+      return ok(await runClock(ctx));
     },
   },
   {
@@ -533,7 +534,7 @@ export const routes: Route[] = [
     bodyless: true,
     summary:
       "Internal. Advance time-dependent state: apply due deadlines, run Solon. Idempotent; safe to overlap.",
-    handle: async (ctx) => ok(await ctx.deps.courtClock.tick()),
+    handle: async (ctx) => ok(await runClock(ctx)),
   },
   {
     method: "GET",
@@ -541,6 +542,14 @@ export const routes: Route[] = [
     auth: "cron",
     summary:
       "Internal. Same as POST; exists because Vercel Cron only sends GET. The one GET that acts, and only with the cron secret.",
-    handle: async (ctx) => ok(await ctx.deps.courtClock.tick()),
+    handle: async (ctx) => ok(await runClock(ctx)),
   },
 ];
+
+/** One clock run; a run that left something undone is also reported as an operational warning. */
+async function runClock(ctx: RouteContext) {
+  const summary = await ctx.deps.courtClock.tick();
+  const warning = warningForTick(summary);
+  if (warning) ctx.deps.onWarning?.(warning);
+  return summary;
+}

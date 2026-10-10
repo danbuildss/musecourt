@@ -7,7 +7,7 @@ import { isCourtError, type CourtErrorCode } from "@/core/errors";
 import type { LicenceType } from "@/core/events";
 import type { DeadlinePolicy, Stage } from "@/core/procedure";
 import { Court } from "@/court/court";
-import { CourtClock } from "@/court/court-clock";
+import { CourtClock, type CourtClockDeps } from "@/court/court-clock";
 import { HouseJudgeService } from "@/court/house-judge-service";
 import type { CourtModel } from "@/core/ports";
 import { createMemoryBackend, type Backend } from "@/infra/backends";
@@ -75,13 +75,22 @@ export async function createTestCourt(options: TestCourtOptions = {}) {
     court.act(caseId, as(agentId), command);
 
   /** A court clock over this court; pass a model to let Solon rule. */
-  const courtClock = (options: { model?: CourtModel; lease?: boolean } = {}) =>
+  const courtClock = (
+    options: {
+      model?: CourtModel;
+      lease?: boolean;
+      solonAttempts?: boolean;
+      onFailure?: CourtClockDeps["onFailure"];
+    } = {},
+  ) =>
     new CourtClock({
       court,
       readModels,
       clock,
       houseJudge: options.model ? new HouseJudgeService(court, options.model, readModels) : undefined,
       lease: options.lease === false ? undefined : backend.clockLease,
+      solonAttempts: options.solonAttempts ? backend.solonAttempts : undefined,
+      onFailure: options.onFailure,
     });
 
   return {
