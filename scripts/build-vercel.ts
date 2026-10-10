@@ -39,7 +39,14 @@ await cp(join(root, "skill.md"), join(fn, "skill.md"));
 await writeFile(
   join(fn, ".vc-config.json"),
   JSON.stringify(
-    { runtime: "nodejs22.x", handler: "index.mjs", launcherType: "Nodejs", shouldAddHelpers: false },
+    {
+      runtime: "nodejs22.x",
+      handler: "index.mjs",
+      launcherType: "Nodejs",
+      shouldAddHelpers: false,
+      // Solon's model calls can take tens of seconds; 60 s is the most every Vercel plan allows.
+      maxDuration: 60,
+    },
     null,
     2,
   ),

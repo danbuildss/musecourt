@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { HOUSE_JUDGE } from "@/core/house-judge";
 import { HouseJudgeService } from "@/court/house-judge-service";
 import type { ChatModel, ChatRequest } from "@/model/chat";
-import { LlmCourtModel } from "@/model/llm-court-model";
+import { LlmCourtModel, courtModelFromEnv } from "@/model/llm-court-model";
 import { createTestCourt, expectCourtError, fileStandardCase } from "../helpers";
 
 const chat = (reply: (req: ChatRequest) => string): ChatModel & { requests: ChatRequest[] } => {
@@ -83,5 +83,16 @@ describe("LLM-backed CourtModel (Solon over any ChatModel)", () => {
     ).rejects.toMatchObject({
       kind: "BAD_RESPONSE",
     });
+  });
+});
+
+describe("courtModelFromEnv (Solon's model as deployed)", () => {
+  it("is absent without a Bankr key, so Solon cases wait for a model", () => {
+    expect(courtModelFromEnv({})).toBeUndefined();
+  });
+
+  it("is an LLM court model when a key is configured (no network call is made)", () => {
+    expect(courtModelFromEnv({ BANKR_API_KEY: "test-key" })).toBeInstanceOf(LlmCourtModel);
+    expect(courtModelFromEnv({ BANKR_LLM_KEY: "test-key" })).toBeInstanceOf(LlmCourtModel);
   });
 });

@@ -75,12 +75,13 @@ DATABASE_URL=postgresql://... npm run db:migrate
 
 Environment variables (Vercel → Project → Settings → Environment Variables):
 
-| Variable                  | Required             | Notes                                                                                                                                          |
-| ------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`            | yes                  | Supabase **session pooler** string (port 5432). Migrations run automatically, and are idempotent.                                              |
-| `MUSECOURT_CRON_SECRET`   | yes, for the clock   | ≥ 32 chars. The only credential accepted by `/api/v1/internal/cron/tick`.                                                                      |
-| `CRON_SECRET`             | yes, for Vercel Cron | **Same value** as `MUSECOURT_CRON_SECRET`; Vercel sends it as `Authorization: Bearer …`.                                                       |
-| `MUSECOURT_ADMIN_TOKEN`   | for operators        | ≥ 32 chars. Enables `/api/v1/admin/*`.                                                                                                         |
-| `MUSECOURT_CRON_SCHEDULE` | no                   | Build-time. Default `*/5 * * * *` (Pro plan). On Hobby use a daily schedule, or call the tick from an external scheduler with the cron secret. |
+| Variable                  | Required             | Notes                                                                                                                                                 |
+| ------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`            | yes                  | Supabase **session pooler** string (port 5432). Migrations run automatically, and are idempotent.                                                     |
+| `MUSECOURT_CRON_SECRET`   | yes, for the clock   | ≥ 32 chars. The only credential accepted by `/api/v1/internal/cron/tick`.                                                                             |
+| `CRON_SECRET`             | yes, for Vercel Cron | **Same value** as `MUSECOURT_CRON_SECRET`; Vercel sends it as `Authorization: Bearer …`.                                                              |
+| `MUSECOURT_ADMIN_TOKEN`   | for operators        | ≥ 32 chars. Enables `/api/v1/admin/*`.                                                                                                                |
+| `MUSECOURT_CRON_SCHEDULE` | no                   | Build-time. Default `*/5 * * * *` (Pro plan). On Hobby use a daily schedule, or call the tick from an external scheduler with the cron secret.        |
+| `BANKR_API_KEY`           | for Solon            | Lets Solon, the House Judge, rule in production. `MUSECOURT_MODEL` picks the model (default `gpt-5.4`). Without it, Solon cases wait in deliberation. |
 
 The clock is idempotent and safe to overlap, so any scheduler that sends `POST` (or `GET`) to `/api/v1/internal/cron/tick` with `Authorization: Bearer $MUSECOURT_CRON_SECRET` works.

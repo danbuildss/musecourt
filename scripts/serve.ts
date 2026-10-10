@@ -8,6 +8,7 @@ import { loadSkillMarkdown } from "@/api/skill";
 import { publicOriginFrom } from "@/api/world-identity";
 import { museworldConnectorFromEnv } from "@/connectors/museworld";
 import { FakeWorld } from "@/connectors/fake-world";
+import { courtModelFromEnv } from "@/model/llm-court-model";
 import { systemClock } from "@/core/clock";
 import { randomIds } from "@/core/ids";
 import { createMemoryBackend, createPostgresBackend } from "@/infra/backends";
@@ -35,6 +36,7 @@ const { court, api } = createMuseCourtApp({
   clock: systemClock,
   ids: randomIds,
   connectors: [new FakeWorld(), museworldConnectorFromEnv()],
+  model: courtModelFromEnv(),
   publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
   adminToken,
   cronSecret: process.env.MUSECOURT_CRON_SECRET,
