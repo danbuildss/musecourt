@@ -4,7 +4,6 @@ import type { StoredEvent } from "@/core/events";
 import { buildTranscript } from "@/court/projections/transcript";
 import type { ApiDeps } from "./app";
 import { issueCredential, type Principal } from "./auth";
-import { renderDebugCase } from "./debug-view";
 import { discoveryDocument } from "./discovery";
 import { ApiError } from "./errors";
 import { json } from "./http";
@@ -394,23 +393,6 @@ export const routes: Route[] = [
         offset: q.offset,
       });
       return ok({ casebook: entries, limit: q.limit, offset: q.offset });
-    },
-  },
-  {
-    method: "GET",
-    path: "/debug/cases/:caseId",
-    auth: "public",
-    summary: "Minimal read-only HTML view of a case (debugging only).",
-    async handle(ctx) {
-      const view = await caseView(ctx.deps, caseIdParam(ctx), ctx.now);
-      return new Response(renderDebugCase(view), {
-        status: 200,
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-          "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
-          "x-content-type-options": "nosniff",
-        },
-      });
     },
   },
 

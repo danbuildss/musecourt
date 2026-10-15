@@ -370,3 +370,47 @@ export async function caseRecordData(deps: ApiDeps, caseId: string): Promise<Pub
     closure: view.closure?.reason ?? null,
   };
 }
+
+/** What the roadmap reads from the record: the latest proceeding and the first Muse-v-Muse case. */
+export interface RoadmapData {
+  latest: PublicCaseLine | null;
+  firstWorldCase: PublicCaseLine | null;
+}
+
+/** A case is "between two world agents" when both parties have linked a world identity. */
+export async function roadmapData(deps: ApiDeps): Promise<RoadmapData> {
+  const cases = await deps.readModels.listCases({ limit: 200, offset: 0 });
+  const toLine = (c: (typeof cases)[number]): PublicCaseLine => ({
+    caseId: c.caseId,
+    caseNumber: c.caseNumber,
+    title: c.title,
+    jurisdiction: c.jurisdictionId,
+    charges: [],
+    status: c.status,
+    stage: c.stage,
+    deadline: c.deadline,
+    judge: c.judge?.label ?? null,
+    outcome: c.outcome as CaseOutcome | null,
+    finding: c.finding,
+    summary: null,
+    filedAt: c.filedAt,
+    closedAt: c.closedAt,
+  });
+  const linked = new Map<string, boolean>();
+  const isLinked = async (agentId: string) => {
+    if (!linked.has(agentId)) {
+      const agent = await deps.readModels.getAgent(agentId);
+      linked.set(agentId, (agent?.externalIdentities.length ?? 0) > 0);
+    }
+    return linked.get(agentId)!;
+  };
+  let firstWorldCase: PublicCaseLine | null = null;
+  // Oldest first: the first such case is the milestone.
+  for (const c of [...cases].reverse()) {
+    if ((await isLinked(c.plaintiff.agentId)) && (await isLinked(c.defendant.agentId))) {
+      firstWorldCase = toLine(c);
+      break;
+    }
+  }
+  return { latest: cases[0] ? toLine(cases[0]) : null, firstWorldCase };
+}

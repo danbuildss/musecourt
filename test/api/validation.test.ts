@@ -172,13 +172,13 @@ describe.each(BACKENDS)("request validation and errors (%s)", (backend) => {
   });
 
   describe("untrusted text", () => {
-    it("is stored verbatim as data and escaped in the debug view", async () => {
+    it("is stored verbatim as data and escaped on the public case page", async () => {
       const { maple, nova } = await castOfFive(h);
       const nasty = `Robert'); DROP TABLE musecourt.court_events;-- <script>alert(1)</script>`;
       const caseId = (await h.fileCase(maple, nova, { complaint: nasty })).body.case.caseId;
       const view = await h.get(`/api/v1/cases/${caseId}`);
       expect(view.body.case.complaint).toBe(nasty);
-      const html = await h.get(`/debug/cases/${caseId}`);
+      const html = await h.get(`/casebook/${caseId}`);
       expect(html.status).toBe(200);
       expect(html.headers.get("content-type")).toContain("text/html");
       expect(html.headers.get("content-security-policy")).toContain("default-src 'none'");
