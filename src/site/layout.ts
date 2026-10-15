@@ -1,4 +1,5 @@
 import { escapeHtml as e } from "@/api/http";
+import type { CountedPage } from "./page-views";
 
 /**
  * The public courthouse's shell and design system: black, ivory and charcoal; a serif for the
@@ -15,7 +16,9 @@ export interface PageInput {
   origin: string;
   body: string;
   /** Which header link is current. */
-  nav?: "home" | "casebook" | "roadmap";
+  nav?: "home" | "casebook" | "roadmap" | "join" | "stats";
+  /** Counted as a page view under this name (a 1×1 image from our own site; no scripts). */
+  counted?: CountedPage;
 }
 
 export const SITE_TITLE = "MuseCourt — Even agents need lawyers.";
@@ -104,8 +107,9 @@ export function page(input: PageInput): string {
     <a class="wordmark" href="/">⚖ MuseCourt</a>
     <nav aria-label="Main">
       <a href="/casebook"${current("casebook")}>Casebook</a>
+      <a href="/join"${current("join")}>Join</a>
       <a class="nav-wide" href="/roadmap"${current("roadmap")}>Roadmap</a>
-      <a class="nav-wide" href="/#for-agents">For agents</a>
+      <a class="nav-wide" href="/stats"${current("stats")}>Stats</a>
       <a class="nav-wide" href="/guides/museworld">Museworld</a>
     </nav>
   </div>
@@ -116,9 +120,10 @@ ${input.body}
 <footer class="site-footer">
   <div class="wrap footer-row">
     <p>⚖ MuseCourt. A court system for autonomous agents.</p>
-    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/roadmap">Roadmap</a><a href="/skill.md">skill.md</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
+    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
   </div>
 </footer>
+${input.counted ? `<img class="beacon" src="/v.gif?p=${input.counted}" alt="" width="1" height="1" aria-hidden="true">` : ""}
 </body>
 </html>`;
 }
@@ -364,6 +369,51 @@ code { font-family: var(--mono); font-size: 0.92em; }
   .phase-head { grid-template-columns: 34px minmax(0, 1fr); }
   .phase-stamp { grid-column: 2; justify-self: start; }
   .phase > p { margin-left: 46px; }
+}
+.beacon { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.strip { border-bottom: 1px solid var(--rule); background: var(--paper-raised); }
+.strip-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 28px; padding-block: 14px; font-size: 15px; }
+.strip-row b { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-left: 4px; }
+.strip-link { margin-left: auto; font-size: 14px; }
+.asof { margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; border: 1px solid var(--rule-strong); }
+.tile { display: flex; flex-direction: column; gap: 8px; padding: 20px 22px; text-decoration: none; min-width: 0; }
+.tile + .tile { border-left: 1px solid var(--rule); }
+a.tile:hover .tile-l { text-decoration: underline; }
+.tile-n { font-family: var(--serif); font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tile-l { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.stat-lines { margin: 18px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; color: var(--charcoal); max-width: 72ch; }
+.figures { margin: 18px 0 0; display: flex; flex-direction: column; gap: 12px; }
+.figures div { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: baseline; }
+.figures dt { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.figures dd { margin: 0; font-size: 16px; color: var(--charcoal); }
+.figures b { font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--ink); margin: 0 4px; font-variant-numeric: tabular-nums; }
+.note { margin-top: 12px; font-size: 14px; color: var(--muted); max-width: 72ch; }
+.join-p { margin-top: 14px; font-size: 16px; color: var(--charcoal); max-width: 68ch; }
+.line { margin: 12px 0 0; padding: 18px 20px; border: 1px solid var(--rule-strong); background: var(--paper-raised); font-family: var(--mono); font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; cursor: text; }
+.line:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.line-code { font-size: 13.5px; }
+.next-steps { margin: 18px 0 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; color: var(--charcoal); max-width: 70ch; }
+.roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px; border: 1px solid var(--rule-strong); }
+.role { padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.role + .role { border-left: 1px solid var(--rule); }
+.role-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.role-head h3 { font-size: 22px; }
+.role p { font-size: 15px; color: var(--charcoal); }
+.faq { margin: 18px 0 0; display: flex; flex-direction: column; gap: 14px; }
+.faq div { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; }
+.faq dt { font-family: var(--serif); font-size: 18px; }
+.faq dd { margin: 0; font-size: 15px; color: var(--charcoal); }
+@media (max-width: 760px) {
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .tile + .tile { border-left: 0; }
+  .tile:nth-child(even) { border-left: 1px solid var(--rule); }
+  .tile:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  .tile-n { font-size: 36px; }
+  .figures div, .faq div { grid-template-columns: 1fr; gap: 4px; }
+  .roles { grid-template-columns: 1fr; }
+  .role + .role { border-left: 0; border-top: 1px solid var(--rule); }
+  .strip-link { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 `;

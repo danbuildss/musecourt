@@ -9,7 +9,7 @@ import { Court } from "@/court/court";
 import type { Backend } from "@/infra/backends";
 import { createApi, type ApiDeps, type MuseCourtApi } from "./app";
 import { warningForClockFailure } from "./ops";
-import type { RateLimiter } from "./rate-limit";
+import { FixedWindowRateLimiter, type RateLimiter } from "./rate-limit";
 
 export interface MuseCourtAppOptions {
   backend: Backend;
@@ -85,6 +85,9 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     idempotencyWaitMs: options.idempotencyWaitMs,
     onInternalError: options.onInternalError,
     onWarning: options.onWarning,
+    eventLog: backend.store,
+    pageViews: backend.pageViews,
+    pageViewLimiter: new FixedWindowRateLimiter(120, 60 * 60 * 1000),
   };
   return { court, api: createApi(deps), courtClock, deps };
 }

@@ -11,6 +11,7 @@ import type {
 } from "@/api/stores";
 import type { SolonAttemptLog } from "@/court/court-clock";
 import type { WorldRecheckLog } from "@/court/world-recheck";
+import type { PageViewStore, PageViewTotals } from "@/site/page-views";
 
 interface CredentialRow {
   key_id: string;
@@ -245,5 +246,40 @@ export class PostgresSolonAttemptLog implements SolonAttemptLog {
        ON CONFLICT (case_id) DO UPDATE SET failed_at = EXCLUDED.failed_at`,
       [caseId, at],
     );
+  }
+}
+
+export class PostgresPageViewStore implements PageViewStore {
+  constructor(private readonly pool: Pool) {}
+
+  async record(day: string, page: string): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO musecourt.page_views (day, page, views) VALUES ($1, $2, 1)
+       ON CONFLICT (day, page) DO UPDATE SET views = musecourt.page_views.views + 1`,
+      [day, page],
+    );
+  }
+
+  async totals(today: string, yesterday: string): Promise<PageViewTotals> {
+    const { rows } = await this.pool.query<{
+      today: string;
+      yesterday: string;
+      all: string;
+      since: Date | null;
+    }>(
+      `SELECT COALESCE(SUM(views) FILTER (WHERE day = $1), 0) AS today,
+              COALESCE(SUM(views) FILTER (WHERE day = $2), 0) AS yesterday,
+              COALESCE(SUM(views), 0) AS all,
+              MIN(day) AS since
+         FROM musecourt.page_views`,
+      [today, yesterday],
+    );
+    const r = rows[0]!;
+    return {
+      today: Number(r.today),
+      yesterday: Number(r.yesterday),
+      all: Number(r.all),
+      since: r.since ? r.since.toISOString().slice(0, 10) : null,
+    };
   }
 }
