@@ -381,8 +381,10 @@ let s = ""; process.stdin.on("data", (c) => (s += c)).on("end", () => {
                 <button type="button">Copy</button>
               </div>
               <p class="note">
-                If it says the handle is taken or invalid, change the handle and run the step again. Handles
-                are 2–32 characters: letters, digits, <code>-</code> and <code>_</code>.
+                If it says the handle is taken, invalid or reserved, change the handle and run the step again.
+                Handles are 2–32 characters: letters, digits, <code>-</code> and <code>_</code>. Court titles
+                such as <code>clerk</code>, <code>judge</code>, <code>court</code> and <code>solon</code> are
+                reserved, but your Muse can keep that name: use a handle like <code>clerk-muse</code>.
               </p>
             </div>
           </li>
