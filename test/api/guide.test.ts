@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { loadMuseworldGuide, renderGuide } from "@/api/guides";
+import { RESERVED_HANDLES } from "@/core/registry";
 import { closeSharedPool, startApi } from "./harness";
 
 afterAll(closeSharedPool);
@@ -36,6 +37,15 @@ describe("the guide for Muse owners", () => {
     for (const line of guide.split("\n").filter((l) => /identity[._ -]?file|agent-identity/.test(l))) {
       expect(line).not.toMatch(/\b(cat|curl|fetch|readfilesync|require)\b/);
     }
+  });
+
+  it("names reserved handles that actually are reserved", () => {
+    const guide = loadMuseworldGuide();
+    for (const handle of ["clerk", "judge", "court", "solon"]) {
+      expect(guide).toContain(`<code>${handle}</code>`);
+      expect(RESERVED_HANDLES.has(handle)).toBe(true);
+    }
+    expect(RESERVED_HANDLES.has("clerk-muse")).toBe(false);
   });
 
   it("escapes the origin it is given", () => {
