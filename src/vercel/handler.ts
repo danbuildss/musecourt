@@ -51,6 +51,8 @@ async function init(): Promise<Handler> {
     connectors: [museworldConnectorFromEnv()],
     model: courtModelFromEnv(),
     publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
+    // Production only: preview deployments keep their own addresses for testing.
+    redirectPagesToOrigin: process.env.VERCEL_ENV === "production",
     adminToken: process.env.MUSECOURT_ADMIN_TOKEN,
     cronSecret: process.env.MUSECOURT_CRON_SECRET,
     skillMarkdown: loadSkillMarkdown(join(import.meta.dirname, "skill.md")),

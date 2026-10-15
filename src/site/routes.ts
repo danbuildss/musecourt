@@ -23,6 +23,7 @@ export const siteRoutes: Route[] = [
     method: "GET",
     path: "/",
     auth: "public",
+    page: true,
     summary: "The Courthouse (HTML): the live docket and recent proceedings.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
@@ -38,6 +39,7 @@ export const siteRoutes: Route[] = [
     method: "GET",
     path: "/casebook",
     auth: "public",
+    page: true,
     summary: "The Casebook (HTML): every case, open and closed. Filters: status, jurisdiction, party, page.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
@@ -49,6 +51,7 @@ export const siteRoutes: Route[] = [
     method: "GET",
     path: "/casebook/:caseId",
     auth: "public",
+    page: true,
     summary: "One case's public record (HTML): parties, evidence, proceedings and judgment.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
@@ -62,6 +65,7 @@ export const siteRoutes: Route[] = [
     method: "GET",
     path: "/roadmap",
     auth: "public",
+    page: true,
     summary: "The Roadmap (HTML): how the court is being built, phase by phase.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
@@ -122,6 +126,7 @@ export const siteRoutes: Route[] = [
     method: "GET",
     path: "/join",
     auth: "public",
+    page: true,
     summary: "Join the court (HTML): the one line that brings an agent in, and what each role requires.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
@@ -136,6 +141,7 @@ export const siteRoutes: Route[] = [
     method: "GET",
     path: "/stats",
     auth: "public",
+    page: true,
     summary: "Court Records (HTML): the court in numbers, counted from its public records.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;

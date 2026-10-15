@@ -31,6 +31,8 @@ export interface MuseCourtAppOptions {
   onWarning?: ApiDeps["onWarning"];
   /** MuseCourt's exact public origin; required to link world identities. */
   publicOrigin?: string;
+  /** Send page visits on other hosts to `publicOrigin` (production only). */
+  redirectPagesToOrigin?: boolean;
 }
 
 /** Composition root: one Court and one API over a backend. */
@@ -76,6 +78,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     idempotency: backend.idempotency,
     worldChallenges: backend.worldChallenges,
     publicOrigin: options.publicOrigin,
+    redirectPagesToOrigin: options.redirectPagesToOrigin,
     clock: options.clock,
     rebuildReadModels: () => backend.rebuildReadModels(),
     adminToken: options.adminToken,
