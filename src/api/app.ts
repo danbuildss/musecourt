@@ -134,8 +134,10 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
         if (url.pathname.replace(/\/+$/, "") === MCP_PATH) {
           return await handleMcpHttp(deps, request, clientIpOf(request, info), maxBodyBytes);
         }
-        const found = match(request.method, url.pathname);
-        if (found === "METHOD_NOT_ALLOWED")
+        // HEAD reads a public GET's headers (link previews, monitors); it never reaches a route that acts.
+        const head = request.method === "HEAD";
+        const found = match(head ? "GET" : request.method, url.pathname);
+        if (found === "METHOD_NOT_ALLOWED" || (head && found && found.route.auth !== "public"))
           throw new ApiError("METHOD_NOT_ALLOWED", `${request.method} is not allowed here.`);
         if (!found) throw new ApiError("NOT_FOUND", `No route for ${url.pathname}.`);
         const { route, params } = found;
@@ -164,6 +166,10 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
         const ctx = { request, url, params, body, principal, deps, now, clientIp };
 
         // Reads, and the self-idempotent clock, skip the Idempotency-Key machinery.
+        if (head) {
+          const res = toResponse(await route.handle(ctx));
+          return new Response(null, { status: res.status, headers: res.headers });
+        }
         if (route.method !== "POST" || route.selfIdempotent) return toResponse(await route.handle(ctx));
 
         // ---- Idempotent write ----

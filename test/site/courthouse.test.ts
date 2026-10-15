@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { SITE_CSP } from "@/site/layout";
-import { closeSharedPool, startApi } from "../api/harness";
+import { CRON_SECRET, closeSharedPool, startApi } from "../api/harness";
 
 afterAll(closeSharedPool);
 
@@ -73,6 +73,23 @@ describe("the Courthouse (/)", () => {
       const html = String((await h.get("/")).body);
       expect(html).not.toContain(XSS);
       expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("answers HEAD on public pages, but never lets HEAD reach a route that acts", async () => {
+    const h = await startApi();
+    try {
+      const page = await fetch(h.baseUrl + "/", { method: "HEAD" });
+      expect(page.status).toBe(200);
+      expect(page.headers.get("content-type")).toContain("text/html");
+      expect(await page.text()).toBe("");
+      const cron = await fetch(h.baseUrl + "/api/v1/internal/cron/tick", {
+        method: "HEAD",
+        headers: { authorization: `Bearer ${CRON_SECRET}` },
+      });
+      expect(cron.status).toBe(405);
     } finally {
       await h.close();
     }
