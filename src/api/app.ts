@@ -52,6 +52,11 @@ export interface ApiDeps {
   pageViews?: PageViewStore;
   /** Limits page-view counting per client address. */
   pageViewLimiter?: RateLimiter;
+  /**
+   * Send people's page visits on any other host (e.g. the platform's own *.vercel.app address) to
+   * the same page on `publicOrigin`. API, MCP, skill.md and cron requests are never redirected.
+   */
+  redirectPagesToOrigin?: boolean;
   /** Receives operational warnings (rejected proofs and world evidence, clock failures). */
   onWarning?: (warning: OpsWarning) => void;
 }
@@ -132,6 +137,20 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
     }
   }
 
+  /** A permanent redirect to the same page on the public origin, when this host is not it. */
+  function pageRedirect(url: URL): Response | null {
+    if (!deps.redirectPagesToOrigin || !deps.publicOrigin) return null;
+    const origin = new URL(deps.publicOrigin);
+    if (url.host === origin.host) return null;
+    return new Response(null, {
+      status: 308,
+      headers: {
+        location: `${origin.origin}${url.pathname}${url.search}`,
+        "cache-control": "public, max-age=3600",
+      },
+    });
+  }
+
   const replay = (record: IdempotencyRecord) =>
     json(record.responseStatus!, record.responseBody, { "idempotent-replayed": "true" });
 
@@ -149,6 +168,8 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
           throw new ApiError("METHOD_NOT_ALLOWED", `${request.method} is not allowed here.`);
         if (!found) throw new ApiError("NOT_FOUND", `No route for ${url.pathname}.`);
         const { route, params } = found;
+        const moved = route.page ? pageRedirect(url) : null;
+        if (moved) return moved;
         const now = deps.clock.now();
         const clientIp = clientIpOf(request, info);
 

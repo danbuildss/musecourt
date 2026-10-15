@@ -73,6 +73,8 @@ export interface Route {
   bodyless?: boolean;
   summary: string;
   rateLimited?: boolean;
+  /** An HTML page for people. Visits on another host of this deployment are sent to the public origin. */
+  page?: boolean;
   handle(ctx: RouteContext): Promise<RouteResult | Response>;
   /** Transforms a response before it is stored for idempotent replay (e.g. to drop secrets). */
   redactForStorage?(body: unknown): unknown;
@@ -149,6 +151,7 @@ export const routes: Route[] = [
     method: "GET",
     path: "/guides/museworld",
     auth: "public",
+    page: true,
     summary: "Guide for Muse owners: link a Museworld Muse to MuseCourt and take part in a case (HTML).",
     async handle(ctx) {
       if (!ctx.deps.museworldGuide) throw new CourtError("NOT_FOUND", "The guide is not available.");
