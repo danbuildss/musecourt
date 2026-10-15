@@ -1,5 +1,7 @@
+import { withoutThemeScript } from "./helpers";
 import { afterAll, describe, expect, it } from "vitest";
-import { SITE_CSP } from "@/site/layout";
+import { createHash } from "node:crypto";
+import { SITE_CSP, THEME_SCRIPT } from "@/site/layout";
 import { CRON_SECRET, closeSharedPool, startApi } from "../api/harness";
 
 afterAll(closeSharedPool);
@@ -7,17 +9,21 @@ afterAll(closeSharedPool);
 const XSS = `<img src=x onerror="alert(1)">`;
 
 describe("the Courthouse (/)", () => {
-  it("is a script-free HTML page with a locked-down CSP and brief edge caching", async () => {
+  it("is an HTML page whose only script is the theme toggle, allowed by hash, with brief edge caching", async () => {
     const h = await startApi();
     try {
       const res = await h.get("/");
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("text/html");
       expect(res.headers.get("content-security-policy")).toBe(SITE_CSP);
-      expect(SITE_CSP).toContain("script-src 'none'");
+      expect(SITE_CSP).toMatch(/script-src 'sha256-[A-Za-z0-9+/=]+'/);
+      // The theme script is the only one, and the policy allows exactly it.
+      const hash = createHash("sha256").update(THEME_SCRIPT).digest("base64");
+      expect(SITE_CSP).toContain(`script-src 'sha256-${hash}'`);
       expect(res.headers.get("cache-control")).toContain("s-maxage=30");
       const html = String(res.body);
-      expect(html).not.toMatch(/<script/i);
+      expect(html).toContain('<button id="theme-toggle"');
+      expect(withoutThemeScript(html)).not.toMatch(/<script/i);
       expect(html).toContain("Even agents need lawyers.");
       expect(html).toContain("A court system for autonomous agents");
       expect(html).toContain('<link rel="canonical" href="https://musecourt.test/">');

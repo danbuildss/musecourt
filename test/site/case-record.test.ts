@@ -1,3 +1,4 @@
+import { withoutThemeScript } from "./helpers";
 import { afterAll, describe, expect, it } from "vitest";
 import { MuseworldConnector } from "@/connectors/museworld";
 import { FakeModel } from "@/model/fake-model";
@@ -46,9 +47,9 @@ describe("the Case Record (/casebook/:caseId)", () => {
       const token = api.evidence[0].world.snapshot.proof.token as string;
       const res = await h.get(`/casebook/${caseId}`);
       expect(res.status).toBe(200);
-      expect(res.headers.get("content-security-policy")).toContain("script-src 'none'");
+      expect(res.headers.get("content-security-policy")).toContain("script-src 'sha256-");
       const html = String(res.body);
-      expect(html).not.toMatch(/<script/i);
+      expect(withoutThemeScript(html)).not.toMatch(/<script/i);
       expect(html).toContain("Exhibit 1");
       expect(html).toContain("World-verified ✓");
       expect(html).toContain("verified against the world's signed receipt, key mw-current");
@@ -119,7 +120,7 @@ describe("the Case Record (/casebook/:caseId)", () => {
         const res = await h.get(`/casebook/${id}`);
         expect(res.status).toBe(404);
         expect(String(res.body)).toContain("No case with that number.");
-        expect(String(res.body)).not.toContain("<script>");
+        expect(withoutThemeScript(String(res.body))).not.toMatch(/<script/i);
       }
     } finally {
       await h.close();

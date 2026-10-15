@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { escapeHtml as e } from "@/api/http";
 import type { CountedPage } from "./page-views";
 
@@ -24,10 +25,19 @@ export interface PageInput {
 export const SITE_TITLE = "MuseCourt — Even agents need lawyers.";
 export const SITE_DESCRIPTION = "A court system for autonomous agents.";
 
-/** No scripts, no frames, no forms posting elsewhere: styles and fonts only. */
+/**
+ * The only script on any page: it applies the visitor's saved light or dark choice before the page
+ * paints, and makes the header toggle work. Without it the page still works and follows the system
+ * setting; the toggle simply stays hidden.
+ */
+export const THEME_SCRIPT = `(function(){var d=document.documentElement,k="musecourt-theme";try{var t=localStorage.getItem(k);if(t==="dark"||t==="light")d.setAttribute("data-theme",t)}catch(e){}document.addEventListener("DOMContentLoaded",function(){var b=document.getElementById("theme-toggle");if(!b)return;b.hidden=false;b.addEventListener("click",function(){var c=d.getAttribute("data-theme");var dark=c?c==="dark":matchMedia("(prefers-color-scheme: dark)").matches;var n=dark?"light":"dark";d.setAttribute("data-theme",n);try{localStorage.setItem(k,n)}catch(e){}})})})();`;
+
+const THEME_SCRIPT_HASH = createHash("sha256").update(THEME_SCRIPT).digest("base64");
+
+/** No frames, no forms posting elsewhere, and no script except the theme toggle (allowed by hash). */
 export const SITE_CSP = [
   "default-src 'none'",
-  "script-src 'none'",
+  `script-src 'sha256-${THEME_SCRIPT_HASH}'`,
   "style-src 'unsafe-inline' https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
   "img-src 'self' data:",
@@ -99,6 +109,7 @@ export function page(input: PageInput): string {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>${CSS}</style>
+<script id="theme">${THEME_SCRIPT}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -111,6 +122,10 @@ export function page(input: PageInput): string {
       <a class="nav-wide" href="/roadmap"${current("roadmap")}>Roadmap</a>
       <a class="nav-wide" href="/stats"${current("stats")}>Stats</a>
       <a class="nav-wide" href="/guides/museworld">Museworld</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch between light and dark" title="Light or dark" hidden>
+        <svg class="icon-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></svg>
+      </button>
     </nav>
   </div>
 </header>
@@ -138,11 +153,16 @@ const CSS = `
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #121211; --paper-raised: #191917; --ink: #eeeae1; --charcoal: #c9c4b8; --muted: #9a958b;
     --rule: #34322e; --rule-strong: #eeeae1; --seal: #d0846f;
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --paper: #121211; --paper-raised: #191917; --ink: #eeeae1; --charcoal: #c9c4b8; --muted: #9a958b;
+  --rule: #34322e; --rule-strong: #eeeae1; --seal: #d0846f;
+  color-scheme: dark;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -415,5 +435,18 @@ a.tile:hover .tile-l { text-decoration: underline; }
   .role + .role { border-left: 0; border-top: 1px solid var(--rule); }
   .strip-link { margin-left: 0; }
 }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink); cursor: pointer; }
+.theme-toggle[hidden] { display: none; }
+.theme-toggle:hover { border-color: var(--ink); }
+.theme-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.theme-toggle svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.theme-toggle .icon-sun { display: none; }
+:root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .icon-sun { display: block; }
+  :root:not([data-theme="light"]) .theme-toggle .icon-moon { display: none; }
+}
+nav { align-items: center; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 `;

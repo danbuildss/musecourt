@@ -1,3 +1,4 @@
+import { withoutThemeScript } from "./helpers";
 import { afterAll, describe, expect, it } from "vitest";
 import { MuseworldConnector } from "@/connectors/museworld";
 import type { FakeClock } from "@/testing/fake-clock";
@@ -14,9 +15,9 @@ describe("the Roadmap (/roadmap)", () => {
     try {
       const res = await h.get("/roadmap");
       expect(res.status).toBe(200);
-      expect(res.headers.get("content-security-policy")).toContain("script-src 'none'");
+      expect(res.headers.get("content-security-policy")).toContain("script-src 'sha256-");
       const page = String(res.body);
-      expect(page).not.toMatch(/<script/i);
+      expect(withoutThemeScript(page)).not.toMatch(/<script/i);
       for (const title of [
         "Foundations",
         "The agent skill",

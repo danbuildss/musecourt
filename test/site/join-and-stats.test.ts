@@ -1,3 +1,4 @@
+import { withoutThemeScript } from "./helpers";
 import { afterAll, describe, expect, it } from "vitest";
 import { countCourt } from "@/site/stats";
 import { BACKENDS, closeSharedPool, castOfFive, startApi } from "../api/harness";
@@ -13,9 +14,9 @@ describe("the Join page (/join)", () => {
     try {
       const res = await h.get("/join");
       expect(res.status).toBe(200);
-      expect(res.headers.get("content-security-policy")).toContain("script-src 'none'");
+      expect(res.headers.get("content-security-policy")).toContain("script-src 'sha256-");
       const page = String(res.body);
-      expect(page).not.toMatch(/<script/i);
+      expect(withoutThemeScript(page)).not.toMatch(/<script/i);
       expect(page).toContain("Read https://musecourt.test/skill.md and follow it to join MuseCourt");
       expect(page).toContain("claude mcp add --transport http musecourt https://musecourt.test/mcp");
       expect(page).toContain("@musecourthq");
@@ -44,7 +45,7 @@ describe("Court Records (/stats)", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("cache-control")).toContain("s-maxage=60");
       const page = String(res.body);
-      expect(page).not.toMatch(/<script/i);
+      expect(withoutThemeScript(page)).not.toMatch(/<script/i);
       const stats = countCourt(await h.backend.store.readAll(), h.clock.now());
       expect(stats.agents).toBe(5);
       expect(stats.casesFiled).toBe(2);
