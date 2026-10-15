@@ -272,5 +272,64 @@ code { font-family: var(--mono); font-size: 0.92em; }
   .cb-label { display: inline; }
   .legend div { grid-template-columns: 1fr; gap: 6px; }
 }
+.record-head { padding-block: 32px 44px; border-bottom: 1px solid var(--rule); }
+.crumb { font-size: 14px; margin-bottom: 26px; }
+.record-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.record-title h1 { font-size: clamp(32px, 5.5vw, 52px); margin-block: 10px 10px; }
+.record-title .meta { font-size: 13px; color: var(--muted); }
+.record-stamp { padding-top: 6px; flex: none; }
+.file-card { margin-top: 30px; border: 1px solid var(--rule-strong); background: var(--paper-raised); }
+.parties { display: grid; grid-template-columns: 1fr 1fr; }
+.party { padding: 18px 20px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.party + .party { border-left: 1px solid var(--rule); }
+.party-name { font-family: var(--serif); font-size: 22px; margin-top: 4px; overflow-wrap: anywhere; }
+.party-name .meta { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.party-line { font-size: 14px; color: var(--charcoal); }
+.particulars { margin: 0; border-top: 1px solid var(--rule); }
+.particulars div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; padding: 12px 20px; }
+.particulars div + div { border-top: 1px solid var(--rule); }
+.particulars dt { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+.particulars dd { margin: 0; font-size: 15px; }
+.particulars .meta { font-size: 12.5px; color: var(--muted); }
+.section-head h2 .numeral { font-size: 0.8em; color: var(--muted); }
+.said { margin: 6px 0 0; padding: 2px 0 2px 16px; border-left: 2px solid var(--rule-strong); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15.5px; color: var(--ink); max-width: 72ch; }
+.none { font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--charcoal); }
+.matter { display: grid; gap: 22px; margin-top: 18px; }
+.matter .meta { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.law-text { margin-top: 6px; font-family: var(--serif); font-size: 17px; color: var(--charcoal); max-width: 70ch; }
+.evidence { list-style: none; margin: 0; padding: 0; }
+.ev { padding-block: 18px; border-bottom: 1px solid var(--rule); display: flex; flex-direction: column; gap: 8px; }
+.ev-head { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; }
+.ev-id { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.ev-title { font-family: var(--serif); font-size: 19px; overflow-wrap: anywhere; }
+.ev .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.ev .said, .ev .none, .ev .meta { margin-left: 110px; }
+.timeline { list-style: none; margin: 0; padding: 0; }
+.tl { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; padding-block: 12px; border-bottom: 1px solid var(--rule); }
+.tl time { font-family: var(--mono); font-size: 12.5px; color: var(--muted); padding-top: 2px; }
+.tl p { font-size: 15px; }
+.tl-stage p { font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--charcoal); padding-top: 2px; }
+.tl-judgment p { font-weight: 600; }
+.judgment { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.judgment-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.finding { font-family: var(--serif); font-size: 30px; }
+.judgment .eyebrow { margin-top: 12px; }
+.remedies { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.remedies .meta { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.judgment-none { margin-top: 14px; }
+.judgment-none + .eyebrow { margin-top: 18px; }
+.machine { border-bottom: 0; padding-block: 28px; }
+.machine .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .record-title { flex-direction: column; gap: 12px; }
+  .record-stamp { padding-top: 0; order: -1; }
+  .parties { grid-template-columns: 1fr; }
+  .party + .party { border-left: 0; border-top: 1px solid var(--rule); }
+  .particulars div { grid-template-columns: 1fr; gap: 4px; }
+  .ev-head { grid-template-columns: minmax(0, 1fr) auto; }
+  .ev-id { grid-column: 1 / -1; }
+  .ev .said, .ev .none, .ev .meta { margin-left: 0; }
+  .tl { grid-template-columns: 1fr; gap: 4px; }
+}
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 `;

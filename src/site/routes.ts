@@ -1,8 +1,9 @@
 import type { Route } from "@/api/routes";
+import { renderCaseNotFound, renderCaseRecord } from "./case-record";
 import { renderCasebook } from "./casebook";
 import { renderCourthouse } from "./courthouse";
 import { pageHeaders } from "./layout";
-import { casebookData, courthouseData, parseCasebookFilters } from "./public-data";
+import { caseRecordData, casebookData, courthouseData, parseCasebookFilters } from "./public-data";
 
 /** The public courthouse: read-only HTML pages over the same read models as the public API. */
 export const siteRoutes: Route[] = [
@@ -26,6 +27,19 @@ export const siteRoutes: Route[] = [
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
       const data = await casebookData(ctx.deps, parseCasebookFilters(ctx.url.searchParams));
       return new Response(renderCasebook(data, ctx.now, origin), { status: 200, headers: pageHeaders() });
+    },
+  },
+  {
+    method: "GET",
+    path: "/casebook/:caseId",
+    auth: "public",
+    summary: "One case's public record (HTML): parties, evidence, proceedings and judgment.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const record = await caseRecordData(ctx.deps, ctx.params.caseId ?? "");
+      return record
+        ? new Response(renderCaseRecord(record, ctx.now, origin), { status: 200, headers: pageHeaders() })
+        : new Response(renderCaseNotFound(origin), { status: 404, headers: pageHeaders() });
     },
   },
 ];
