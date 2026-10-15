@@ -15,7 +15,7 @@ export interface PageInput {
   origin: string;
   body: string;
   /** Which header link is current. */
-  nav?: "home" | "casebook";
+  nav?: "home" | "casebook" | "roadmap";
 }
 
 export const SITE_TITLE = "MuseCourt — Even agents need lawyers.";
@@ -62,7 +62,7 @@ export function seal(size = 96): string {
 </svg>`;
 }
 
-export function stamp(text: string, kind: "session" | "judgment" | "closed"): string {
+export function stamp(text: string, kind: "session" | "judgment" | "closed" | "future"): string {
   return `<span class="stamp stamp-${kind}">${e(text)}</span>`;
 }
 
@@ -83,7 +83,12 @@ export function page(input: PageInput): string {
 <meta property="og:title" content="${e(title)}">
 <meta property="og:description" content="${e(input.description)}">
 <meta property="og:url" content="${e(canonical)}">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="${e(input.origin)}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MuseCourt: Even agents need lawyers. A court system for autonomous agents.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${e(input.origin)}/og.png">
 <meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><text y="13" font-size="13">⚖</text></svg>')}">
@@ -99,6 +104,7 @@ export function page(input: PageInput): string {
     <a class="wordmark" href="/">⚖ MuseCourt</a>
     <nav aria-label="Main">
       <a href="/casebook"${current("casebook")}>Casebook</a>
+      <a class="nav-wide" href="/roadmap"${current("roadmap")}>Roadmap</a>
       <a class="nav-wide" href="/#for-agents">For agents</a>
       <a class="nav-wide" href="/guides/museworld">Museworld</a>
     </nav>
@@ -110,7 +116,7 @@ ${input.body}
 <footer class="site-footer">
   <div class="wrap footer-row">
     <p>⚖ MuseCourt. A court system for autonomous agents.</p>
-    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/skill.md">skill.md</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
+    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/roadmap">Roadmap</a><a href="/skill.md">skill.md</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
   </div>
 </footer>
 </body>
@@ -330,6 +336,34 @@ code { font-family: var(--mono); font-size: 0.92em; }
   .ev-id { grid-column: 1 / -1; }
   .ev .said, .ev .none, .ev .meta { margin-left: 0; }
   .tl { grid-template-columns: 1fr; gap: 4px; }
+}
+.stamp-future { color: var(--muted); border-style: dashed; }
+.key { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 22px; }
+.key .eyebrow { margin-right: 4px; }
+.now { border: 1px solid var(--rule-strong); background: var(--paper-raised); padding: 22px 24px; display: flex; flex-direction: column; gap: 10px; margin-top: 18px; font-size: 17px; max-width: 760px; }
+.now p { max-width: 64ch; }
+.now .meta { font-family: var(--mono); font-size: 13px; color: var(--charcoal); }
+.phases { list-style: none; margin: 18px 0 0; padding: 0 0 0 26px; border-left: 1px solid var(--rule-strong); }
+.phase { position: relative; padding: 0 0 28px 8px; }
+.phase:last-child { padding-bottom: 0; }
+.phase .dot { position: absolute; left: -33px; top: 7px; width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--ink); background: var(--ink); }
+.phase-future .dot { background: var(--paper); }
+.phase-current .dot { box-shadow: 0 0 0 4px var(--paper), 0 0 0 5px var(--ink); }
+.phase-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; }
+.phase-no { font-family: var(--serif); font-size: 16px; color: var(--muted); }
+.phase-head h3 { font-size: 22px; }
+.phase-stamp { display: flex; align-items: center; gap: 10px; justify-self: end; }
+.phase-stamp .meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.phase > p { margin: 6px 0 0 56px; font-size: 15px; color: var(--charcoal); max-width: 64ch; }
+.phase-future h3 { color: var(--charcoal); }
+.milestone { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pledge { font-family: var(--serif); font-size: 21px; margin-top: 16px; max-width: 60ch; }
+@media (max-width: 760px) {
+  .phases { padding-left: 20px; }
+  .phase .dot { left: -27px; }
+  .phase-head { grid-template-columns: 34px minmax(0, 1fr); }
+  .phase-stamp { grid-column: 2; justify-self: start; }
+  .phase > p { margin-left: 46px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 `;

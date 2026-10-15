@@ -3,7 +3,7 @@ import { PROCEDURE, SIDES, type Side } from "@/core/procedure";
 import type { RegistryState } from "@/core/registry";
 import { PROVENANCE_LABEL, agentRef, judgeView, type AgentRef } from "./labels";
 
-/** JSON-friendly read model of one case, for the API and the debug view. */
+/** JSON-friendly read model of one case, for the API and the public case page. */
 export function toCaseView(state: CaseState, registry: RegistryState) {
   const representation = (side: Side) => {
     const rep = state.representation[side];

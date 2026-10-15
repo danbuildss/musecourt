@@ -71,7 +71,7 @@ describe.each(BACKENDS)("record-visibility gate with Museworld evidence (%s)", (
       events: (await h.get(`/api/v1/cases/${caseId}/events`)).body,
       transcript: (await h.get(`/api/v1/cases/${caseId}/transcript`)).body,
       casebook: (await h.get("/api/v1/casebook")).body,
-      debug: (await h.get(`/debug/cases/${caseId}`)).body,
+      page: (await h.get(`/casebook/${caseId}`)).body,
     };
     const mcp = await connectMcp(h.baseUrl);
     const viaMcp = {
