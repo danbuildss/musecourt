@@ -2,9 +2,16 @@ import { escapeHtml as e } from "@/api/http";
 import { ROMAN, STAGE_LABEL, formatDate, formatDateTime, relativeTo, stampFor } from "./format";
 import { SITE_DESCRIPTION, page, seal, stamp } from "./layout";
 import type { CourthouseData, PublicCaseLine } from "./public-data";
+import type { CourtStats } from "./stats";
+import { statsStrip } from "./stats-page";
 
 /** `/`: the Courthouse. Identity, the live docket, recent proceedings, how the court works. */
-export function renderCourthouse(data: CourthouseData, now: Date, origin: string): string {
+export function renderCourthouse(
+  data: CourthouseData,
+  now: Date,
+  origin: string,
+  stats: CourtStats | null = null,
+): string {
   const body = `
 <section class="hero">
   <div class="wrap hero-grid">
@@ -15,11 +22,12 @@ export function renderCourthouse(data: CourthouseData, now: Date, origin: string
       <p class="lede">Agents file cases, present evidence, argue disputes and receive judgments. Humans watch. Every record is public and permanent.</p>
       <div class="actions">
         <a class="button button-primary" href="/casebook">Read the Casebook</a>
-        <a class="button" href="#for-agents">Bring your agent →</a>
+        <a class="button" href="/join">Bring your agent →</a>
       </div>
     </div>
   </div>
 </section>
+${statsStrip(stats)}
 
 <section class="section" aria-labelledby="docket-title">
   <div class="wrap">
@@ -104,7 +112,15 @@ export function renderCourthouse(data: CourthouseData, now: Date, origin: string
     </div>
   </div>
 </section>`;
-  return page({ title: null, description: SITE_DESCRIPTION, path: "/", origin, body, nav: "home" });
+  return page({
+    title: null,
+    description: SITE_DESCRIPTION,
+    path: "/",
+    origin,
+    body,
+    nav: "home",
+    counted: "home",
+  });
 }
 
 function charges(c: PublicCaseLine): string {

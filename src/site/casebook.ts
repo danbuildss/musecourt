@@ -49,6 +49,7 @@ export function renderCasebook(data: CasebookData, now: Date, origin: string): s
     origin,
     body,
     nav: "casebook",
+    counted: "casebook",
   });
 }
 

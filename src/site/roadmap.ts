@@ -147,6 +147,7 @@ export function renderRoadmap(data: RoadmapData, origin: string): string {
     origin,
     body,
     nav: "roadmap",
+    counted: "roadmap",
   });
 }
 

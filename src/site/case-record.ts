@@ -74,6 +74,7 @@ ${sections
     origin,
     body,
     nav: "casebook",
+    counted: "case",
   });
 }
 

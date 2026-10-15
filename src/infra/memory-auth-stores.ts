@@ -10,6 +10,7 @@ import type {
 } from "@/api/stores";
 import type { SolonAttemptLog } from "@/court/court-clock";
 import type { WorldRecheckLog } from "@/court/world-recheck";
+import type { PageViewStore, PageViewTotals } from "@/site/page-views";
 
 export class MemoryCredentialStore implements CredentialStore {
   private readonly records = new Map<string, CredentialRecord>();
@@ -142,5 +143,29 @@ export class MemorySolonAttemptLog implements SolonAttemptLog {
 
   async markFailed(caseId: string, at: Date): Promise<void> {
     this.failed.set(caseId, at.toISOString());
+  }
+}
+
+export class MemoryPageViewStore implements PageViewStore {
+  private readonly views = new Map<string, number>();
+
+  async record(day: string, page: string): Promise<void> {
+    const key = `${day}|${page}`;
+    this.views.set(key, (this.views.get(key) ?? 0) + 1);
+  }
+
+  async totals(today: string, yesterday: string): Promise<PageViewTotals> {
+    let all = 0;
+    let t = 0;
+    let y = 0;
+    let since: string | null = null;
+    for (const [key, n] of this.views) {
+      const day = key.slice(0, 10);
+      all += n;
+      if (day === today) t += n;
+      if (day === yesterday) y += n;
+      if (!since || day < since) since = day;
+    }
+    return { today: t, yesterday: y, all, since };
   }
 }

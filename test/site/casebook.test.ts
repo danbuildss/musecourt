@@ -1,3 +1,4 @@
+import { withoutThemeScript } from "./helpers";
 import { afterAll, describe, expect, it } from "vitest";
 import { CASEBOOK_PAGE_SIZE, parseCasebookFilters } from "@/site/public-data";
 import { closeSharedPool, startApi, type ApiHarness, type Agent } from "../api/harness";
@@ -26,9 +27,9 @@ describe("the Casebook (/casebook)", () => {
       const { open, closed } = await twoCases(h);
       const res = await h.get("/casebook");
       expect(res.status).toBe(200);
-      expect(res.headers.get("content-security-policy")).toContain("script-src 'none'");
+      expect(res.headers.get("content-security-policy")).toContain("script-src 'sha256-");
       const page = String(res.body);
-      expect(page).not.toMatch(/<script/i);
+      expect(withoutThemeScript(page)).not.toMatch(/<script/i);
       expect(page).toContain(`/casebook/${open.caseId}`);
       expect(page).toContain(`/casebook/${closed.caseId}`);
       expect(page).toContain("Withdrawn by the plaintiff.");

@@ -3,12 +3,14 @@ import type { CredentialStore, IdempotencyStore, WorldChallengeStore } from "@/a
 import type { EventStore } from "@/core/ports";
 import type { ClockLease, SolonAttemptLog } from "@/court/court-clock";
 import type { WorldRecheckLog } from "@/court/world-recheck";
+import type { PageViewStore } from "@/site/page-views";
 import { projectEvents, rebuildFromLog } from "@/court/read-models/projector";
 import type { ReadModels } from "@/court/read-models/types";
 import {
   MemoryCredentialStore,
   MemoryIdempotencyStore,
   MemoryWorldChallengeStore,
+  MemoryPageViewStore,
   MemorySolonAttemptLog,
   MemoryWorldRecheckLog,
 } from "./memory-auth-stores";
@@ -18,6 +20,7 @@ import {
   PostgresCredentialStore,
   PostgresIdempotencyStore,
   PostgresWorldChallengeStore,
+  PostgresPageViewStore,
   PostgresSolonAttemptLog,
   PostgresWorldRecheckLog,
 } from "./postgres-auth-stores";
@@ -36,6 +39,8 @@ export interface Backend {
   worldRechecks: WorldRecheckLog;
   /** When Solon last failed to rule on each case (retry pacing). */
   solonAttempts: SolonAttemptLog;
+  /** Public page-view counts for the courthouse site (no personal data). */
+  pageViews: PageViewStore;
   /** Best-effort lease so overlapping clock runs don't duplicate work. */
   clockLease: ClockLease;
   /** Drops all read models and rebuilds them from the event log. */
@@ -57,6 +62,7 @@ export function createMemoryBackend(): Backend & { credentials: MemoryCredential
     worldChallenges: new MemoryWorldChallengeStore(),
     worldRechecks: new MemoryWorldRecheckLog(),
     solonAttempts: new MemorySolonAttemptLog(),
+    pageViews: new MemoryPageViewStore(),
     clockLease: memoryLease(),
     rebuildReadModels: async () => rebuildFromLog(await store.readAll(), readModels),
     dumpReadModels: async () => readModels.dump(),
@@ -81,6 +87,7 @@ export function createPostgresBackend(pool: Pool): Backend {
     worldChallenges: new PostgresWorldChallengeStore(pool),
     worldRechecks: new PostgresWorldRecheckLog(pool),
     solonAttempts: new PostgresSolonAttemptLog(pool),
+    pageViews: new PostgresPageViewStore(pool),
     clockLease: postgresLease(pool),
     async rebuildReadModels() {
       const client = await pool.connect();

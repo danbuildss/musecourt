@@ -1,4 +1,6 @@
 import type { Clock } from "@/core/clock";
+import type { EventStore } from "@/core/ports";
+import type { PageViewStore } from "@/site/page-views";
 import type { Court } from "@/court/court";
 import type { ReadModels } from "@/court/read-models/types";
 import type { CourtClock } from "@/court/court-clock";
@@ -44,6 +46,12 @@ export interface ApiDeps {
   idempotencyStaleMs?: number;
   /** Receives unexpected errors (never sent to clients). */
   onInternalError?: (error: unknown) => void;
+  /** The court's append-only log, read whole for the public statistics. */
+  eventLog?: Pick<EventStore, "readAll">;
+  /** Public page-view counts (no personal data). */
+  pageViews?: PageViewStore;
+  /** Limits page-view counting per client address. */
+  pageViewLimiter?: RateLimiter;
   /** Receives operational warnings (rejected proofs and world evidence, clock failures). */
   onWarning?: (warning: OpsWarning) => void;
 }

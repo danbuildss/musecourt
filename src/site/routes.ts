@@ -1,6 +1,10 @@
 import type { Route } from "@/api/routes";
 import { loadOgImage, robotsTxt, sitemapXml } from "./assets";
 import { renderCaseNotFound, renderCaseRecord } from "./case-record";
+import { renderJoin } from "./join";
+import { COUNTED_PAGES, utcDay, type CountedPage } from "./page-views";
+import { courtStats } from "./stats";
+import { renderStats } from "./stats-page";
 import { renderCasebook } from "./casebook";
 import { renderCourthouse } from "./courthouse";
 import { pageHeaders } from "./layout";
@@ -22,7 +26,11 @@ export const siteRoutes: Route[] = [
     summary: "The Courthouse (HTML): the live docket and recent proceedings.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
-      const html = renderCourthouse(await courthouseData(ctx.deps), ctx.now, origin);
+      const [data, stats] = await Promise.all([
+        courthouseData(ctx.deps),
+        courtStats(ctx.deps, ctx.now).catch(() => null),
+      ]);
+      const html = renderCourthouse(data, ctx.now, origin, stats);
       return new Response(html, { status: 200, headers: pageHeaders() });
     },
   },
@@ -110,4 +118,71 @@ export const siteRoutes: Route[] = [
       });
     },
   },
+  {
+    method: "GET",
+    path: "/join",
+    auth: "public",
+    summary: "Join the court (HTML): the one line that brings an agent in, and what each role requires.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const jurisdictions = (await ctx.deps.readModels.listJurisdictions()).map((j) => ({
+        name: j.name,
+        lawCount: j.laws.length,
+      }));
+      return new Response(renderJoin(origin, jurisdictions), { status: 200, headers: pageHeaders() });
+    },
+  },
+  {
+    method: "GET",
+    path: "/stats",
+    auth: "public",
+    summary: "Court Records (HTML): the court in numbers, counted from its public records.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const stats = await courtStats(ctx.deps, ctx.now);
+      if (!stats) return new Response(renderCaseNotFound(origin), { status: 404, headers: pageHeaders() });
+      return new Response(renderStats(stats, origin), {
+        status: 200,
+        headers: {
+          ...pageHeaders(),
+          "cache-control": "public, max-age=0, s-maxage=60, stale-while-revalidate=60",
+        },
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/v.gif",
+    auth: "public",
+    summary: "Counts one public page view (a 1×1 image). Stores only page + day; nothing about the viewer.",
+    async handle(ctx) {
+      const page = ctx.url.searchParams.get("p") ?? "";
+      const agent = ctx.request.headers.get("user-agent") ?? "";
+      const counted =
+        ctx.request.method === "GET" &&
+        (COUNTED_PAGES as readonly string[]).includes(page) &&
+        !AUTOMATED.test(agent) &&
+        (ctx.deps.pageViewLimiter?.hit(`views:${ctx.clientIp}`, ctx.now) ?? true);
+      if (counted && ctx.deps.pageViews) {
+        await ctx.deps.pageViews.record(utcDay(ctx.now), page as CountedPage).catch(() => undefined);
+      }
+      return new Response(PIXEL, {
+        status: 200,
+        headers: {
+          "content-type": "image/gif",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    },
+  },
 ];
+
+/** Readers that announce themselves as automated are not counted as views. */
+const AUTOMATED =
+  /bot|crawl|spider|slurp|preview|fetch|curl|wget|python|httpclient|headless|lighthouse|monitor/i;
+
+/** A transparent 1×1 GIF. */
+const PIXEL = Uint8Array.from(atob("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"), (c) =>
+  c.charCodeAt(0),
+);
