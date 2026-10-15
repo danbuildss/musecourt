@@ -64,7 +64,8 @@ interface Match {
 }
 
 function match(method: string, pathname: string): Match | "METHOD_NOT_ALLOWED" | null {
-  const segments = pathname.replace(/\/+$/, "").split("/");
+  // "/" keeps its one empty segment so the courthouse route can match it.
+  const segments = (pathname === "/" ? "/" : pathname.replace(/\/+$/, "")).split("/");
   let methodMismatch = false;
   for (const route of routes) {
     const pattern = route.path.split("/");

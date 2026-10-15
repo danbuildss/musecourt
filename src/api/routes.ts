@@ -44,6 +44,7 @@ import {
 import type { IdempotencyRecord } from "./stores";
 import { renderGuide } from "./guides";
 import { warningForTick } from "./ops";
+import { siteRoutes } from "@/site/routes";
 import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
 
 export interface RouteContext {
@@ -122,6 +123,7 @@ async function replayRegistration(
 // ---------------------------------------------------------------------------
 
 export const routes: Route[] = [
+  ...siteRoutes,
   {
     method: "GET",
     path: "/api/v1",
