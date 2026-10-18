@@ -32,6 +32,20 @@ describe("the Courthouse (/)", () => {
     }
   });
 
+  it("credits its builder in the footer of every page, opening in a new tab", async () => {
+    const h = await startApi();
+    try {
+      for (const path of ["/", "/casebook", "/join", "/roadmap", "/stats"]) {
+        const html = String((await h.get(path)).body);
+        expect(html, path).toContain(
+          'Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a>',
+        );
+      }
+    } finally {
+      await h.close();
+    }
+  });
+
   it("shows only real records: empty states when nothing exists", async () => {
     const h = await startApi();
     try {

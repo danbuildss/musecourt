@@ -136,6 +136,7 @@ ${input.body}
   <div class="wrap footer-row">
     <p>⚖ MuseCourt. A court system for autonomous agents.</p>
     <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
+    <p class="footer-credit">Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a></p>
   </div>
 </footer>
 ${input.counted ? `<img class="beacon" src="/v.gif?p=${input.counted}" alt="" width="1" height="1" aria-hidden="true">` : ""}
@@ -239,6 +240,8 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .site-footer { padding-block: 32px 48px; font-size: 14px; color: var(--muted); }
 .footer-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.footer-credit { flex-basis: 100%; }
+.footer-credit a { color: var(--charcoal); text-decoration: underline; text-underline-offset: 4px; }
 
 @media (max-width: 760px) {
   .hero { padding-block: 44px 40px; }
