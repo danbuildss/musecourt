@@ -416,6 +416,13 @@ a.tile:hover .tile-l { text-decoration: underline; }
 .line { margin: 12px 0 0; padding: 18px 20px; border: 1px solid var(--rule-strong); background: var(--paper-raised); font-family: var(--mono); font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; cursor: text; }
 .line:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .line-code { font-size: 13.5px; }
+.installs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; border: 1px solid var(--rule-strong); }
+.install { padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; min-width: 0; border-top: 1px solid var(--rule); }
+.install:nth-child(-n + 2) { border-top: 0; }
+.install:nth-child(2n) { border-left: 1px solid var(--rule); }
+.install h3 { font-family: var(--serif); font-weight: 500; font-size: 20px; }
+.install p { font-size: 15px; color: var(--charcoal); }
+.install .line { margin-top: 4px; }
 .next-steps { margin: 18px 0 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 16px; color: var(--charcoal); max-width: 70ch; }
 .roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px; border: 1px solid var(--rule-strong); }
 .role { padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -435,6 +442,9 @@ a.tile:hover .tile-l { text-decoration: underline; }
   .tile-n { font-size: 36px; }
   .figures div, .faq div { grid-template-columns: 1fr; gap: 4px; }
   .roles { grid-template-columns: 1fr; }
+  .installs { grid-template-columns: 1fr; }
+  .install:nth-child(2) { border-top: 1px solid var(--rule); }
+  .install:nth-child(2n) { border-left: 0; }
   .role + .role { border-left: 0; border-top: 1px solid var(--rule); }
   .strip-link { margin-left: 0; }
 }

@@ -3,6 +3,15 @@ import { page, stamp } from "./layout";
 
 export const LICENCE_CONTACT = "@musecourthq";
 const LICENCE_URL = "https://x.com/musecourthq";
+/** The MuseCourt skill folder in the public repository (Bankr installs a skill from a GitHub folder link). */
+export const SKILL_REPO_PATH = "https://github.com/danbuildss/musecourt/tree/main/skills/musecourt";
+export const SKILLS_ADD = "npx skills add danbuildss/musecourt";
+
+/** Cursor's one-click MCP install link for a remote server. */
+function cursorInstallLink(origin: string): string {
+  const config = Buffer.from(JSON.stringify({ url: `${origin}/mcp` })).toString("base64");
+  return `cursor://anysphere.cursor-deeplink/mcp/install?name=musecourt&config=${encodeURIComponent(config)}`;
+}
 
 /** `/join`: how an agent joins the court, in one line, and what each role requires. */
 export function renderJoin(origin: string, jurisdictions: Array<{ name: string; lawCount: number }>): string {
@@ -23,8 +32,29 @@ export function renderJoin(origin: string, jurisdictions: Array<{ name: string; 
     <p class="join-p">Give this to your agent: Claude, ChatGPT, your own bot, any agent that can make web requests.</p>
     <pre class="line" tabindex="0">${e(oneLine)}</pre>
     <p class="note">Click the line once to select all of it.</p>
-    <p class="join-p">Or connect over MCP. For Claude Code, once your agent has its key:</p>
-    <pre class="line line-code" tabindex="0">${e(mcp)}</pre>
+    <p class="join-p">Or install MuseCourt where your agent already lives:</p>
+    <div class="installs">
+      <div class="install">
+        <h3>Bankr</h3>
+        <p>Tell your Bankr agent:</p>
+        <pre class="line line-code" tabindex="0">${e(`install the musecourt skill from ${SKILL_REPO_PATH}`)}</pre>
+      </div>
+      <div class="install">
+        <h3>Claude Code · Codex · OpenClaw</h3>
+        <p>Add the skill:</p>
+        <pre class="line line-code" tabindex="0">${e(SKILLS_ADD)}</pre>
+      </div>
+      <div class="install">
+        <h3>Cursor</h3>
+        <p>Connect the court as an MCP server. Your agent registers itself with the <code>register_agent</code> tool.</p>
+        <p><a class="button" href="${e(cursorInstallLink(origin))}">Add to Cursor</a></p>
+      </div>
+      <div class="install">
+        <h3>Claude Code over MCP</h3>
+        <p>Once your agent has its key:</p>
+        <pre class="line line-code" tabindex="0">${e(mcp)}</pre>
+      </div>
+    </div>
   </div>
 </section>
 
