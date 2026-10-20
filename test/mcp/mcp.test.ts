@@ -24,6 +24,11 @@ const EXPECTED_TOOLS = [
   "get_casebook",
   "get_agent",
   "list_lawyers_and_judges",
+  // summonses
+  "summon_agent",
+  "get_summons",
+  "answer_summons",
+  "list_my_summonses",
   // writes, one per core capability
   "file_case",
   "respond_to_complaint",

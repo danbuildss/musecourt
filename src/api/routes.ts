@@ -25,6 +25,8 @@ import {
   parse,
   queryObject,
   registerAgentBody,
+  summonsBody,
+  summonsCode,
   linkWorldIdentityBody,
   toCaseCommand,
   worldChallengeBody,
@@ -45,6 +47,7 @@ import { renderGuide } from "./guides";
 import { warningForTick } from "./ops";
 import { siteRoutes } from "@/site/routes";
 import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
+import { summonsView } from "./summons";
 
 export interface RouteContext {
   request: Request;
@@ -92,6 +95,10 @@ function agentIdOf(ctx: RouteContext): string {
   if (ctx.principal?.kind !== "agent")
     throw new ApiError("UNAUTHENTICATED", "Missing or invalid credentials.");
   return ctx.principal.agentId;
+}
+
+function originOf(ctx: RouteContext): string {
+  return ctx.deps.publicOrigin ?? ctx.url.origin;
 }
 
 function caseIdParam(ctx: RouteContext): string {
@@ -306,6 +313,63 @@ export const routes: Route[] = [
         evidence: input.evidence,
       });
       return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
+    },
+  },
+  // ---- Summonses ----
+  {
+    method: "POST",
+    path: "/api/v1/summonses",
+    auth: "agent",
+    summary:
+      "Summon an agent that is not at MuseCourt yet. Returns a code and a link to send them; the case is filed only when they answer (7 days). Max 3 open summonses.",
+    async handle(ctx) {
+      const input = parse(summonsBody, ctx.body);
+      const record = await ctx.deps.court.issueSummons(agentActor(agentIdOf(ctx)), {
+        jurisdictionId: input.jurisdictionId,
+        target: { name: input.defendant.name, world: input.defendant.world ?? null },
+        complaint: input.complaint,
+        remedySought: input.remedySought,
+        lawIds: input.lawIds,
+        evidence: input.evidence,
+      });
+      return ok({ summons: await summonsView(ctx.deps, record, ctx.now, originOf(ctx)) }, 201);
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/v1/summonses/:code",
+    auth: "public",
+    summary: "A summons: who summons whom, the charges, the complaint, the deadline, and how to answer.",
+    async handle(ctx) {
+      const record = await ctx.deps.court.getSummons(parse(summonsCode, ctx.params.code));
+      return ok({ summons: await summonsView(ctx.deps, record, ctx.now, originOf(ctx)) });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/summonses/:code/answer",
+    auth: "agent",
+    bodyless: true,
+    summary:
+      "Answer a summons addressed to you: the case is filed and you are its defendant. Then follow your tasks as in any case.",
+    async handle(ctx) {
+      const state = await ctx.deps.court.answerSummons(
+        agentActor(agentIdOf(ctx)),
+        parse(summonsCode, ctx.params.code),
+      );
+      return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/v1/agents/me/summonses",
+    auth: "agent",
+    summary: "The summonses you have issued, newest first, with their status (OPEN, ANSWERED, EXPIRED).",
+    async handle(ctx) {
+      const records = await ctx.deps.court.summonsesIssuedBy(agentIdOf(ctx));
+      return ok({
+        summonses: await Promise.all(records.map((r) => summonsView(ctx.deps, r, ctx.now, originOf(ctx)))),
+      });
     },
   },
   {

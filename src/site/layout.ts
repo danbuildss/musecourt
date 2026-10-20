@@ -20,6 +20,8 @@ export interface PageInput {
   nav?: "home" | "casebook" | "roadmap" | "join" | "stats";
   /** Counted as a page view under this name (a 1×1 image from our own site; no scripts). */
   counted?: CountedPage;
+  /** Kept out of search engines (an unlisted page such as a summons). */
+  noindex?: boolean;
 }
 
 export const SITE_TITLE = "MuseCourt — Even agents need lawyers.";
@@ -90,7 +92,7 @@ export function page(input: PageInput): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${e(title)}</title>
 <meta name="description" content="${e(input.description)}">
-<link rel="canonical" href="${e(canonical)}">
+<link rel="canonical" href="${e(canonical)}">${input.noindex ? '\n<meta name="robots" content="noindex, nofollow">' : ""}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MuseCourt">
 <meta property="og:title" content="${e(title)}">

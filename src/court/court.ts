@@ -1,4 +1,4 @@
-import { SYSTEM, type Actor } from "@/core/actor";
+import { SYSTEM, agentActor, type Actor } from "@/core/actor";
 import {
   decideCase,
   decideFileCase,
@@ -11,7 +11,9 @@ import type { Clock } from "@/core/clock";
 import { CourtError, fail, isCourtError } from "@/core/errors";
 import {
   REGISTRY_STREAM,
+  SUMMONSES_STREAM,
   caseStream,
+  event,
   jurisdictionStream,
   type CourtEvent,
   type LicenceType,
@@ -38,6 +40,16 @@ import {
 import { opportunitiesForAgent, type Opportunity } from "./projections/tasks";
 import type { ReadModels } from "./read-models/types";
 import { DEFAULT_DEADLINE_POLICY, validateDeadlinePolicy, type DeadlinePolicy } from "@/core/procedure";
+import {
+  buildSummonsBook,
+  decideAnswerSummons,
+  decideIssueSummons,
+  requireSummons,
+  summonsCodeFrom,
+  type SummonsBook,
+  type SummonsRecord,
+  type SummonsTarget,
+} from "@/core/summons";
 import {
   buildRegistry,
   decideGrantLicence,
@@ -271,6 +283,137 @@ export class Court {
       );
     });
     return (await this.getCase(caseId))!;
+  }
+
+  // -------------------------------------------------------------------------
+  // Summonses: a case waiting for a defendant who is not at the court yet
+  // -------------------------------------------------------------------------
+
+  /**
+   * Issues a summons. The case is validated exactly as a filing would be (laws, wording, evidence,
+   * world events), but nothing is filed or published until the summoned agent answers.
+   */
+  async issueSummons(
+    actor: Actor,
+    input: Omit<FileCaseInput, "caseId" | "defendantId"> & { jurisdictionId: string; target: SummonsTarget },
+  ): Promise<SummonsRecord> {
+    if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can issue a summons.");
+    const summonsId = this.deps.ids.next("summons");
+    const code = summonsCodeFrom(this.deps.ids.next("smncode"));
+    const jurisdiction = await this.getJurisdiction(input.jurisdictionId);
+    const registry = await this.getRegistry();
+    // Dry-run the filing against a stand-in defendant so every filing rule applies now.
+    const standIn = "agent_summoned_probe";
+    const probeRegistry = { ...registry, agents: new Map(registry.agents) };
+    probeRegistry.agents.set(standIn, {
+      agentId: standIn,
+      handle: "summoned",
+      displayName: "Summoned agent",
+      ownerRef: null,
+      world: null,
+      registeredAt: this.deps.clock.now().toISOString(),
+      licences: {},
+    });
+    const filing = decideFileCase(
+      jurisdiction,
+      { actor, now: this.deps.clock.now(), registry: probeRegistry, ids: PROBE_IDS, world: PROBE_WORLD },
+      { ...input, caseId: "case_probe", defendantId: standIn },
+      this.policy,
+    );
+    // World events are checked now, so a defendant never answers a summons that cannot be filed.
+    await this.lookupWorldEvidence(jurisdiction!, input.evidence ?? []);
+    const filed = filing.caseEvents.find((e) => e.type === "CaseFiled");
+    const complaint = filed?.type === "CaseFiled" ? filed.data.complaint : input.complaint;
+    const remedySought = filed?.type === "CaseFiled" ? filed.data.remedySought : "";
+
+    await this.retrying(async () => {
+      const book = await this.getSummonsBook();
+      const events = decideIssueSummons(
+        book,
+        { actor, now: this.deps.clock.now(), registry: await this.getRegistry() },
+        {
+          summonsId,
+          code,
+          jurisdictionId: input.jurisdictionId,
+          target: input.target,
+          complaint,
+          remedySought,
+          lawIds: input.lawIds,
+          evidence: input.evidence ?? [],
+        },
+      );
+      await this.append([{ streamId: SUMMONSES_STREAM, expectedVersion: book.version, events }], actor);
+    });
+    return (await this.getSummonsBook()).byId.get(summonsId)!;
+  }
+
+  /**
+   * The summoned agent answers: the case is filed with the summoning agent as plaintiff and the
+   * summons is marked answered, in one atomic write. From then on it is an ordinary case.
+   */
+  async answerSummons(actor: Actor, code: string): Promise<CaseState> {
+    const caseId = this.deps.ids.next("case");
+    await this.retrying(async () => {
+      const book = await this.getSummonsBook();
+      const record = requireSummons(book, code);
+      const registry = await this.getRegistry();
+      const defendantId = decideAnswerSummons(record, { actor, now: this.deps.clock.now(), registry });
+      const plaintiff = agentActor(record.plaintiffId);
+      const jurisdictionStreamId = jurisdictionStream(record.jurisdictionId);
+      const input: FileCaseInput = {
+        caseId,
+        defendantId,
+        complaint: record.complaint,
+        remedySought: record.remedySought,
+        lawIds: record.lawIds,
+        evidence: record.evidence,
+      };
+      const decide = async (world: WorldLookup, ids: IdGenerator) => {
+        const jurisdictionEvents = await this.deps.store.readStream(jurisdictionStreamId);
+        const jurisdiction = buildJurisdiction(jurisdictionEvents);
+        const decision = decideFileCase(
+          jurisdiction,
+          { actor: plaintiff, now: this.deps.clock.now(), registry, ids, world },
+          input,
+          this.policy,
+        );
+        return { jurisdiction, jurisdictionVersion: jurisdictionEvents.length, decision };
+      };
+      const probe = await decide(PROBE_WORLD, PROBE_IDS);
+      const world = await this.lookupWorldEvidence(probe.jurisdiction!, record.evidence);
+      const { jurisdictionVersion, decision } = await decide(world, this.deps.ids);
+      await this.append(
+        [
+          {
+            streamId: jurisdictionStreamId,
+            expectedVersion: jurisdictionVersion,
+            events: decision.jurisdictionEvents,
+          },
+          { streamId: caseStream(caseId), expectedVersion: 0, events: decision.caseEvents },
+          {
+            streamId: SUMMONSES_STREAM,
+            expectedVersion: book.version,
+            events: [event("SummonsAnswered", { summonsId: record.summonsId, defendantId, caseId })],
+          },
+        ],
+        plaintiff,
+      );
+    });
+    return (await this.getCase(caseId))!;
+  }
+
+  async getSummons(code: string): Promise<SummonsRecord> {
+    return requireSummons(await this.getSummonsBook(), code);
+  }
+
+  /** The summonses an agent has issued, newest first. */
+  async summonsesIssuedBy(agentId: string): Promise<SummonsRecord[]> {
+    const book = await this.getSummonsBook();
+    return [...book.byId.values()].filter((s) => s.plaintiffId === agentId).reverse();
+  }
+
+  private async getSummonsBook(): Promise<SummonsBook> {
+    return buildSummonsBook(await this.deps.store.readStream(SUMMONSES_STREAM));
   }
 
   /** Every case action goes through here: the core decides, the store records. */

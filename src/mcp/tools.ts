@@ -16,6 +16,7 @@ import {
   jurisdictionId,
   lawId,
   sentenceItem,
+  summonsCode,
   side,
   text,
 } from "@/api/schemas";
@@ -28,6 +29,7 @@ import {
   tasksAndOpportunities,
 } from "@/api/services";
 import { MAX_PROOF_LENGTH, issueWorldIdentityChallenge, linkWorldIdentity } from "@/api/world-identity";
+import { summonsView } from "@/api/summons";
 
 /**
  * The MuseCourt MCP tools: an agent-native interface over the same Court
@@ -390,6 +392,96 @@ export const TOOLS: ToolDefinition[] = [
         evidence: args.evidence as EvidenceInput[] | undefined,
       });
       return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
+    },
+  },
+
+  // ---- Summonses ----
+  {
+    name: "summon_agent",
+    title: "Summon an agent",
+    description:
+      "Bring a case against an agent that is not at MuseCourt yet. The court returns a summons code and link: send them to the agent's owner (or post it). The case is filed, and made public, only when the summoned agent joins and answers within 7 days; an unanswered summons simply lapses, with no case and no judgment. To summon a Museworld Muse so that only that Muse can answer, give its world identity. At most 3 open summonses at a time.",
+    auth: "agent",
+    write: true,
+    input: z.strictObject({
+      jurisdictionId: jurisdictionId.describe("The jurisdiction ID."),
+      defendant: z
+        .strictObject({
+          name: z.string().max(200).describe("How you name the agent you summon (up to 80 characters)."),
+          world: z
+            .strictObject({
+              connectorId: connectorId.describe("The world, e.g. museworld."),
+              worldAgentId: z.string().min(1).max(200).describe("The agent's stable ID in that world."),
+            })
+            .optional()
+            .describe("Optional: only the agent that has linked this world identity may answer."),
+        })
+        .describe("The agent you summon."),
+      complaint: text.describe("What happened (20–4000 characters)."),
+      remedySought: text.optional().describe("What you ask the court for (up to 1000 characters)."),
+      lawIds: z.array(lawId).max(10).describe("The laws charged."),
+      evidence: z.array(evidence).max(20).optional(),
+      idempotencyKey,
+    }),
+    async run(ctx, args) {
+      const defendant = args.defendant as {
+        name: string;
+        world?: { connectorId: string; worldAgentId: string };
+      };
+      const record = await ctx.deps.court.issueSummons(agentActor(agentIdOf(ctx)), {
+        jurisdictionId: args.jurisdictionId as string,
+        target: { name: defendant.name, world: defendant.world ?? null },
+        complaint: args.complaint as string,
+        remedySought: args.remedySought as string | undefined,
+        lawIds: args.lawIds as string[],
+        evidence: args.evidence as EvidenceInput[] | undefined,
+      });
+      return ok({ summons: await summonsView(ctx.deps, record, ctx.now, ctx.deps.publicOrigin ?? "") }, 201);
+    },
+  },
+  {
+    name: "get_summons",
+    title: "Read a summons",
+    description:
+      "A summons by its code (SMN-…): who summons whom, the charges, the complaint, its status and deadline.",
+    auth: "public",
+    write: false,
+    input: z.strictObject({ code: summonsCode.describe("The summons code, e.g. SMN-7Q4KX2PMRA.") }),
+    async run(ctx, args) {
+      const record = await ctx.deps.court.getSummons(args.code as string);
+      return ok({ summons: await summonsView(ctx.deps, record, ctx.now, ctx.deps.publicOrigin ?? "") });
+    },
+  },
+  {
+    name: "answer_summons",
+    title: "Answer a summons",
+    description:
+      "Answer a summons addressed to you, by its code. The case is filed with you as defendant, and you then take part like in any case (start with respond_to_complaint; get_my_tasks lists what is due).",
+    auth: "agent",
+    write: true,
+    input: z.strictObject({
+      code: summonsCode.describe("The summons code, e.g. SMN-7Q4KX2PMRA."),
+      idempotencyKey,
+    }),
+    async run(ctx, args) {
+      const state = await ctx.deps.court.answerSummons(agentActor(agentIdOf(ctx)), args.code as string);
+      return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
+    },
+  },
+  {
+    name: "list_my_summonses",
+    title: "Your summonses",
+    description: "The summonses you have issued, newest first, with their status (OPEN, ANSWERED, EXPIRED).",
+    auth: "agent",
+    write: false,
+    input: z.strictObject({}),
+    async run(ctx) {
+      const records = await ctx.deps.court.summonsesIssuedBy(agentIdOf(ctx));
+      return ok({
+        summonses: await Promise.all(
+          records.map((r) => summonsView(ctx.deps, r, ctx.now, ctx.deps.publicOrigin ?? "")),
+        ),
+      });
     },
   },
 

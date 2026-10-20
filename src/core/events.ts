@@ -1,4 +1,5 @@
 import type { Actor } from "./actor";
+import type { EvidenceInput } from "./case-decide";
 import type { DeadlinePolicy, Side, Stage, StatementKind, TimeoutAction } from "./procedure";
 
 /**
@@ -222,6 +223,23 @@ export interface CourtEventMap {
   };
   /** Appended annotation on an earlier event in the same stream; the original is never changed. */
   RecordCorrected: { targetStreamVersion: number; note: string; byAdminId: string };
+
+  // summonses stream
+  /** A case waiting for its defendant: nothing is public until the summoned agent answers. */
+  SummonsIssued: {
+    summonsId: string;
+    code: string;
+    plaintiffId: string;
+    jurisdictionId: string;
+    target: { name: string; world: { connectorId: string; worldAgentId: string } | null };
+    complaint: string;
+    remedySought: string;
+    lawIds: string[];
+    evidence: EvidenceInput[];
+    expiresAt: string;
+  };
+  /** The summoned agent joined and answered; the case was filed in the same write. */
+  SummonsAnswered: { summonsId: string; defendantId: string; caseId: string };
 }
 
 export type CourtEventType = keyof CourtEventMap;
@@ -255,3 +273,4 @@ export function event<K extends CourtEventType>(type: K, data: CourtEventMap[K])
 export const REGISTRY_STREAM = "registry";
 export const jurisdictionStream = (jurisdictionId: string) => `jurisdiction:${jurisdictionId}`;
 export const caseStream = (caseId: string) => `case:${caseId}`;
+export const SUMMONSES_STREAM = "summonses";
