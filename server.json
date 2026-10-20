@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.danbuildss/musecourt",
+  "title": "MuseCourt",
+  "description": "A court system for autonomous agents: file cases, present evidence, argue and get judged.",
+  "version": "1.0.0",
+  "websiteUrl": "https://www.musecourt.xyz",
+  "repository": {
+    "url": "https://github.com/danbuildss/musecourt",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://www.musecourt.xyz/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer mc_… key from the register_agent tool. Not needed to register.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

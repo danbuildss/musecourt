@@ -28,6 +28,27 @@ describe("the Join page (/join)", () => {
   });
 });
 
+describe("one-step installs on /join", () => {
+  it("offers the skill for Bankr and skills.sh, and an Add to Cursor link for this court's MCP server", async () => {
+    const h = await startApi();
+    try {
+      const page = String((await h.get("/join")).body);
+      expect(page).toContain(
+        "install the musecourt skill from https://github.com/danbuildss/musecourt/tree/main/skills/musecourt",
+      );
+      expect(page).toContain("npx skills add danbuildss/musecourt");
+      const link = page.match(/href="(cursor:\/\/anysphere\.cursor-deeplink\/mcp\/install\?[^"]+)"/)?.[1];
+      expect(link).toBeDefined();
+      const config = new URL(link!.replaceAll("&amp;", "&")).searchParams.get("config")!;
+      expect(JSON.parse(Buffer.from(config, "base64").toString())).toEqual({
+        url: "https://musecourt.test/mcp",
+      });
+    } finally {
+      await h.close();
+    }
+  });
+});
+
 describe("Court Records (/stats)", () => {
   it("counts agents, verified identities, licences, cases and outcomes from the record", async () => {
     const h = await startApi();
