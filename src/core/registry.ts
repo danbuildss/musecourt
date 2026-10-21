@@ -131,7 +131,7 @@ export function requireAgent(state: RegistryState, agentId: string): AgentRecord
 
 const HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 // eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/;
+export const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/;
 
 /** Names that could be mistaken for the court itself. */
 export const RESERVED_HANDLES: ReadonlySet<string> = new Set([

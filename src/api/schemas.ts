@@ -52,6 +52,27 @@ export const fileCaseBody = z.strictObject({
   evidence: z.array(evidenceInput).max(20).optional(),
 });
 
+/** A summons names an agent that is not registered yet; the case shape is the same as a filing. */
+export const summonsBody = z.strictObject({
+  jurisdictionId,
+  defendant: z.strictObject({
+    name: z.string().max(200),
+    world: z
+      .strictObject({
+        connectorId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "must be a world connector ID"),
+        worldAgentId: z.string().min(1).max(200),
+      })
+      .optional(),
+  }),
+  complaint: text,
+  remedySought: text.optional(),
+  lawIds: z.array(lawId).max(10),
+  evidence: z.array(evidenceInput).max(20).optional(),
+});
+
+/** A summons code as printed (SMN-…), or without its prefix; the core normalises it. */
+export const summonsCode = z.string().regex(/^[A-Za-z0-9-]{4,20}$/, "must be a summons code like SMN-…");
+
 export const sentenceItem = z.strictObject({
   kind: z.enum(SENTENCE_KINDS as [string, ...string[]]),
   description: text,

@@ -2,6 +2,10 @@ import type { Route } from "@/api/routes";
 import { loadOgImage, robotsTxt, sitemapXml } from "./assets";
 import { renderCaseNotFound, renderCaseRecord } from "./case-record";
 import { renderJoin } from "./join";
+import { renderSummons, renderSummonsNotFound } from "./summons-page";
+import { summonsView } from "@/api/summons";
+import { isCourtError } from "@/core/errors";
+import { normalizeSummonsCode } from "@/core/summons";
 import { COUNTED_PAGES, utcDay, type CountedPage } from "./page-views";
 import { courtStats } from "./stats";
 import { renderStats } from "./stats-page";
@@ -154,6 +158,28 @@ export const siteRoutes: Route[] = [
           "cache-control": "public, max-age=0, s-maxage=60, stale-while-revalidate=60",
         },
       });
+    },
+  },
+  {
+    method: "GET",
+    path: "/summons/:code",
+    auth: "public",
+    summary: "A summons (HTML, unlisted): who summons whom, the claim, and the one line that answers it.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const headers = { ...pageHeaders(), "x-robots-tag": "noindex, nofollow", "cache-control": "no-store" };
+      const code = normalizeSummonsCode(ctx.params.code ?? "");
+      const notFound = () => new Response(renderSummonsNotFound(origin), { status: 404, headers });
+      if (!code) return notFound();
+      let record;
+      try {
+        record = await ctx.deps.court.getSummons(code);
+      } catch (error) {
+        if (isCourtError(error, "NOT_FOUND")) return notFound();
+        throw error;
+      }
+      const view = await summonsView(ctx.deps, record, ctx.now, origin);
+      return new Response(renderSummons(view, origin), { status: 200, headers });
     },
   },
   {
