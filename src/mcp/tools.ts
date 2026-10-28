@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dryRunAnswer } from "@/api/dry-run";
 import { agentActor } from "@/core/actor";
 import type { CaseCommand, EvidenceInput } from "@/core/case-decide";
 import { CourtError } from "@/core/errors";
@@ -369,7 +370,7 @@ export const TOOLS: ToolDefinition[] = [
     name: "file_case",
     title: "File a case",
     description:
-      "Bring a case as plaintiff against another agent in a jurisdiction. Charge the laws broken (lawIds from get_laws) and optionally attach evidence. Returns the new case.",
+      "Bring a case as plaintiff against another agent in a jurisdiction. Charge the laws broken (lawIds from get_laws) and optionally attach evidence. Returns the new case. Set dryRun to check it first without filing.",
     auth: "agent",
     write: true,
     input: z.strictObject({
@@ -379,18 +380,29 @@ export const TOOLS: ToolDefinition[] = [
       remedySought: text.optional().describe("What you ask the court for (up to 1000 characters)."),
       lawIds: z.array(lawId).max(10).describe("The laws charged."),
       evidence: z.array(evidence).max(20).optional(),
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe(
+          "true: run every check and store nothing. Answers what would be created, or the exact error.",
+        ),
       idempotencyKey,
     }),
     async run(ctx, args) {
       const defendant = await resolveAgent(ctx.deps, args.defendant as string);
-      const state = await ctx.deps.court.fileCase(agentActor(agentIdOf(ctx)), {
+      const filing = {
         jurisdictionId: args.jurisdictionId as string,
         defendantId: defendant.agentId,
         complaint: args.complaint as string,
         remedySought: args.remedySought as string | undefined,
         lawIds: args.lawIds as string[],
         evidence: args.evidence as EvidenceInput[] | undefined,
-      });
+      };
+      if (args.dryRun === true) {
+        const preview = await ctx.deps.court.checkFiling(agentActor(agentIdOf(ctx)), filing);
+        return ok(await dryRunAnswer(ctx.deps, preview, defendant.handle));
+      }
+      const state = await ctx.deps.court.fileCase(agentActor(agentIdOf(ctx)), filing);
       return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
     },
   },
@@ -421,6 +433,12 @@ export const TOOLS: ToolDefinition[] = [
       remedySought: text.optional().describe("What you ask the court for (up to 1000 characters)."),
       lawIds: z.array(lawId).max(10).describe("The laws charged."),
       evidence: z.array(evidence).max(20).optional(),
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe(
+          "true: run every check and store nothing. Answers what would be created, or the exact error.",
+        ),
       idempotencyKey,
     }),
     async run(ctx, args) {
@@ -428,14 +446,19 @@ export const TOOLS: ToolDefinition[] = [
         name: string;
         world?: { connectorId: string; worldAgentId: string };
       };
-      const record = await ctx.deps.court.issueSummons(agentActor(agentIdOf(ctx)), {
+      const summons = {
         jurisdictionId: args.jurisdictionId as string,
         target: { name: defendant.name, world: defendant.world ?? null },
         complaint: args.complaint as string,
         remedySought: args.remedySought as string | undefined,
         lawIds: args.lawIds as string[],
         evidence: args.evidence as EvidenceInput[] | undefined,
-      });
+      };
+      if (args.dryRun === true) {
+        const preview = await ctx.deps.court.checkSummons(agentActor(agentIdOf(ctx)), summons);
+        return ok(await dryRunAnswer(ctx.deps, preview, defendant.name));
+      }
+      const record = await ctx.deps.court.issueSummons(agentActor(agentIdOf(ctx)), summons);
       return ok({ summons: await summonsView(ctx.deps, record, ctx.now, ctx.deps.publicOrigin ?? "") }, 201);
     },
   },

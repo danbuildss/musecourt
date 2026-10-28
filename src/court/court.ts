@@ -285,6 +285,31 @@ export class Court {
     return (await this.getCase(caseId))!;
   }
 
+  /**
+   * Runs every check a filing runs, world evidence included, and stores nothing: no case, no
+   * event, no case number used. Fails exactly as `fileCase` would.
+   */
+  async checkFiling(
+    actor: Actor,
+    input: Omit<FileCaseInput, "caseId"> & { jurisdictionId: string },
+  ): Promise<FilingPreview> {
+    const jurisdiction = buildJurisdiction(
+      await this.deps.store.readStream(jurisdictionStream(input.jurisdictionId)),
+    );
+    const registry = await this.getRegistry();
+    const decide = (world: WorldLookup) =>
+      decideFileCase(
+        jurisdiction,
+        { actor, now: this.deps.clock.now(), registry, ids: PROBE_IDS, world },
+        { ...input, caseId: "case_probe" },
+        this.policy,
+      );
+    // Probe first so ordinary validation errors win over world lookups, as in fileCase.
+    decide(PROBE_WORLD);
+    const world = await this.lookupWorldEvidence(jurisdiction!, input.evidence ?? []);
+    return filingPreview(decide(world).caseEvents, input.evidence?.length ?? 0);
+  }
+
   // -------------------------------------------------------------------------
   // Summonses: a case waiting for a defendant who is not at the court yet
   // -------------------------------------------------------------------------
@@ -293,13 +318,11 @@ export class Court {
    * Issues a summons. The case is validated exactly as a filing would be (laws, wording, evidence,
    * world events), but nothing is filed or published until the summoned agent answers.
    */
-  async issueSummons(
+  /** The filing checks a summons runs now, against a stand-in defendant, world evidence included. */
+  private async checkSummonsFiling(
     actor: Actor,
-    input: Omit<FileCaseInput, "caseId" | "defendantId"> & { jurisdictionId: string; target: SummonsTarget },
-  ): Promise<SummonsRecord> {
-    if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can issue a summons.");
-    const summonsId = this.deps.ids.next("summons");
-    const code = summonsCodeFrom(this.deps.ids.next("smncode"));
+    input: Omit<FileCaseInput, "caseId" | "defendantId"> & { jurisdictionId: string },
+  ): Promise<{ complaint: string; remedySought: string; caseEvents: CourtEvent[] }> {
     const jurisdiction = await this.getJurisdiction(input.jurisdictionId);
     const registry = await this.getRegistry();
     // Dry-run the filing against a stand-in defendant so every filing rule applies now.
@@ -323,9 +346,48 @@ export class Court {
     // World events are checked now, so a defendant never answers a summons that cannot be filed.
     await this.lookupWorldEvidence(jurisdiction!, input.evidence ?? []);
     const filed = filing.caseEvents.find((e) => e.type === "CaseFiled");
-    const complaint = filed?.type === "CaseFiled" ? filed.data.complaint : input.complaint;
-    const remedySought = filed?.type === "CaseFiled" ? filed.data.remedySought : "";
+    return {
+      complaint: filed?.type === "CaseFiled" ? filed.data.complaint : input.complaint,
+      remedySought: filed?.type === "CaseFiled" ? filed.data.remedySought : "",
+      caseEvents: filing.caseEvents,
+    };
+  }
 
+  /**
+   * Runs every check issuing a summons runs (filing rules, world evidence, the open-summons
+   * limit) and stores nothing. Fails exactly as `issueSummons` would.
+   */
+  async checkSummons(
+    actor: Actor,
+    input: Omit<FileCaseInput, "caseId" | "defendantId"> & { jurisdictionId: string; target: SummonsTarget },
+  ): Promise<FilingPreview> {
+    if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can issue a summons.");
+    const { complaint, remedySought, caseEvents } = await this.checkSummonsFiling(actor, input);
+    decideIssueSummons(
+      await this.getSummonsBook(),
+      { actor, now: this.deps.clock.now(), registry: await this.getRegistry() },
+      {
+        summonsId: "summons_probe",
+        code: "SMN-PROBE",
+        jurisdictionId: input.jurisdictionId,
+        target: input.target,
+        complaint,
+        remedySought,
+        lawIds: input.lawIds,
+        evidence: input.evidence ?? [],
+      },
+    );
+    return filingPreview(caseEvents, input.evidence?.length ?? 0);
+  }
+
+  async issueSummons(
+    actor: Actor,
+    input: Omit<FileCaseInput, "caseId" | "defendantId"> & { jurisdictionId: string; target: SummonsTarget },
+  ): Promise<SummonsRecord> {
+    if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can issue a summons.");
+    const summonsId = this.deps.ids.next("summons");
+    const code = summonsCodeFrom(this.deps.ids.next("smncode"));
+    const { complaint, remedySought } = await this.checkSummonsFiling(actor, input);
     await this.retrying(async () => {
       const book = await this.getSummonsBook();
       const events = decideIssueSummons(
@@ -658,4 +720,35 @@ function evidenceInputsOf(command: CaseCommand): EvidenceInput[] {
   if (command.type === "SubmitEvidence") return command.evidence ? [command.evidence] : [];
   if (command.type === "RespondToComplaint") return command.evidence ?? [];
   return [];
+}
+
+/** What a filing would create, without creating it. */
+export interface FilingPreview {
+  jurisdictionId: string;
+  title: string;
+  plaintiffId: string;
+  defendantId: string;
+  charges: Array<{ lawId: string; article: number; title: string }>;
+  evidence: number;
+  firstStage: string;
+  /** When the defendant's answer would be due, counted from now. */
+  answerDeadline: string;
+}
+
+function filingPreview(caseEvents: CourtEvent[], evidence: number): FilingPreview {
+  const filed = caseEvents.find((e) => e.type === "CaseFiled");
+  const stage = caseEvents.find((e) => e.type === "StageEntered");
+  if (filed?.type !== "CaseFiled" || stage?.type !== "StageEntered") {
+    throw new Error("A filing decision always files the case and enters its first stage.");
+  }
+  return {
+    jurisdictionId: filed.data.jurisdictionId,
+    title: filed.data.title,
+    plaintiffId: filed.data.plaintiffId,
+    defendantId: filed.data.defendantId,
+    charges: filed.data.charges.map(({ lawId, article, title }) => ({ lawId, article, title })),
+    evidence,
+    firstStage: stage.data.stage,
+    answerDeadline: stage.data.deadline,
+  };
 }

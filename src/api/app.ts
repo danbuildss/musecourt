@@ -11,7 +11,7 @@ import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFinge
 import { warningForError, type OpsWarning } from "./ops";
 import type { RateLimiter } from "./rate-limit";
 import { routes, type Route, type RouteContext, type RouteResult } from "./routes";
-import { parse, queryObject } from "./schemas";
+import { isDryRun, parse, queryObject } from "./schemas";
 import { MCP_PATH, handleMcpHttp } from "@/mcp/server";
 import { assertIdempotencyKey, runIdempotent } from "./services";
 import type { CredentialStore, IdempotencyRecord, IdempotencyStore, WorldChallengeStore } from "./stores";
@@ -240,7 +240,9 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
         const res = toResponse(await invoke(route, ctx));
         return new Response(null, { status: res.status, headers: res.headers });
       }
-      if (route.method !== "POST" || route.selfIdempotent) return toResponse(await invoke(route, ctx));
+      // A dry run stores nothing, so it needs no Idempotency-Key and is never recorded under one.
+      if (route.method !== "POST" || route.selfIdempotent || (route.dryRunnable && isDryRun(url)))
+        return toResponse(await invoke(route, ctx));
 
       // ---- Idempotent write ----
       const key = request.headers.get("idempotency-key");

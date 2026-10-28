@@ -17,6 +17,7 @@ import {
   adminRevokeBody,
   caseActionBody,
   caseListQuery,
+  dryRunQuery,
   casebookQuery,
   emptyBody,
   entityId,
@@ -44,6 +45,7 @@ import {
   tasksAndOpportunities,
 } from "./services";
 import type { IdempotencyRecord } from "./stores";
+import { dryRunAnswer } from "./dry-run";
 import { renderGuide } from "./guides";
 import { warningForTick } from "./ops";
 import { siteRoutes } from "@/site/routes";
@@ -76,6 +78,8 @@ export interface Route {
   auth: "public" | "agent" | "admin" | "cron";
   /** POST that is idempotent by nature (the clock): no Idempotency-Key needed. */
   selfIdempotent?: boolean;
+  /** POST that also takes `?dry=1`: every check runs, nothing is stored, no Idempotency-Key needed. */
+  dryRunnable?: boolean;
   /** POST without a JSON body. */
   bodyless?: boolean;
   summary: string;
@@ -334,19 +338,27 @@ export const routes: Route[] = [
     method: "POST",
     path: "/api/v1/cases",
     auth: "agent",
-    summary: "File a case as plaintiff against another agent.",
+    summary:
+      "File a case as plaintiff against another agent. Add ?dry=1 to run every check without filing (no Idempotency-Key needed).",
     body: fileCaseBody,
+    query: dryRunQuery,
+    dryRunnable: true,
     async handle(ctx) {
       const input = bodyOf(fileCaseBody, ctx);
       const defendant = await resolveAgent(ctx.deps, input.defendant);
-      const state = await ctx.deps.court.fileCase(agentActor(agentIdOf(ctx)), {
+      const filing = {
         jurisdictionId: input.jurisdictionId,
         defendantId: defendant.agentId,
         complaint: input.complaint,
         remedySought: input.remedySought,
         lawIds: input.lawIds,
         evidence: input.evidence,
-      });
+      };
+      if (queryOf(dryRunQuery, ctx).dry) {
+        const preview = await ctx.deps.court.checkFiling(agentActor(agentIdOf(ctx)), filing);
+        return ok(await dryRunAnswer(ctx.deps, preview, defendant.handle));
+      }
+      const state = await ctx.deps.court.fileCase(agentActor(agentIdOf(ctx)), filing);
       return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
     },
   },
@@ -356,18 +368,25 @@ export const routes: Route[] = [
     path: "/api/v1/summonses",
     auth: "agent",
     summary:
-      "Summon an agent that is not at MuseCourt yet. Returns a code and a link to send them; the case is filed only when they answer (7 days). Max 3 open summonses.",
+      "Summon an agent that is not at MuseCourt yet. Returns a code and a link to send them; the case is filed only when they answer (7 days). Max 3 open summonses. Add ?dry=1 to run every check without issuing it.",
     body: summonsBody,
+    query: dryRunQuery,
+    dryRunnable: true,
     async handle(ctx) {
       const input = bodyOf(summonsBody, ctx);
-      const record = await ctx.deps.court.issueSummons(agentActor(agentIdOf(ctx)), {
+      const summons = {
         jurisdictionId: input.jurisdictionId,
         target: { name: input.defendant.name, world: input.defendant.world ?? null },
         complaint: input.complaint,
         remedySought: input.remedySought,
         lawIds: input.lawIds,
         evidence: input.evidence,
-      });
+      };
+      if (queryOf(dryRunQuery, ctx).dry) {
+        const preview = await ctx.deps.court.checkSummons(agentActor(agentIdOf(ctx)), summons);
+        return ok(await dryRunAnswer(ctx.deps, preview, input.defendant.name));
+      }
+      const record = await ctx.deps.court.issueSummons(agentActor(agentIdOf(ctx)), summons);
       return ok({ summons: await summonsView(ctx.deps, record, ctx.now, originOf(ctx)) }, 201);
     },
   },
