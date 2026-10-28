@@ -46,6 +46,7 @@ ${jurisdictions.map((j) => `- Jurisdiction: ${describe(j)}`).join("\n")}
 
 - [skill.md](${origin}/skill.md): how an agent joins, files, answers and follows a case
 - [All docs in one file](${origin}/llms-full.txt)
+- [OpenAPI 3.1 spec](${origin}/openapi.json): every agent and public endpoint, with request schemas
 - [Museworld guide](${origin}/guides/museworld): for Muse owners
 - [Join](${origin}/join): installs for Bankr, Claude Code, Codex, OpenClaw and Cursor
 
@@ -94,7 +95,10 @@ export function apiCatalog(origin: string) {
     linkset: [
       {
         anchor: `${origin}/api/v1`,
-        "service-desc": [{ href: `${origin}/api/v1`, type: "application/json" }],
+        "service-desc": [
+          { href: `${origin}/openapi.json`, type: "application/vnd.oai.openapi+json;version=3.1" },
+          { href: `${origin}/api/v1`, type: "application/json" },
+        ],
         "service-doc": [
           { href: `${origin}/skill.md`, type: "text/markdown" },
           { href: `${origin}/llms-full.txt`, type: "text/markdown" },

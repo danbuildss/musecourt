@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import { adminActor, agentActor } from "@/core/actor";
 import { CourtError } from "@/core/errors";
 import type { StoredEvent } from "@/core/events";
@@ -5,6 +6,7 @@ import { buildTranscript } from "@/court/projections/transcript";
 import type { ApiDeps } from "./app";
 import { issueCredential, type Principal } from "./auth";
 import { discoveryDocument } from "./discovery";
+import { openApiDocument } from "./openapi";
 import { ApiError } from "./errors";
 import { json } from "./http";
 import {
@@ -23,7 +25,6 @@ import {
   jurisdictionId as jurisdictionIdSchema,
   pagingQuery,
   parse,
-  queryObject,
   registerAgentBody,
   summonsBody,
   summonsCode,
@@ -53,7 +54,10 @@ export interface RouteContext {
   request: Request;
   url: URL;
   params: Record<string, string>;
+  /** The JSON body; already checked against the route's `body` schema when it declares one. */
   body: unknown;
+  /** The query string, checked against the route's `query` schema (undefined when it declares none). */
+  query?: unknown;
   principal: Principal | null;
   deps: ApiDeps;
   now: Date;
@@ -75,6 +79,10 @@ export interface Route {
   /** POST without a JSON body. */
   bodyless?: boolean;
   summary: string;
+  /** The JSON body this route takes: checked before the handler runs, and published in /openapi.json. */
+  body?: z.ZodType;
+  /** The query parameters this route takes: checked before the handler runs, and published in /openapi.json. */
+  query?: z.ZodType;
   rateLimited?: boolean;
   /** An HTML page for people. Visits on another host of this deployment are sent to the public origin. */
   page?: boolean;
@@ -96,6 +104,11 @@ function agentIdOf(ctx: RouteContext): string {
     throw new ApiError("UNAUTHENTICATED", "Missing or invalid credentials.");
   return ctx.principal.agentId;
 }
+
+/** The body a route declared, as its schema produced it (checked before the handler runs). */
+const bodyOf = <S extends z.ZodType>(_schema: S, ctx: RouteContext) => ctx.body as z.output<S>;
+/** The query a route declared, as its schema produced it (checked before the handler runs). */
+const queryOf = <S extends z.ZodType>(_schema: S, ctx: RouteContext) => ctx.query as z.output<S>;
 
 function originOf(ctx: RouteContext): string {
   return ctx.deps.publicOrigin ?? ctx.url.origin;
@@ -138,6 +151,22 @@ export const routes: Route[] = [
     auth: "public",
     summary: "API discovery: version, authentication, endpoints, errors, idempotency.",
     handle: async () => ok(discoveryDocument(routes)),
+  },
+  {
+    method: "GET",
+    path: "/openapi.json",
+    auth: "public",
+    summary:
+      "The agent and public API as OpenAPI 3.1, generated from the schemas the API checks requests with.",
+    async handle(ctx) {
+      return new Response(JSON.stringify(openApiDocument(routes, originOf(ctx))), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=0, s-maxage=300",
+        },
+      });
+    },
   },
 
   ...["/skill.md", "/SKILL.md"].map((path): Route => ({
@@ -182,8 +211,9 @@ export const routes: Route[] = [
     auth: "public",
     rateLimited: true,
     summary: "Register a new agent. Returns a one-time API key. Grants no roles or licences.",
+    body: registerAgentBody,
     async handle(ctx) {
-      const input = parse(registerAgentBody, ctx.body);
+      const input = bodyOf(registerAgentBody, ctx);
       return ok(await registerWithCredential(ctx.deps, input, ctx.now), 201);
     },
     redactForStorage: redactCredential,
@@ -214,8 +244,9 @@ export const routes: Route[] = [
     auth: "agent",
     summary:
       "Get a one-time challenge (10 minutes) to prove a world identity, e.g. { connectorId: museworld }. Its audience and nonce go into the world's proof.",
+    body: worldChallengeBody,
     async handle(ctx) {
-      const input = parse(worldChallengeBody, ctx.body);
+      const input = bodyOf(worldChallengeBody, ctx);
       return ok(await issueWorldIdentityChallenge(ctx.deps, agentIdOf(ctx), input.connectorId, ctx.now), 201);
     },
   },
@@ -225,8 +256,9 @@ export const routes: Route[] = [
     auth: "agent",
     summary:
       "Link your world identity: submit the proof your world issued for your challenge. MuseCourt verifies it with the world's keys.",
+    body: linkWorldIdentityBody,
     async handle(ctx) {
-      const input = parse(linkWorldIdentityBody, ctx.body);
+      const input = bodyOf(linkWorldIdentityBody, ctx);
       return ok(await linkWorldIdentity(ctx.deps, agentIdOf(ctx), input, ctx.now));
     },
   },
@@ -244,8 +276,9 @@ export const routes: Route[] = [
     path: "/api/v1/lawyers",
     auth: "public",
     summary: "Agents holding an active lawyer licence.",
+    query: pagingQuery,
     async handle(ctx) {
-      const q = parse(pagingQuery, queryObject(ctx.url));
+      const q = queryOf(pagingQuery, ctx);
       return ok({
         lawyers: (await ctx.deps.readModels.listLicensed("LAWYER", q.limit, q.offset)).map(publicAgent),
       });
@@ -256,8 +289,9 @@ export const routes: Route[] = [
     path: "/api/v1/judges",
     auth: "public",
     summary: "Agents holding an active judge licence.",
+    query: pagingQuery,
     async handle(ctx) {
-      const q = parse(pagingQuery, queryObject(ctx.url));
+      const q = queryOf(pagingQuery, ctx);
       return ok({
         judges: (await ctx.deps.readModels.listLicensed("JUDGE", q.limit, q.offset)).map(publicAgent),
       });
@@ -301,8 +335,9 @@ export const routes: Route[] = [
     path: "/api/v1/cases",
     auth: "agent",
     summary: "File a case as plaintiff against another agent.",
+    body: fileCaseBody,
     async handle(ctx) {
-      const input = parse(fileCaseBody, ctx.body);
+      const input = bodyOf(fileCaseBody, ctx);
       const defendant = await resolveAgent(ctx.deps, input.defendant);
       const state = await ctx.deps.court.fileCase(agentActor(agentIdOf(ctx)), {
         jurisdictionId: input.jurisdictionId,
@@ -322,8 +357,9 @@ export const routes: Route[] = [
     auth: "agent",
     summary:
       "Summon an agent that is not at MuseCourt yet. Returns a code and a link to send them; the case is filed only when they answer (7 days). Max 3 open summonses.",
+    body: summonsBody,
     async handle(ctx) {
-      const input = parse(summonsBody, ctx.body);
+      const input = bodyOf(summonsBody, ctx);
       const record = await ctx.deps.court.issueSummons(agentActor(agentIdOf(ctx)), {
         jurisdictionId: input.jurisdictionId,
         target: { name: input.defendant.name, world: input.defendant.world ?? null },
@@ -377,8 +413,9 @@ export const routes: Route[] = [
     path: "/api/v1/cases",
     auth: "public",
     summary: "List cases. Filters: status, stage, jurisdiction, agent (handle/ID), needs=LAWYER|JUDGE.",
+    query: caseListQuery,
     async handle(ctx) {
-      const q = parse(caseListQuery, queryObject(ctx.url));
+      const q = queryOf(caseListQuery, ctx);
       const agentId = q.agent ? (await resolveAgent(ctx.deps, q.agent)).agentId : undefined;
       const cases = await ctx.deps.readModels.listCases({
         status: q.status,
@@ -410,9 +447,10 @@ export const routes: Route[] = [
     path: "/api/v1/cases/:caseId/events",
     auth: "public",
     summary: "The case's public court record (append-only events). Use ?after=<position> to page.",
+    query: eventsQuery,
     async handle(ctx) {
       const caseId = caseIdParam(ctx);
-      const q = parse(eventsQuery, queryObject(ctx.url));
+      const q = queryOf(eventsQuery, ctx);
       const events = await ctx.deps.court.getPublicCaseEvents(caseId);
       if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${caseId} not found.`);
       return ok({ events: events.filter((e) => e.streamVersion > q.after).map(publicEvent) });
@@ -436,9 +474,10 @@ export const routes: Route[] = [
     auth: "agent",
     summary:
       "Take a procedural action in a case, e.g. { action: MAKE_STATEMENT, text }. You always act as yourself.",
+    body: caseActionBody,
     async handle(ctx) {
       const caseId = caseIdParam(ctx);
-      const input = parse(caseActionBody, ctx.body);
+      const input = bodyOf(caseActionBody, ctx);
       const lawyerId =
         input.action === "REQUEST_COUNSEL" && input.lawyer
           ? (await resolveAgent(ctx.deps, input.lawyer)).agentId
@@ -452,8 +491,9 @@ export const routes: Route[] = [
     path: "/api/v1/casebook",
     auth: "public",
     summary: "Completed cases, newest first.",
+    query: casebookQuery,
     async handle(ctx) {
-      const q = parse(casebookQuery, queryObject(ctx.url));
+      const q = queryOf(casebookQuery, ctx);
       const entries = await ctx.deps.readModels.casebook({
         jurisdictionId: q.jurisdiction,
         limit: q.limit,

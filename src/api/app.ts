@@ -10,7 +10,8 @@ import { ApiError, toErrorBody } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFingerprint } from "./http";
 import { warningForError, type OpsWarning } from "./ops";
 import type { RateLimiter } from "./rate-limit";
-import { routes, type Route, type RouteResult } from "./routes";
+import { routes, type Route, type RouteContext, type RouteResult } from "./routes";
+import { parse, queryObject } from "./schemas";
 import { MCP_PATH, handleMcpHttp } from "@/mcp/server";
 import { assertIdempotencyKey, runIdempotent } from "./services";
 import type { CredentialStore, IdempotencyRecord, IdempotencyStore, WorldChallengeStore } from "./stores";
@@ -122,9 +123,18 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
   const toResponse = (result: RouteResult | Response): Response =>
     result instanceof Response ? result : json(result.status, result.body, result.headers);
 
+  /** Runs a route: its declared body and query are checked first, so handlers get them valid. */
+  function invoke(route: Route, ctx: RouteContext) {
+    return route.handle({
+      ...ctx,
+      body: route.body ? parse(route.body, ctx.body) : ctx.body,
+      query: route.query ? parse(route.query, queryObject(ctx.url)) : undefined,
+    });
+  }
+
   async function execute(route: Route, ctx: Parameters<Route["handle"]>[0]) {
     try {
-      const result = await route.handle(ctx);
+      const result = await invoke(route, ctx);
       if (result instanceof Response)
         return { response: result, status: result.status, body: null, code: undefined };
       return { response: toResponse(result), status: result.status, body: result.body, code: undefined };
@@ -227,10 +237,10 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
 
       // Reads, and the self-idempotent clock, skip the Idempotency-Key machinery.
       if (head) {
-        const res = toResponse(await route.handle(ctx));
+        const res = toResponse(await invoke(route, ctx));
         return new Response(null, { status: res.status, headers: res.headers });
       }
-      if (route.method !== "POST" || route.selfIdempotent) return toResponse(await route.handle(ctx));
+      if (route.method !== "POST" || route.selfIdempotent) return toResponse(await invoke(route, ctx));
 
       // ---- Idempotent write ----
       const key = request.headers.get("idempotency-key");
