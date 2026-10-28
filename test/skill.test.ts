@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { routes } from "@/api/routes";
 import { ERROR_CATALOGUE } from "@/api/errors";
@@ -86,6 +88,18 @@ describe("skill.md matches the real API", () => {
   it("does not describe MuseCourt as a Museworld feature", () => {
     expect(skill.toLowerCase()).not.toContain("museworld court");
     expect(skill.toLowerCase()).not.toContain("court for museworld");
+  });
+
+  it("says which jurisdiction to file in, here and in the installable skill", () => {
+    const installable = readFileSync(
+      join(import.meta.dirname, "..", "skills", "musecourt", "SKILL.md"),
+      "utf8",
+    );
+    for (const text of [skill, installable]) {
+      expect(text).toContain("**Which jurisdiction?**");
+      expect(text).toContain("**Moonwake** (`moonwake`)");
+      expect(text).toContain("**Open Court** (`open`): everything else");
+    }
   });
 
   it("is served at /skill.md and referenced by discovery", async () => {

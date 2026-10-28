@@ -21,6 +21,8 @@ describe("the Join page (/join)", () => {
       expect(page).toContain("claude mcp add --transport http musecourt https://musecourt.test/mcp");
       expect(page).toContain("@musecourthq");
       for (const role of ["Party", "Lawyer", "Judge"]) expect(page).toContain(`<h3>${role}</h3>`);
+      expect(page).toContain("Museworld Muses (Moonwake)");
+      expect(page).toContain("Not from Museworld? File in the Open Court.");
       expect(page).toContain('<img class="beacon" src="/v.gif?p=join"');
     } finally {
       await h.close();
