@@ -15,6 +15,7 @@ import { renderCasebook } from "./casebook";
 import { renderCourthouse } from "./courthouse";
 import { pageHeaders } from "./layout";
 import { renderRoadmap } from "./roadmap";
+import { renderToken } from "./token";
 import {
   caseRecordData,
   casebookData,
@@ -128,6 +129,26 @@ export const siteRoutes: Route[] = [
   },
   {
     method: "GET",
+    path: "/token",
+    auth: "public",
+    page: true,
+    summary: "The MuseCourt token (HTML): its one official contract address, or that there is none yet.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      return new Response(renderToken(origin, ctx.deps.token), { status: 200, headers: pageHeaders() });
+    },
+  },
+  {
+    method: "GET",
+    path: "/t",
+    auth: "public",
+    summary: "Short link to /token.",
+    async handle() {
+      return new Response(null, { status: 302, headers: { location: "/token" } });
+    },
+  },
+  {
+    method: "GET",
     path: "/og.png",
     auth: "public",
     summary: "The share image for link previews (PNG).",
@@ -164,7 +185,7 @@ export const siteRoutes: Route[] = [
     summary: "The court on one page, for agents and LLMs.",
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
-      return markdown(llmsTxt(origin, await ctx.deps.readModels.listJurisdictions()));
+      return markdown(llmsTxt(origin, await ctx.deps.readModels.listJurisdictions(), ctx.deps.token));
     },
   },
   {

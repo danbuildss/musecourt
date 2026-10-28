@@ -14,6 +14,7 @@ import { routes, type Route, type RouteContext, type RouteResult } from "./route
 import { isDryRun, parse, queryObject } from "./schemas";
 import { MCP_PATH, handleMcpHttp } from "@/mcp/server";
 import { assertIdempotencyKey, runIdempotent } from "./services";
+import type { TokenConfig } from "@/site/token";
 import type { CredentialStore, IdempotencyRecord, IdempotencyStore, WorldChallengeStore } from "./stores";
 
 export interface ApiDeps {
@@ -61,6 +62,8 @@ export interface ApiDeps {
   redirectPagesToOrigin?: boolean;
   /** Receives operational warnings (rejected proofs and world evidence, clock failures). */
   onWarning?: (warning: OpsWarning) => void;
+  /** The community token, once launched (shown on /token and in llms.txt; the court never uses it). */
+  token?: TokenConfig;
 }
 
 export interface RequestInfo {

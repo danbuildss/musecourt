@@ -15,6 +15,7 @@ import { migrate } from "@/infra/migrate";
 import { MOONWAKE_JURISDICTION } from "@/seed/laws";
 import { courtModelFromEnv } from "@/model/llm-court-model";
 import { seedJurisdiction } from "@/seed/seed-court";
+import { tokenFromEnv } from "@/site/token";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 /**
@@ -55,6 +56,7 @@ async function init(): Promise<Handler> {
     redirectPagesToOrigin: process.env.VERCEL_ENV === "production",
     adminToken: process.env.MUSECOURT_ADMIN_TOKEN,
     cronSecret: process.env.MUSECOURT_CRON_SECRET,
+    token: tokenFromEnv(),
     skillMarkdown: loadSkillMarkdown(join(import.meta.dirname, "skill.md")),
     museworldGuide: loadMuseworldGuide(join(import.meta.dirname, "museworld-guide.html")),
     registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),

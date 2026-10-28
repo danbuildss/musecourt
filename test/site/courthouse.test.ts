@@ -55,7 +55,8 @@ describe("the Courthouse (/)", () => {
           '<p class="footer-official">Official: <a href="/">musecourt.xyz</a> · ' +
             '<a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · ' +
             '<a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. ' +
-            "Token news comes only from these. We never DM first.</p>",
+            'Token news comes only from these, and the one contract address lives at <a href="/token">musecourt.xyz/token</a>. ' +
+            "We never DM first.</p>",
         );
       }
     } finally {

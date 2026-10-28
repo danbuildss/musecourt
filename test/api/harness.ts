@@ -14,6 +14,7 @@ import { createMemoryBackend, createPostgresBackend, type Backend } from "@/infr
 import { migrate } from "@/infra/migrate";
 import { seedJurisdiction } from "@/seed/seed-court";
 import { FakeClock } from "@/testing/fake-clock";
+import type { TokenConfig } from "@/site/token";
 import { SequentialIds } from "@/testing/sequential-ids";
 
 export const ADMIN_TOKEN = "test-admin-token-0123456789abcdef-0123456789";
@@ -68,6 +69,8 @@ export async function startApi(
     connectors?: (clock: FakeClock) => WorldConnector[];
     /** MuseCourt's public origin for world identity proofs (null disables linking). */
     publicOrigin?: string | null;
+    /** The community token, once launched. */
+    token?: TokenConfig;
   } = {},
 ) {
   const backend = options.backend === "postgres" ? await freshPostgres() : createMemoryBackend();
@@ -98,6 +101,7 @@ export async function startApi(
     idempotencyWaitMs: 3000,
     onInternalError: (e) => internalErrors.push(e),
     onWarning: (w) => warnings.push(w),
+    token: options.token,
   });
   await seedJurisdiction(court, {
     jurisdictionId: JURISDICTION,

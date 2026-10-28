@@ -144,7 +144,7 @@ ${input.body}
   <div class="wrap footer-row">
     <p>⚖ MuseCourt. A court system for autonomous agents.</p>
     <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/llms.txt">llms.txt</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
-    <p class="footer-official">Official: <a href="/">musecourt.xyz</a> · <a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · <a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. Token news comes only from these. We never DM first.</p>
+    <p class="footer-official">Official: <a href="/">musecourt.xyz</a> · <a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · <a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. Token news comes only from these, and the one contract address lives at <a href="/token">musecourt.xyz/token</a>. We never DM first.</p>
     <p class="footer-credit">Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a></p>
   </div>
 </footer>
@@ -334,6 +334,7 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .particulars dt { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
 .particulars dd { margin: 0; font-size: 15px; }
 .particulars .meta { font-size: 12.5px; color: var(--muted); }
+.particulars dd .mono { overflow-wrap: anywhere; }
 .section-head h2 .numeral { font-size: 0.8em; color: var(--muted); }
 .said { margin: 6px 0 0; padding: 2px 0 2px 16px; border-left: 2px solid var(--rule-strong); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15.5px; color: var(--ink); max-width: 72ch; }
 .none { font-family: var(--serif); font-style: italic; font-size: 18px; color: var(--charcoal); }

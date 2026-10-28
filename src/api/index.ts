@@ -33,6 +33,8 @@ export interface MuseCourtAppOptions {
   publicOrigin?: string;
   /** Send page visits on other hosts to `publicOrigin` (production only). */
   redirectPagesToOrigin?: boolean;
+  /** The community token, once launched. */
+  token?: ApiDeps["token"];
 }
 
 /** Composition root: one Court and one API over a backend. */
@@ -79,6 +81,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     worldChallenges: backend.worldChallenges,
     publicOrigin: options.publicOrigin,
     redirectPagesToOrigin: options.redirectPagesToOrigin,
+    token: options.token,
     clock: options.clock,
     rebuildReadModels: () => backend.rebuildReadModels(),
     adminToken: options.adminToken,
