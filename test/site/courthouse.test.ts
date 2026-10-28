@@ -46,6 +46,23 @@ describe("the Courthouse (/)", () => {
     }
   });
 
+  it("names the official site and accounts in the footer of every page", async () => {
+    const h = await startApi();
+    try {
+      for (const path of ["/", "/casebook", "/join", "/roadmap", "/stats"]) {
+        const html = String((await h.get(path)).body);
+        expect(html, path).toContain(
+          '<p class="footer-official">Official: <a href="/">musecourt.xyz</a> · ' +
+            '<a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · ' +
+            '<a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. ' +
+            "Token news comes only from these. We never DM first.</p>",
+        );
+      }
+    } finally {
+      await h.close();
+    }
+  });
+
   it("shows only real records: empty states when nothing exists", async () => {
     const h = await startApi();
     try {
