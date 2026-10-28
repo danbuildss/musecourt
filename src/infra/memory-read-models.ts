@@ -62,6 +62,13 @@ export class MemoryReadModels implements ReadModels, ReadModelWriter {
 
   // ---- queries ----
 
+  async findCaseIdByNumber(caseNumber: string): Promise<string | null> {
+    const wanted = caseNumber.toUpperCase();
+    for (const row of this.cases.values())
+      if (row.summary.caseNumber.toUpperCase() === wanted) return row.summary.caseId;
+    return null;
+  }
+
   async getCaseView(caseId: string): Promise<CaseView | null> {
     return structuredClone(this.cases.get(caseId)?.view ?? null);
   }

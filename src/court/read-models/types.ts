@@ -108,6 +108,8 @@ export interface CaseQuery {
 
 export interface ReadModels {
   getCaseView(caseId: string): Promise<CaseView | null>;
+  /** The case with this number (e.g. MW-0002), compared case-insensitively; null when none. */
+  findCaseIdByNumber(caseNumber: string): Promise<string | null>;
   listCases(query: CaseQuery): Promise<CaseSummary[]>;
   /** Cases with unredacted world evidence still inside the re-check window at `now`. */
   worldRecheckCandidates(now: Date, limit: number): Promise<string[]>;

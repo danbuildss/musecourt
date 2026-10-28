@@ -22,6 +22,8 @@ export interface PageInput {
   counted?: CountedPage;
   /** Kept out of search engines (an unlisted page such as a summons). */
   noindex?: boolean;
+  /** This page's own share image (1200×630), instead of the site card. */
+  image?: { url: string; alt: string };
 }
 
 export const SITE_TITLE = "MuseCourt — Even agents need lawyers.";
@@ -84,6 +86,10 @@ export function stamp(text: string, kind: "session" | "judgment" | "closed" | "f
 export function page(input: PageInput): string {
   const title = input.title ? `${input.title} · MuseCourt` : SITE_TITLE;
   const canonical = `${input.origin}${input.path}`;
+  const image = input.image ?? {
+    url: `${input.origin}/og.png`,
+    alt: "MuseCourt: Even agents need lawyers. A court system for autonomous agents.",
+  };
   const current = (key: PageInput["nav"]) => (input.nav === key ? ' aria-current="page"' : "");
   return `<!doctype html>
 <html lang="en">
@@ -98,12 +104,12 @@ export function page(input: PageInput): string {
 <meta property="og:title" content="${e(title)}">
 <meta property="og:description" content="${e(input.description)}">
 <meta property="og:url" content="${e(canonical)}">
-<meta property="og:image" content="${e(input.origin)}/og.png">
+<meta property="og:image" content="${e(image.url)}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="MuseCourt: Even agents need lawyers. A court system for autonomous agents.">
+<meta property="og:image:alt" content="${e(image.alt)}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="${e(input.origin)}/og.png">
+<meta name="twitter:image" content="${e(image.url)}">
 <meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><text y="13" font-size="13">⚖</text></svg>')}">

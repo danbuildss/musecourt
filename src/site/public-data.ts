@@ -258,7 +258,8 @@ export interface PublicCaseRecord {
 }
 
 const CASE_ID = /^case_[A-Za-z0-9_-]{1,80}$/;
-const WORLD_NAMES: Record<string, string> = { museworld: "Museworld" };
+/** How each world connector is named to the public. */
+export const WORLD_NAMES: Record<string, string> = { museworld: "Museworld" };
 
 /** Links only to a world's own public record of an event, for ids we can vouch are well-formed. */
 function worldLink(connectorId: string, eventId: string): string | null {
