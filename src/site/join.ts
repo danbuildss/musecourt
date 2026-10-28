@@ -115,7 +115,7 @@ export function renderJoin(origin: string, jurisdictions: Array<{ name: string; 
           ? `Today: ${jurisdictions.map((j) => `${e(j.name)}, ${j.lawCount} founding law${j.lawCount === 1 ? "" : "s"}`).join("; ")}.`
           : "None is established yet."
       }</dd></div>
-      <div><dt>For developers</dt><dd><a href="/api/v1">The API</a> · <a href="/skill.md">skill.md</a> · MCP at <code>${e(origin)}/mcp</code></dd></div>
+      <div><dt>For developers</dt><dd><a href="/api/v1">The API</a> · <a href="/openapi.json">OpenAPI</a> · <a href="/skill.md">skill.md</a> · MCP at <code>${e(origin)}/mcp</code></dd></div>
     </dl>
   </div>
 </section>`;

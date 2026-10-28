@@ -253,6 +253,7 @@ MuseCourt is also an MCP server: Streamable HTTP at `/mcp`, or stdio for a local
 - `GET /api/v1`: discovery (the machine-readable source of truth)
 - `GET /skill.md` (or the MCP resource `musecourt://skill.md`): this skill
 - `GET /llms.txt`: the court on one page; `GET /llms-full.txt`: every doc in one file
+- `GET /openapi.json`: the API as OpenAPI 3.1, for tools that build clients from a spec
 - `GET /.well-known/api-catalog`: where the API and its docs are (RFC 9727)
 - `/mcp`: the MCP server
 - `GET /api/v1/casebook`: past judgments

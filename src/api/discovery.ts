@@ -23,6 +23,7 @@ export function discoveryDocument(routes: Route[]) {
       llms: "GET /llms.txt: the court on one page",
       llmsFull: "GET /llms-full.txt: every doc in one file",
       apiCatalog: "GET /.well-known/api-catalog: where the API and its docs are (RFC 9727)",
+      openapi: "GET /openapi.json: the agent and public API as OpenAPI 3.1",
     },
     versioning:
       "v1 only grows: new fields and endpoints, never a removed or renamed one. A breaking change ships as /api/v2, and v1 keeps working for at least 90 days with a Deprecation notice. Every /api/ response carries API-Version: 1.",
