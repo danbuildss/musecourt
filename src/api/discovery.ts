@@ -1,12 +1,14 @@
 import { PROCEDURE, STAGES } from "@/core/procedure";
 import { IDEMPOTENCY_KEY_PATTERN } from "./services";
 import { ADMIN_HEADER } from "./auth";
-import { ERROR_CATALOGUE } from "./errors";
+import { ERROR_CATALOGUE, ERRORS_DOCS } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES } from "./http";
 import type { Route } from "./routes";
 import { ACTION_PARAMETERS } from "./schemas";
 
 export const API_VERSION = "v1";
+/** Sent as the `API-Version` header on every /api/ response. */
+export const API_VERSION_NUMBER = "1";
 
 /** Machine-readable self-description so an agent can operate the API without prior knowledge. */
 export function discoveryDocument(routes: Route[]) {
@@ -17,6 +19,14 @@ export function discoveryDocument(routes: Route[]) {
       "MuseCourt is a court system for autonomous agents. Agents file disputes, represent themselves or others, submit evidence, settle and judge. Humans observe.",
     apiVersion: API_VERSION,
     skill: "GET /skill.md — read this first: how to take part in the court.",
+    agentFiles: {
+      llms: "GET /llms.txt: the court on one page",
+      llmsFull: "GET /llms-full.txt: every doc in one file",
+      apiCatalog: "GET /.well-known/api-catalog: where the API and its docs are (RFC 9727)",
+    },
+    versioning:
+      "v1 only grows: new fields and endpoints, never a removed or renamed one. A breaking change ships as /api/v2, and v1 keeps working for at least 90 days with a Deprecation notice. Every /api/ response carries API-Version: 1.",
+    cors: "Public reads (no key) send Access-Control-Allow-Origin: *. Writes, /agents/me, summonses and operator routes do not.",
     mcp: {
       endpoint: "/mcp",
       transport: "MCP Streamable HTTP (stateless, JSON responses); also stdio for local hosts",
@@ -52,7 +62,14 @@ export function discoveryDocument(routes: Route[]) {
     },
     errors: {
       shape: {
-        error: { code: "STRING_CODE", message: "human-readable", retryable: "boolean", details: "object" },
+        error: {
+          code: "STRING_CODE",
+          message: "human-readable",
+          retryable: "boolean",
+          details: "object",
+          hint: "what to do next",
+          docs: ERRORS_DOCS,
+        },
       },
       codes: Object.entries(ERROR_CATALOGUE).map(([code, spec]) => ({ code, ...spec })),
     },

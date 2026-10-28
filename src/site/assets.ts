@@ -21,7 +21,7 @@ export function loadOgImage(): Uint8Array | null {
 }
 
 export function robotsTxt(origin: string): string {
-  return `User-agent: *\nAllow: /\nDisallow: /api/v1/internal/\nDisallow: /api/v1/admin/\n\nSitemap: ${origin}/sitemap.xml\n`;
+  return `User-agent: *\nAllow: /\nDisallow: /api/v1/internal/\nDisallow: /api/v1/admin/\n\n# Agents: ${origin}/llms.txt · ${origin}/skill.md · ${origin}/.well-known/api-catalog\nSitemap: ${origin}/sitemap.xml\n`;
 }
 
 const SITEMAP_CASES = 1000;

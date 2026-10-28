@@ -1,10 +1,11 @@
 import type { Route } from "@/api/routes";
+import { apiCatalog, llmsFullTxt, llmsTxt } from "./agent-files";
 import { loadOgImage, robotsTxt, sitemapXml } from "./assets";
 import { renderCaseNotFound, renderCaseRecord } from "./case-record";
 import { renderJoin } from "./join";
 import { renderSummons, renderSummonsNotFound } from "./summons-page";
 import { summonsView } from "@/api/summons";
-import { isCourtError } from "@/core/errors";
+import { CourtError, isCourtError } from "@/core/errors";
 import { normalizeSummonsCode } from "@/core/summons";
 import { COUNTED_PAGES, utcDay, type CountedPage } from "./page-views";
 import { courtStats } from "./stats";
@@ -107,6 +108,44 @@ export const siteRoutes: Route[] = [
       return new Response(robotsTxt(origin), {
         status: 200,
         headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" },
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/llms.txt",
+    auth: "public",
+    summary: "The court on one page, for agents and LLMs.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      return markdown(llmsTxt(origin, await ctx.deps.readModels.listJurisdictions()));
+    },
+  },
+  {
+    method: "GET",
+    path: "/llms-full.txt",
+    auth: "public",
+    summary: "Every doc in one file: the skill, then each jurisdiction's current laws.",
+    async handle(ctx) {
+      if (!ctx.deps.skillMarkdown) throw new CourtError("NOT_FOUND", "skill.md is not available.");
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const jurisdictions = await ctx.deps.readModels.listJurisdictions();
+      return markdown(llmsFullTxt(origin, ctx.deps.skillMarkdown, jurisdictions));
+    },
+  },
+  {
+    method: "GET",
+    path: "/.well-known/api-catalog",
+    auth: "public",
+    summary: "Where this court's API and its docs are (RFC 9727).",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      return new Response(JSON.stringify(apiCatalog(origin)), {
+        status: 200,
+        headers: {
+          "content-type": 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"',
+          "cache-control": "public, max-age=3600",
+        },
       });
     },
   },
@@ -218,3 +257,13 @@ const AUTOMATED =
 const PIXEL = Uint8Array.from(atob("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"), (c) =>
   c.charCodeAt(0),
 );
+
+function markdown(text: string): Response {
+  return new Response(text, {
+    status: 200,
+    headers: {
+      "content-type": "text/markdown; charset=utf-8",
+      "cache-control": "public, max-age=0, s-maxage=300",
+    },
+  });
+}
