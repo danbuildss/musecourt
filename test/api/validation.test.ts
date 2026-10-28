@@ -161,6 +161,8 @@ describe.each(BACKENDS)("request validation and errors (%s)", (backend) => {
             message: "Unexpected server error.",
             retryable: true,
             details: {},
+            hint: "Retry the same request with the same Idempotency-Key.",
+            docs: "/skill.md#10-errors",
           },
         });
         expect(JSON.stringify(res.body)).not.toMatch(/postgres:|stack|at .*\.ts/);

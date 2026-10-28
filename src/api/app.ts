@@ -5,6 +5,7 @@ import type { Court } from "@/court/court";
 import type { ReadModels } from "@/court/read-models/types";
 import type { CourtClock } from "@/court/court-clock";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
+import { API_VERSION_NUMBER } from "./discovery";
 import { ApiError, toErrorBody } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFingerprint } from "./http";
 import { warningForError, type OpsWarning } from "./ops";
@@ -154,77 +155,106 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
   const replay = (record: IdempotencyRecord) =>
     json(record.responseStatus!, record.responseBody, { "idempotent-replayed": "true" });
 
+  /**
+   * Headers every response gets on the way out: the API version on /api/ paths, and open CORS on
+   * public reads (pages, the record, the skill and agent files). Writes, `me`, admin, internal and
+   * summons routes never get CORS.
+   */
+  function finish(request: Request, response: Response): Response {
+    const { pathname } = new URL(request.url);
+    const extra: Record<string, string> = {};
+    if (pathname.startsWith("/api/")) extra["api-version"] = API_VERSION_NUMBER;
+    if (request.method === "GET" || request.method === "HEAD") {
+      const found = match("GET", pathname);
+      if (
+        found &&
+        found !== "METHOD_NOT_ALLOWED" &&
+        found.route.auth === "public" &&
+        !/\/summons(es)?(\/|$)/.test(found.route.path)
+      )
+        extra["access-control-allow-origin"] = "*";
+    }
+    if (!Object.keys(extra).length) return response;
+    const headers = new Headers(response.headers);
+    for (const [name, value] of Object.entries(extra)) headers.set(name, value);
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
+
   return {
     async fetch(request, info) {
-      try {
-        const url = new URL(request.url);
-        if (url.pathname.replace(/\/+$/, "") === MCP_PATH) {
-          return await handleMcpHttp(deps, request, clientIpOf(request, info), maxBodyBytes);
-        }
-        // HEAD reads a public GET's headers (link previews, monitors); it never reaches a route that acts.
-        const head = request.method === "HEAD";
-        const found = match(head ? "GET" : request.method, url.pathname);
-        if (found === "METHOD_NOT_ALLOWED" || (head && found && found.route.auth !== "public"))
-          throw new ApiError("METHOD_NOT_ALLOWED", `${request.method} is not allowed here.`);
-        if (!found) throw new ApiError("NOT_FOUND", `No route for ${url.pathname}.`);
-        const { route, params } = found;
-        const moved = route.page ? pageRedirect(url) : null;
-        if (moved) return moved;
-        const now = deps.clock.now();
-        const clientIp = clientIpOf(request, info);
-
-        let principal: Principal | null = null;
-        if (route.auth === "agent") {
-          principal = await authenticateAgent(request, deps.credentials, now, async (agentId) =>
-            Boolean(await deps.readModels.getAgent(agentId)),
-          );
-        }
-        if (route.auth === "admin") principal = authenticateAdmin(request, deps.adminToken);
-        if (route.auth === "cron") principal = authenticateCron(request, deps.cronSecret);
-
-        if (
-          route.rateLimited &&
-          deps.registrationLimiter &&
-          !deps.registrationLimiter.hit(`register:${clientIp}`, now)
-        ) {
-          throw new ApiError("RATE_LIMITED", "Too many registrations from this address. Retry later.");
-        }
-
-        const body =
-          route.method === "POST" && !route.bodyless ? await readJsonBody(request, maxBodyBytes) : undefined;
-        const ctx = { request, url, params, body, principal, deps, now, clientIp };
-
-        // Reads, and the self-idempotent clock, skip the Idempotency-Key machinery.
-        if (head) {
-          const res = toResponse(await route.handle(ctx));
-          return new Response(null, { status: res.status, headers: res.headers });
-        }
-        if (route.method !== "POST" || route.selfIdempotent) return toResponse(await route.handle(ctx));
-
-        // ---- Idempotent write ----
-        const key = request.headers.get("idempotency-key");
-        if (!key)
-          throw new ApiError("IDEMPOTENCY_KEY_REQUIRED", "POST requests need an Idempotency-Key header.");
-        assertIdempotencyKey(key, "Idempotency-Key");
-        const scope =
-          principal?.kind === "agent" ? `agent:${principal.agentId}` : (principal?.kind ?? "public");
-        return await runIdempotent(deps, {
-          scope,
-          key,
-          fingerprint: requestFingerprint(request.method, url.pathname, body),
-          now,
-          execute: async () => {
-            const outcome = await execute(route, ctx);
-            const stored = route.redactForStorage ? route.redactForStorage(outcome.body) : outcome.body;
-            return { result: outcome.response, status: outcome.status, body: stored, code: outcome.code };
-          },
-          replay: async (record) => (await route.onReplay?.(ctx, record, scope)) ?? replay(record),
-        });
-      } catch (error) {
-        const { body } = toErrorBody(error);
-        if (body.error.code === "INTERNAL_ERROR") deps.onInternalError?.(error);
-        return errorResponse(error);
-      }
+      return finish(request, await handle(request, info));
     },
   };
+
+  async function handle(request: Request, info?: RequestInfo): Promise<Response> {
+    try {
+      const url = new URL(request.url);
+      if (url.pathname.replace(/\/+$/, "") === MCP_PATH) {
+        return await handleMcpHttp(deps, request, clientIpOf(request, info), maxBodyBytes);
+      }
+      // HEAD reads a public GET's headers (link previews, monitors); it never reaches a route that acts.
+      const head = request.method === "HEAD";
+      const found = match(head ? "GET" : request.method, url.pathname);
+      if (found === "METHOD_NOT_ALLOWED" || (head && found && found.route.auth !== "public"))
+        throw new ApiError("METHOD_NOT_ALLOWED", `${request.method} is not allowed here.`);
+      if (!found) throw new ApiError("NOT_FOUND", `No route for ${url.pathname}.`);
+      const { route, params } = found;
+      const moved = route.page ? pageRedirect(url) : null;
+      if (moved) return moved;
+      const now = deps.clock.now();
+      const clientIp = clientIpOf(request, info);
+
+      let principal: Principal | null = null;
+      if (route.auth === "agent") {
+        principal = await authenticateAgent(request, deps.credentials, now, async (agentId) =>
+          Boolean(await deps.readModels.getAgent(agentId)),
+        );
+      }
+      if (route.auth === "admin") principal = authenticateAdmin(request, deps.adminToken);
+      if (route.auth === "cron") principal = authenticateCron(request, deps.cronSecret);
+
+      if (
+        route.rateLimited &&
+        deps.registrationLimiter &&
+        !deps.registrationLimiter.hit(`register:${clientIp}`, now)
+      ) {
+        throw new ApiError("RATE_LIMITED", "Too many registrations from this address. Retry later.");
+      }
+
+      const body =
+        route.method === "POST" && !route.bodyless ? await readJsonBody(request, maxBodyBytes) : undefined;
+      const ctx = { request, url, params, body, principal, deps, now, clientIp };
+
+      // Reads, and the self-idempotent clock, skip the Idempotency-Key machinery.
+      if (head) {
+        const res = toResponse(await route.handle(ctx));
+        return new Response(null, { status: res.status, headers: res.headers });
+      }
+      if (route.method !== "POST" || route.selfIdempotent) return toResponse(await route.handle(ctx));
+
+      // ---- Idempotent write ----
+      const key = request.headers.get("idempotency-key");
+      if (!key)
+        throw new ApiError("IDEMPOTENCY_KEY_REQUIRED", "POST requests need an Idempotency-Key header.");
+      assertIdempotencyKey(key, "Idempotency-Key");
+      const scope =
+        principal?.kind === "agent" ? `agent:${principal.agentId}` : (principal?.kind ?? "public");
+      return await runIdempotent(deps, {
+        scope,
+        key,
+        fingerprint: requestFingerprint(request.method, url.pathname, body),
+        now,
+        execute: async () => {
+          const outcome = await execute(route, ctx);
+          const stored = route.redactForStorage ? route.redactForStorage(outcome.body) : outcome.body;
+          return { result: outcome.response, status: outcome.status, body: stored, code: outcome.code };
+        },
+        replay: async (record) => (await route.onReplay?.(ctx, record, scope)) ?? replay(record),
+      });
+    } catch (error) {
+      const { body } = toErrorBody(error);
+      if (body.error.code === "INTERNAL_ERROR") deps.onInternalError?.(error);
+      return errorResponse(error);
+    }
+  }
 }

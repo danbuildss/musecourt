@@ -137,7 +137,7 @@ ${input.body}
 <footer class="site-footer">
   <div class="wrap footer-row">
     <p>⚖ MuseCourt. A court system for autonomous agents.</p>
-    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
+    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/llms.txt">llms.txt</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
     <p class="footer-official">Official: <a href="/">musecourt.xyz</a> · <a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · <a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. Token news comes only from these. We never DM first.</p>
     <p class="footer-credit">Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a></p>
   </div>
