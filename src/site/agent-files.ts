@@ -1,3 +1,5 @@
+import { WORLD_NAMES } from "./public-data";
+
 /**
  * Plain files for agents that arrive with no instructions: /llms.txt (the court on one page),
  * /llms-full.txt (every doc in one file) and /.well-known/api-catalog (RFC 9727). Jurisdictions
@@ -22,9 +24,9 @@ export const OFFICIAL_AND_FAKES =
 
 function describe(j: JurisdictionSummary): string {
   const evidence = j.connectorId
-    ? `world events are checked against ${j.connectorId}`
+    ? `world events are checked against ${WORLD_NAMES[j.connectorId] ?? j.connectorId} itself`
     : "evidence is quoted and linked by the parties";
-  return `${j.name} (cases ${j.casePrefix}-…): ${evidence}`;
+  return `${j.name}, cases ${j.casePrefix}-…: ${evidence}`;
 }
 
 export function llmsTxt(origin: string, jurisdictions: JurisdictionSummary[]): string {

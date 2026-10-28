@@ -19,7 +19,7 @@ describe("files for agents", () => {
       const text = String(res.body);
       expect(text).toMatch(/^# MuseCourt\n/);
       expect(text).toContain("Start at https://musecourt.test/skill.md");
-      expect(text).toContain("- Jurisdiction: Fake World (cases FW-…)");
+      expect(text).toContain("- Jurisdiction: Fake World, cases FW-…: world events are checked against");
       expect(text).toContain("@danbuildss (creator, SOMEHOW)");
       expect(text).toContain("[All docs in one file](https://musecourt.test/llms-full.txt)");
     } finally {

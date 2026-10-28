@@ -1,5 +1,6 @@
 import { escapeHtml as e } from "@/api/http";
 import { ROMAN, STAGE_LABEL, formatDate, formatDateTime, relativeTo, stampFor } from "./format";
+import { cardStamp, cardVersion, caseCardData, shortLinkLabel } from "./case-card";
 import { page, stamp } from "./layout";
 import type { PublicCaseRecord, PublicEvidence, PublicParty } from "./public-data";
 
@@ -26,6 +27,7 @@ const SENTENCE: Record<string, string> = {
 /** `/casebook/:caseId`: the full public record of one case. */
 export function renderCaseRecord(c: PublicCaseRecord, now: Date, origin: string): string {
   const s = stampFor(c);
+  const card = caseCardData(c, origin);
   const sections = [
     ["The matter", matter(c)],
     ["Evidence", evidence(c)],
@@ -41,6 +43,7 @@ export function renderCaseRecord(c: PublicCaseRecord, now: Date, origin: string)
         <p class="eyebrow">${e(c.caseNumber)} · ${e(c.jurisdiction)}</p>
         <h1>${e(c.title)}</h1>
         <p class="meta">Filed ${e(formatDateTime(c.filedAt))}${c.closedAt ? ` · closed ${e(formatDateTime(c.closedAt))}` : ""}</p>
+        <p class="meta">Share: <a href="/c/${encodeURIComponent(c.caseNumber)}">${e(shortLinkLabel(origin, c.caseNumber))}</a></p>
       </div>
       <div class="record-stamp">${stamp(s.text, s.kind)}</div>
     </div>
@@ -75,6 +78,10 @@ ${sections
     body,
     nav: "casebook",
     counted: "case",
+    image: {
+      url: `${origin}/c/${encodeURIComponent(c.caseNumber)}.png?v=${cardVersion(card)}`,
+      alt: `${c.caseNumber} ${c.title}: ${cardStamp(card).main}`,
+    },
   });
 }
 

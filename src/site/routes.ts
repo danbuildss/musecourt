@@ -1,6 +1,7 @@
 import type { Route } from "@/api/routes";
 import { apiCatalog, llmsFullTxt, llmsTxt } from "./agent-files";
 import { loadOgImage, robotsTxt, sitemapXml } from "./assets";
+import { caseCardData, renderCaseCard } from "./case-card";
 import { renderCaseNotFound, renderCaseRecord } from "./case-record";
 import { renderJoin } from "./join";
 import { renderSummons, renderSummonsNotFound } from "./summons-page";
@@ -64,6 +65,51 @@ export const siteRoutes: Route[] = [
       return record
         ? new Response(renderCaseRecord(record, ctx.now, origin), { status: 200, headers: pageHeaders() })
         : new Response(renderCaseNotFound(origin), { status: 404, headers: pageHeaders() });
+    },
+  },
+  {
+    method: "GET",
+    path: "/c/:ref",
+    auth: "public",
+    summary: "Short link to a case by its number (/c/MW-0002), or its share card (/c/MW-0002.png).",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const ref = ctx.params.ref ?? "";
+      const wantsCard = /\.png$/i.test(ref);
+      const number = ref.replace(/\.png$/i, "");
+      const caseId = /^[A-Za-z]{2,6}-\d{1,9}$/.test(number)
+        ? await ctx.deps.readModels.findCaseIdByNumber(number)
+        : null;
+      const record = caseId ? await caseRecordData(ctx.deps, caseId) : null;
+      if (!record) {
+        return wantsCard
+          ? new Response("No case has that number.", {
+              status: 404,
+              headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+            })
+          : new Response(renderCaseNotFound(origin), { status: 404, headers: pageHeaders() });
+      }
+      if (!wantsCard) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location: `/casebook/${encodeURIComponent(record.caseId)}`,
+            "cache-control": "public, max-age=300",
+          },
+        });
+      }
+      const png = await renderCaseCard(caseCardData(record, origin));
+      return new Response(png, {
+        status: 200,
+        headers: {
+          "content-type": "image/png",
+          "cache-control":
+            record.status === "CLOSED"
+              ? "public, max-age=3600, s-maxage=86400"
+              : "public, max-age=60, s-maxage=300",
+          "x-content-type-options": "nosniff",
+        },
+      });
     },
   },
   {

@@ -146,6 +146,14 @@ function toAgent(r: AgentDbRow): AgentRow {
 export class PostgresReadModels implements ReadModels {
   constructor(private readonly db: Queryable) {}
 
+  async findCaseIdByNumber(caseNumber: string): Promise<string | null> {
+    const { rows } = await this.db.query<{ case_id: string }>(
+      "SELECT case_id FROM musecourt.rm_cases WHERE case_number = upper($1)",
+      [caseNumber],
+    );
+    return rows[0]?.case_id ?? null;
+  }
+
   async getCaseView(caseId: string): Promise<CaseView | null> {
     const { rows } = await this.db.query<{ view: CaseView }>(
       "SELECT view FROM musecourt.rm_cases WHERE case_id = $1",
