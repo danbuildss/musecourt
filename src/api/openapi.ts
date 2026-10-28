@@ -82,8 +82,9 @@ export function openApiDocument(routes: Route[], origin: string) {
         name: "Idempotency-Key",
         in: "header",
         required: true,
-        description:
-          "A fresh UUID per action. Retry the same action with the same key; a different request needs a new key.",
+        description: route.dryRunnable
+          ? "A fresh UUID per action. Retry the same action with the same key; a different request needs a new key. Not needed (and not recorded) with ?dry=1."
+          : "A fresh UUID per action. Retry the same action with the same key; a different request needs a new key.",
         schema: { type: "string", pattern: IDEMPOTENCY_KEY_PATTERN.source },
       });
     }

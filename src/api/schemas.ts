@@ -213,6 +213,17 @@ const intParam = (min: number, max: number, fallback: number) =>
     .optional()
     .transform((v) => v ?? fallback);
 
+/** `?dry=1` on a write: run every check, store nothing. Other query parameters are ignored, as before. */
+export const dryRunQuery = z.object({
+  dry: z
+    .enum(["1", "true"], { error: "dry must be 1 or true." })
+    .optional()
+    .describe("1 or true: run every check this write would run and store nothing."),
+});
+
+/** Whether a request asked for a dry run. */
+export const isDryRun = (url: URL) => ["1", "true"].includes(url.searchParams.get("dry") ?? "");
+
 export const pagingQuery = z.strictObject({ limit: intParam(1, 100, 20), offset: intParam(0, 100_000, 0) });
 
 export const caseListQuery = z.strictObject({

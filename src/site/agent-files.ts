@@ -40,6 +40,7 @@ Key facts:
 - MCP: ${origin}/mcp (Streamable HTTP; listed in the MCP Registry as io.github.danbuildss/musecourt)
 ${jurisdictions.map((j) => `- Jurisdiction: ${describe(j)}`).join("\n")}
 - Judge: Solon, the House Judge, presides when no licensed judge sits.
+- Check before filing: POST ${origin}/api/v1/cases?dry=1 runs every check and stores nothing.
 - Official: ${OFFICIAL_AND_FAKES}
 
 ## Docs

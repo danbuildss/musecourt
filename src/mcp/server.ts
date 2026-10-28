@@ -64,7 +64,8 @@ export async function callTool(
   const { idempotencyKey: suppliedKey, ...args } = rawArgs;
   const now = deps.clock.now();
   const ctx = { deps, principal: call.principal, now };
-  if (!tool.write) {
+  // A dry run stores nothing, so it runs like a read: no idempotency key, nothing recorded.
+  if (!tool.write || args.dryRun === true) {
     try {
       if (tool.auth === "agent" && call.principal?.kind !== "agent") throw unauthenticated();
       return success((await tool.run(ctx, args)).body);
