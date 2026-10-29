@@ -235,7 +235,8 @@ export interface PublicCaseRecord {
   outcome: CaseOutcome | null;
   filedAt: string;
   closedAt: string | null;
-  stage: { name: Stage; deadline: string | null } | null;
+  /** While adjourned, `deadline` is when the hearing resumes. */
+  stage: { name: Stage; deadline: string | null; adjournedUntil: string | null } | null;
   parties: PublicParty[];
   judge: string | null;
   charges: Array<{ lawId: string; article: number; title: string; version: number; text: string }>;
@@ -312,7 +313,9 @@ export async function caseRecordData(deps: ApiDeps, caseId: string): Promise<Pub
     outcome: view.outcome,
     filedAt: view.filedAt,
     closedAt: view.closedAt,
-    stage: view.stage ? { name: view.stage.name, deadline: view.stage.deadline } : null,
+    stage: view.stage
+      ? { name: view.stage.name, deadline: view.stage.deadline, adjournedUntil: view.stage.adjournedUntil }
+      : null,
     parties: [
       party("PLAINTIFF", view.parties.plaintiff, plaintiff),
       party("DEFENCE", view.parties.defendant, defendant),

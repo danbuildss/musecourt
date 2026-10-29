@@ -1,6 +1,15 @@
 import { counselOf, partyOf, representativeOf, sideOfMember, type CaseState } from "@/core/case-state";
 import { isCourtError } from "@/core/errors";
-import { PROCEDURE, SIDES, otherSide, type CaseAction, type Side, type Stage } from "@/core/procedure";
+import {
+  JUDGE_SCHEDULING,
+  PROCEDURE,
+  SIDES,
+  otherSide,
+  type CaseAction,
+  type SchedulingAction,
+  type Side,
+  type Stage,
+} from "@/core/procedure";
 import type { RegistryState } from "@/core/registry";
 import { assertCanTakeRole, counselRoleFor } from "@/core/roles";
 
@@ -19,7 +28,9 @@ export type TaskKind =
   | "ANSWER_QUESTIONS"
   | "MAKE_CLOSING_STATEMENT"
   | "ISSUE_VERDICT"
-  | "REVIEW_SETTLEMENT_OFFER";
+  | "REVIEW_SETTLEMENT_OFFER"
+  | "PROVIDE_ORDERED_EVIDENCE"
+  | "RULE_ON_REQUEST";
 
 export interface AgentTask {
   caseId: string;
@@ -29,7 +40,7 @@ export interface AgentTask {
   stage: Stage;
   deadline: string;
   side: Side | null;
-  allowedActions: readonly CaseAction[];
+  allowedActions: readonly (CaseAction | SchedulingAction)[];
   detail: string;
 }
 
@@ -47,19 +58,56 @@ export function tasksForCase(agentId: string, state: CaseState): AgentTask[] {
   const stage = state.stage;
   const spec = PROCEDURE[stage];
   const tasks: AgentTask[] = [];
-  const add = (kind: TaskKind, side: Side | null, detail: string) =>
+  const isJudge = state.judge?.kind === "AGENT" && state.judge.agentId === agentId;
+  const add = (
+    kind: TaskKind,
+    side: Side | null,
+    detail: string,
+    extra: { deadline?: string; allowedActions?: readonly (CaseAction | SchedulingAction)[] } = {},
+  ) =>
     tasks.push({
       caseId: state.caseId,
       caseNumber: state.caseNumber,
       title: state.title,
       kind,
       stage,
-      deadline: state.deadline!,
+      deadline: extra.deadline ?? state.deadline!,
       side,
-      allowedActions: spec.allowedActions,
+      allowedActions:
+        extra.allowedActions ??
+        (isJudge ? [...spec.allowedActions, ...JUDGE_SCHEDULING] : spec.allowedActions),
       detail,
     });
-  const isJudge = state.judge?.kind === "AGENT" && state.judge.agentId === agentId;
+
+  for (const order of state.evidenceOrders) {
+    if (!order.answeredBy && representativeOf(state, order.side) === agentId) {
+      add("PROVIDE_ORDERED_EVIDENCE", order.side, `Order ${order.orderId}: ${order.request}`, {
+        deadline: order.dueBy,
+        allowedActions: ["SUBMIT_EVIDENCE"],
+      });
+    }
+  }
+  if (isJudge) {
+    for (const request of state.adjournmentRequests) {
+      if (request.status !== "OPEN") continue;
+      add(
+        "RULE_ON_REQUEST",
+        null,
+        `Request ${request.requestId}: the ${request.side} side asks to adjourn until ${request.until}. ${request.reason}`,
+        { allowedActions: ["RULE_ON_REQUEST"] },
+      );
+    }
+  }
+  const memberSide = sideOfMember(state, agentId);
+  if (memberSide) {
+    for (const offer of state.offers) {
+      if (offer.status === "OPEN" && offer.fromSide === otherSide(memberSide)) {
+        add("REVIEW_SETTLEMENT_OFFER", memberSide, `Settlement offer ${offer.offerId}: ${offer.terms}`);
+      }
+    }
+  }
+  // While adjourned, nothing else is due: the stage's work waits for the hearing to resume.
+  if (state.adjournment) return tasks;
 
   if (stage === "AWAITING_RESPONSE" && representativeOf(state, "DEFENCE") === agentId) {
     add("RESPOND_TO_COMPLAINT", "DEFENCE", "Answer the complaint (and optionally submit evidence).");
@@ -97,15 +145,11 @@ export function tasksForCase(agentId: string, state: CaseState): AgentTask[] {
     }
   }
   if (stage === "DELIBERATION" && isJudge) {
-    add("ISSUE_VERDICT", null, "Issue your verdict, citing the law and evidence that decided it.");
-  }
-  const memberSide = sideOfMember(state, agentId);
-  if (memberSide) {
-    for (const offer of state.offers) {
-      if (offer.status === "OPEN" && offer.fromSide === otherSide(memberSide)) {
-        add("REVIEW_SETTLEMENT_OFFER", memberSide, `Settlement offer ${offer.offerId}: ${offer.terms}`);
-      }
-    }
+    add(
+      "ISSUE_VERDICT",
+      null,
+      "Issue your verdict, citing the law and evidence that decided it. If the record is not enough, adjourn and order evidence instead.",
+    );
   }
   return tasks;
 }

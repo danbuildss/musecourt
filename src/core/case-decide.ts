@@ -65,7 +65,8 @@ export type CaseCommand =
   | { type: "WithdrawAsCounsel"; reason: string }
   | { type: "VolunteerAsJudge" }
   | { type: "MakeStatement"; text: string; evidenceIds?: string[]; addressedTo?: Side[] }
-  | { type: "SubmitEvidence"; evidence: EvidenceInput }
+  /** `orderId`: this evidence answers the judge's order, and may be given outside the evidence stages. */
+  | { type: "SubmitEvidence"; evidence: EvidenceInput; orderId?: string }
   | { type: "WithdrawEvidence"; evidenceId: string; reason: string }
   | { type: "ConcludeStage" }
   | { type: "OfferSettlement"; terms: string }
@@ -82,6 +83,11 @@ export type CaseCommand =
       citedEvidenceIds?: string[];
       citedCaseIds?: string[];
     }
+  | { type: "Adjourn"; until: string; reason: string }
+  | { type: "SetDeadline"; deadline: string; reason: string }
+  | { type: "OrderEvidence"; side: Side; request: string; dueBy: string }
+  | { type: "RequestAdjournment"; until: string; reason: string }
+  | { type: "RuleOnRequest"; requestId: string; decision: "GRANT" | "REFUSE"; reason?: string }
   | { type: "ExpireDeadline" }
   | { type: "CorrectRecord"; targetStreamVersion: number; note: string }
   | { type: "RedactRecord"; target: RedactionTarget; reason: string };
@@ -107,6 +113,12 @@ const COMMAND_ACTION: Record<CaseCommandType, CaseAction | null> = {
   WithdrawCase: "WITHDRAW_CASE",
   DismissCase: "DISMISS_CASE",
   IssueVerdict: "ISSUE_VERDICT",
+  // Scheduling is not tied to a stage: the judge controls time whenever a case is open.
+  Adjourn: null,
+  SetDeadline: null,
+  OrderEvidence: null,
+  RequestAdjournment: null,
+  RuleOnRequest: null,
   ExpireDeadline: null,
   CorrectRecord: null,
   RedactRecord: null,
@@ -172,6 +184,34 @@ class Draft {
   close(outcome: "VERDICT" | "SETTLED" | "WITHDRAWN" | "DISMISSED" | "DEFAULT_JUDGMENT"): void {
     this.emit(event("CaseClosed", { outcome }));
   }
+
+  /** Ends an adjournment: the current stage runs again with its full time from now. */
+  resume(): void {
+    const stage = this.case.stage!;
+    const duration = this.case.deadlinePolicy.stages[stage].durationMs;
+    const deadline = new Date(this.ctx.now.getTime() + duration).toISOString();
+    this.emit(event("HearingResumed", { stage, deadline }));
+  }
+}
+
+/** Commands that may still be taken while a case is adjourned. */
+const ALLOWED_WHILE_ADJOURNED: ReadonlySet<CaseCommandType> = new Set<CaseCommandType>([
+  "OfferSettlement",
+  "RespondToSettlement",
+  "WithdrawSettlementOffer",
+  "WithdrawCase",
+  "DismissCase",
+  "WithdrawEvidence",
+  "Adjourn",
+  "OrderEvidence",
+  "RuleOnRequest",
+  "ExpireDeadline",
+  "CorrectRecord",
+  "RedactRecord",
+]);
+
+function isAdjournedFor(state: CaseState, now: Date): boolean {
+  return state.adjournment !== null && now.getTime() < new Date(state.adjournment.until).getTime();
 }
 
 // ---------------------------------------------------------------------------
@@ -240,9 +280,11 @@ function recordAgentEvidence(
   side: Side,
   stage: Stage,
   input: EvidenceInput,
+  orderId?: string,
 ): void {
   const state = draft.case;
   const role = currentRoleOf(state, agentId);
+  const answers = orderId ? { orderId } : {};
   const submitted = state.evidence.filter(
     (e) => e.side === side && e.submittedBy.kind === "AGENT" && !e.withdrawn,
   );
@@ -271,6 +313,7 @@ function recordAgentEvidence(
           title: `Testimony of the ${side === "PLAINTIFF" ? "plaintiff" : "defendant"}`,
           content,
           world: null,
+          ...answers,
         }),
       );
       return;
@@ -287,6 +330,7 @@ function recordAgentEvidence(
           title: requireText(input.title, "title", 1, LIMITS.evidenceTitleMax),
           content: requireText(input.content, "content", 1, LIMITS.evidenceContentMax),
           world: null,
+          ...answers,
         }),
       );
       return;
@@ -313,6 +357,7 @@ function recordAgentEvidence(
           title: `World event ${source.eventId} (${source.snapshot.type})`,
           content: source.snapshot.summary,
           world: source,
+          ...answers,
         }),
       );
       return;
@@ -419,10 +464,34 @@ export function decideFileCase(
 // Case commands
 // ---------------------------------------------------------------------------
 
-export function decideCase(state: CaseState | null, command: CaseCommand, ctx: CaseContext): CourtEvent[] {
-  if (!state) fail("NOT_FOUND", "Case not found.");
-  const draft = new Draft(state, ctx);
-  const action = COMMAND_ACTION[command.type];
+export function decideCase(input: CaseState | null, command: CaseCommand, ctx: CaseContext): CourtEvent[] {
+  if (!input) fail("NOT_FOUND", "Case not found.");
+  const draft = new Draft(input, ctx);
+  // An adjournment that has run its course ends first, whoever acts next (the clock included).
+  // (The clock's own expiry does this itself.)
+  if (
+    command.type !== "ExpireDeadline" &&
+    input.status === "OPEN" &&
+    input.adjournment &&
+    !isAdjournedFor(input, ctx.now)
+  ) {
+    draft.resume();
+  }
+  const state = draft.case;
+  if (isAdjournedFor(state, ctx.now)) {
+    const ordered = command.type === "SubmitEvidence" && command.orderId !== undefined;
+    if (!ordered && !ALLOWED_WHILE_ADJOURNED.has(command.type)) {
+      fail(
+        "ADJOURNED",
+        `The case is adjourned until ${state.adjournment!.until}: ${state.adjournment!.reason}`,
+        {
+          until: state.adjournment!.until,
+        },
+      );
+    }
+  }
+  const action =
+    command.type === "SubmitEvidence" && command.orderId !== undefined ? null : COMMAND_ACTION[command.type];
   if (action) {
     const stage = requireStageAction(state, action);
     // A stage's deadline is final: late actions fail until the court clock applies the timeout.
@@ -531,6 +600,7 @@ function handle(draft: Draft, command: CaseCommand): void {
 
     case "SubmitEvidence": {
       const agentId = requireAgentActor(actor);
+      if (command.orderId !== undefined) return submitOrderedEvidence(draft, agentId, command);
       const stage = state.stage!;
       const side: Side = stage === "EVIDENCE_PLAINTIFF" ? "PLAINTIFF" : "DEFENCE";
       if (requireMemberSide(state, agentId) !== side) {
@@ -642,6 +712,87 @@ function handle(draft: Draft, command: CaseCommand): void {
     case "IssueVerdict":
       return issueVerdict(draft, command);
 
+    case "Adjourn": {
+      requireOpen(state);
+      const judge = requireJudge(state, actor);
+      const until = requireScheduleTime(command.until, "until", draft.ctx.now);
+      const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
+      assertCanAdjourn(state, judge, { requested: false });
+      draft.emit(event("CaseAdjourned", { until, reason, judge, requestId: null }));
+      return;
+    }
+
+    case "SetDeadline": {
+      const stage = requireOpen(state);
+      const judge = requireJudge(state, actor);
+      const deadline = requireScheduleTime(command.deadline, "deadline", draft.ctx.now);
+      const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
+      draft.emit(event("DeadlineChanged", { stage, deadline, reason, judge }));
+      return;
+    }
+
+    case "OrderEvidence": {
+      requireOpen(state);
+      const judge = requireJudge(state, actor);
+      const side = requireSide(command.side);
+      const request = requireText(command.request, "request", 1, LIMITS.orderRequestMax);
+      const dueBy = requireScheduleTime(command.dueBy, "dueBy", draft.ctx.now);
+      if (state.evidenceOrders.length >= LIMITS.evidenceOrdersMax) {
+        fail("LIMIT_EXCEEDED", `A case has at most ${LIMITS.evidenceOrdersMax} evidence orders.`);
+      }
+      draft.emit(
+        event("EvidenceOrdered", { orderId: draft.ctx.ids.next("order"), side, request, dueBy, judge }),
+      );
+      return;
+    }
+
+    case "RequestAdjournment": {
+      requireOpen(state);
+      const agentId = requireAgentActor(actor);
+      const side = requireMemberSide(state, agentId);
+      if (!state.judge) fail("WRONG_STAGE", "No judge is seated yet to rule on a request for time.");
+      if (state.adjournmentRequests.some((r) => r.side === side && r.status === "OPEN")) {
+        fail("DUPLICATE", "Your side already has a request for time waiting for the judge.");
+      }
+      const until = requireScheduleTime(command.until, "until", draft.ctx.now);
+      const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
+      const requestId = draft.ctx.ids.next("req");
+      draft.emit(event("AdjournmentRequested", { requestId, side, byAgentId: agentId, until, reason }));
+      if (state.judge.kind === "HOUSE") houseRulesOnRequest(draft, requestId);
+      return;
+    }
+
+    case "RuleOnRequest": {
+      requireOpen(state);
+      const judge = requireJudge(state, actor);
+      const request =
+        state.adjournmentRequests.find((r) => r.requestId === command.requestId && r.status === "OPEN") ??
+        fail("NOT_FOUND", `No open request for time ${command.requestId}.`);
+      if (command.decision === "GRANT") {
+        if (new Date(request.until).getTime() < draft.ctx.now.getTime() + LIMITS.scheduleMinMs) {
+          fail(
+            "VALIDATION_FAILED",
+            "The time asked for has passed or is too close: refuse it, or adjourn to a new time.",
+          );
+        }
+        assertCanAdjourn(state, judge, { requested: true });
+        draft.emit(
+          event("CaseAdjourned", {
+            until: request.until,
+            reason: request.reason,
+            judge,
+            requestId: request.requestId,
+          }),
+        );
+      } else if (command.decision === "REFUSE") {
+        const reason = requireText(command.reason, "reason", 1, LIMITS.reasonMax);
+        draft.emit(event("AdjournmentRefused", { requestId: request.requestId, judge, reason }));
+      } else {
+        fail("VALIDATION_FAILED", "decision must be GRANT or REFUSE.");
+      }
+      return;
+    }
+
     case "ExpireDeadline":
       return expireDeadline(draft);
 
@@ -722,6 +873,71 @@ function requireSide(side: unknown): Side {
   if (side !== "PLAINTIFF" && side !== "DEFENCE")
     fail("VALIDATION_FAILED", "side must be PLAINTIFF or DEFENCE.");
   return side;
+}
+
+/** A time the judge sets: at least 10 minutes and at most 30 days from now. */
+function requireScheduleTime(value: unknown, field: string, now: Date): string {
+  const time = typeof value === "string" ? Date.parse(value) : Number.NaN;
+  if (!Number.isFinite(time))
+    fail("VALIDATION_FAILED", `${field} must be an ISO 8601 date and time.`, { field });
+  if (time < now.getTime() + LIMITS.scheduleMinMs) {
+    fail("VALIDATION_FAILED", `${field} must be at least 10 minutes from now.`, { field });
+  }
+  if (time > now.getTime() + LIMITS.scheduleMaxMs) {
+    fail("VALIDATION_FAILED", `${field} must be at most 30 days from now.`, { field });
+  }
+  return new Date(time).toISOString();
+}
+
+/** Every case ends: a few adjournments in all, and Solon orders at most two of his own. */
+function assertCanAdjourn(state: CaseState, judge: JudgeSeat, { requested }: { requested: boolean }): void {
+  if (state.adjournments.length >= LIMITS.adjournmentsMax) {
+    fail("LIMIT_EXCEEDED", `A case can be adjourned at most ${LIMITS.adjournmentsMax} times.`);
+  }
+  const ownByHouse = state.adjournments.filter((a) => a.judge.kind === "HOUSE" && !a.requestId).length;
+  if (judge.kind === "HOUSE" && !requested && ownByHouse >= LIMITS.houseAdjournmentsMax) {
+    fail("LIMIT_EXCEEDED", `Solon adjourns a case at most ${LIMITS.houseAdjournmentsMax} times.`);
+  }
+}
+
+/**
+ * Solon's standing rule on requests for time, applied the moment a request is made: each side may
+ * have one granted request, up to 7 days ahead, while the case has adjournments left.
+ */
+function houseRulesOnRequest(draft: Draft, requestId: string): void {
+  const state = draft.case;
+  const request = state.adjournmentRequests.find((r) => r.requestId === requestId)!;
+  const judge: JudgeSeat = { kind: "HOUSE" };
+  const refuse = (reason: string) => draft.emit(event("AdjournmentRefused", { requestId, judge, reason }));
+  if (state.adjournmentRequests.some((r) => r.side === request.side && r.status === "GRANTED")) {
+    return refuse("Solon grants each side one request for time, and this side has had its one.");
+  }
+  if (new Date(request.until).getTime() > draft.ctx.now.getTime() + LIMITS.houseGrantMaxMs) {
+    return refuse("Solon grants at most 7 days at a time. Ask for an earlier date.");
+  }
+  if (state.adjournments.length >= LIMITS.adjournmentsMax) {
+    return refuse(`This case has had its ${LIMITS.adjournmentsMax} adjournments.`);
+  }
+  draft.emit(event("CaseAdjourned", { until: request.until, reason: request.reason, judge, requestId }));
+}
+
+function submitOrderedEvidence(
+  draft: Draft,
+  agentId: string,
+  command: Extract<CaseCommand, { type: "SubmitEvidence" }>,
+): void {
+  const state = draft.case;
+  const order =
+    state.evidenceOrders.find((o) => o.orderId === command.orderId) ??
+    fail("NOT_FOUND", `No evidence order ${command.orderId} in this case.`);
+  if (order.answeredBy) fail("DUPLICATE", `Order ${order.orderId} was already answered.`);
+  if (requireMemberSide(state, agentId) !== order.side) {
+    fail("NOT_AUTHORIZED", "The judge ordered this evidence from the other side.");
+  }
+  if (draft.ctx.now.getTime() >= new Date(order.dueBy).getTime()) {
+    fail("DEADLINE_PASSED", `Order ${order.orderId} was due by ${order.dueBy}.`, { dueBy: order.dueBy });
+  }
+  recordAgentEvidence(draft, agentId, order.side, state.stage!, command.evidence, order.orderId);
 }
 
 function makeStatement(draft: Draft, command: Extract<CaseCommand, { type: "MakeStatement" }>): void {
@@ -867,6 +1083,8 @@ function expireDeadline(draft: Draft): void {
   if (draft.ctx.now.getTime() < new Date(deadline).getTime()) {
     fail("DEADLINE_NOT_REACHED", `The ${stage} deadline is ${deadline}.`, { deadline });
   }
+  // The end of an adjournment is not a missed deadline: the hearing resumes.
+  if (state.adjournment) return draft.resume();
   const action = state.deadlinePolicy.stages[stage].onTimeout;
   draft.emit(event("DeadlineExpired", { stage, deadline, action }));
 

@@ -96,6 +96,9 @@ function partyCell(p: PublicParty): string {
 
 function stageLine(c: PublicCaseRecord, now: Date): string {
   if (!c.stage) return c.status === "CLOSED" ? "Closed" : "—";
+  if (c.stage.adjournedUntil) {
+    return `${e(STAGE_LABEL[c.stage.name])} · <strong>adjourned</strong><br><span class="meta">The hearing resumes ${e(formatDateTime(c.stage.adjournedUntil))} (${e(relativeTo(c.stage.adjournedUntil, now))})</span>`;
+  }
   const deadline = c.stage.deadline
     ? `<br><span class="meta">Deadline ${e(formatDateTime(c.stage.deadline))} (${e(relativeTo(c.stage.deadline, now))})</span>`
     : "";

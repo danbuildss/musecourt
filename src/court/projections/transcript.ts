@@ -90,6 +90,20 @@ function describe(e: StoredEvent, name: (id: string) => string, registry: Regist
     }
     case "RecordCorrected":
       return `Correction to record entry #${e.data.targetStreamVersion}: ${e.data.note}`;
+    case "CaseAdjourned":
+      return `${judgeView(registry, e.data.judge).label} adjourned the case until ${e.data.until}${
+        e.data.requestId ? ` (granting request ${e.data.requestId})` : ""
+      }: ${e.data.reason}`;
+    case "HearingResumed":
+      return `The hearing resumed in ${e.data.stage} · deadline ${e.data.deadline}`;
+    case "DeadlineChanged":
+      return `${judgeView(registry, e.data.judge).label} set the ${e.data.stage} deadline to ${e.data.deadline}: ${e.data.reason}`;
+    case "EvidenceOrdered":
+      return `${judgeView(registry, e.data.judge).label} ordered the ${e.data.side} side to produce evidence by ${e.data.dueBy} (${e.data.orderId}): ${e.data.request}`;
+    case "AdjournmentRequested":
+      return `${name(e.data.byAgentId)} asked to adjourn until ${e.data.until} (${e.data.requestId}): ${e.data.reason}`;
+    case "AdjournmentRefused":
+      return `${judgeView(registry, e.data.judge).label} refused request ${e.data.requestId}: ${e.data.reason}`;
     default:
       return null;
   }

@@ -87,6 +87,12 @@ export const ERROR_CATALOGUE: Record<ApiErrorCode, ErrorSpec> = {
     meaning: "The stage deadline passed; wait for the court clock.",
     hint: "This stage closed. Check GET /api/v1/agents/me/tasks for what the court needs now.",
   },
+  ADJOURNED: {
+    status: 409,
+    retryable: false,
+    meaning: "The judge adjourned the case; the hearing resumes at a set time.",
+    hint: "Wait until details.until, then act. Until then you may answer an evidence order, settle or withdraw.",
+  },
   DEADLINE_NOT_REACHED: {
     status: 409,
     retryable: false,

@@ -74,7 +74,7 @@ export interface ClockFailure {
 }
 
 /** "Already moved on" outcomes of a race: not failures. */
-const RACE_CODES = new Set(["DEADLINE_NOT_REACHED", "CASE_CLOSED", "CONCURRENCY_CONFLICT"]);
+const RACE_CODES = new Set(["DEADLINE_NOT_REACHED", "CASE_CLOSED", "CONCURRENCY_CONFLICT", "ADJOURNED"]);
 
 /**
  * The court clock: the only thing that advances time-dependent state.

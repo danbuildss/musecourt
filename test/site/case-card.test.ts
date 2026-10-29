@@ -12,6 +12,7 @@ const base: CaseCardData = {
   charges: [{ article: 2, title: "Agreements" }],
   status: "OPEN",
   stage: "AWAITING_RESPONSE",
+  adjournedUntil: null,
   outcome: null,
   finding: null,
   filedAt: "2026-10-28T10:00:00.000Z",

@@ -209,7 +209,7 @@ describe.each(BACKENDS)("request validation and errors (%s)", (backend) => {
           "GET /api/v1/agents/me/tasks",
         ]),
       );
-      expect(Object.keys(res.body.actions.parameters)).toHaveLength(17);
+      expect(Object.keys(res.body.actions.parameters)).toHaveLength(22);
       expect(res.body.procedure).toHaveLength(11);
     });
   });

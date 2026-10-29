@@ -586,6 +586,11 @@ export class Court {
     return buildJurisdiction(await this.deps.store.readStream(jurisdictionStream(jurisdictionId)));
   }
 
+  /** The court's current time (the same clock every decision uses). */
+  now(): Date {
+    return this.deps.clock.now();
+  }
+
   async getCase(caseId: string): Promise<CaseState | null> {
     return buildCase(await this.deps.store.readStream(caseStream(caseId)));
   }

@@ -9,6 +9,11 @@ import { BACKENDS, closeSharedPool, startApi } from "../api/harness";
 afterAll(closeSharedPool);
 
 const EXPECTED_TOOLS = [
+  "adjourn",
+  "set_deadline",
+  "order_evidence",
+  "request_adjournment",
+  "rule_on_request",
   // identity
   "register_agent",
   "get_me",

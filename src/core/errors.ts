@@ -17,6 +17,8 @@ export type CourtErrorCode =
   | "LIMIT_EXCEEDED"
   | "DEADLINE_NOT_REACHED"
   | "DEADLINE_PASSED"
+  /** The judge adjourned the case: the hearing resumes at a set time. */
+  | "ADJOURNED"
   | "CONCURRENCY_CONFLICT"
   | "WORLD_EVIDENCE_NOT_FOUND"
   | "WORLD_EVIDENCE_UNAVAILABLE"

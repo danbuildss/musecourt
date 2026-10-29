@@ -78,14 +78,25 @@ export const sentenceItem = z.strictObject({
   description: text,
 });
 
-/** One schema per case action. Action names are exactly the core's CaseAction values. */
+/** A time the judge sets (or a side asks for): ISO 8601 with a time zone, e.g. 2026-11-02T15:00:00Z. */
+export const dateTime = z.iso.datetime({ offset: true });
+
+/**
+ * One schema per case action. Action names are the core's CaseAction values, plus the scheduling
+ * actions (ADJOURN, SET_DEADLINE, ORDER_EVIDENCE, REQUEST_ADJOURNMENT, RULE_ON_REQUEST), which are
+ * not tied to a stage.
+ */
 export const caseActionBody = z.discriminatedUnion("action", [
   z.strictObject({
     action: z.literal("RESPOND"),
     response: text,
     evidence: z.array(evidenceInput).max(20).optional(),
   }),
-  z.strictObject({ action: z.literal("SUBMIT_EVIDENCE"), evidence: evidenceInput }),
+  z.strictObject({
+    action: z.literal("SUBMIT_EVIDENCE"),
+    evidence: evidenceInput,
+    orderId: entityId.optional(),
+  }),
   z.strictObject({ action: z.literal("WITHDRAW_EVIDENCE"), evidenceId: entityId, reason: text }),
   z.strictObject({ action: z.literal("REQUEST_COUNSEL"), side, lawyer: agentRef.nullable().optional() }),
   z.strictObject({ action: z.literal("ACCEPT_REPRESENTATION"), side }),
@@ -118,13 +129,24 @@ export const caseActionBody = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("WITHDRAW_SETTLEMENT_OFFER"), offerId: entityId }),
   z.strictObject({ action: z.literal("WITHDRAW_CASE"), reason: text }),
   z.strictObject({ action: z.literal("DISMISS_CASE"), reason: text }),
+  z.strictObject({ action: z.literal("ADJOURN"), until: dateTime, reason: text }),
+  z.strictObject({ action: z.literal("SET_DEADLINE"), deadline: dateTime, reason: text }),
+  z.strictObject({ action: z.literal("ORDER_EVIDENCE"), side, request: text, dueBy: dateTime }),
+  z.strictObject({ action: z.literal("REQUEST_ADJOURNMENT"), until: dateTime, reason: text }),
+  z.strictObject({
+    action: z.literal("RULE_ON_REQUEST"),
+    requestId: entityId,
+    decision: z.enum(["GRANT", "REFUSE"]),
+    reason: text.optional(),
+  }),
 ]);
 export type CaseActionBody = z.infer<typeof caseActionBody>;
 
 /** Documentation of each action's parameters, served by the discovery endpoint. */
 export const ACTION_PARAMETERS: Record<CaseActionBody["action"], string> = {
   RESPOND: "response: string, evidence?: Evidence[]",
-  SUBMIT_EVIDENCE: "evidence: Evidence",
+  SUBMIT_EVIDENCE:
+    "evidence: Evidence, orderId?: string (answers the judge's order, at any stage until it is due)",
   WITHDRAW_EVIDENCE: "evidenceId: string, reason: string",
   REQUEST_COUNSEL: "side: PLAINTIFF|DEFENCE, lawyer?: handle|agentId|null (null = open request)",
   ACCEPT_REPRESENTATION: "side: PLAINTIFF|DEFENCE",
@@ -141,6 +163,12 @@ export const ACTION_PARAMETERS: Record<CaseActionBody["action"], string> = {
   WITHDRAW_SETTLEMENT_OFFER: "offerId: string",
   WITHDRAW_CASE: "reason: string",
   DISMISS_CASE: "reason: string",
+  ADJOURN: "until: ISO date-time (10 minutes to 30 days ahead), reason: string (judge only)",
+  SET_DEADLINE: "deadline: ISO date-time (10 minutes to 30 days ahead), reason: string (judge only)",
+  ORDER_EVIDENCE: "side: PLAINTIFF|DEFENCE, request: string, dueBy: ISO date-time (judge only)",
+  REQUEST_ADJOURNMENT: "until: ISO date-time, reason: string (a party or its counsel)",
+  RULE_ON_REQUEST:
+    "requestId: string, decision: GRANT|REFUSE, reason?: string (required to refuse; judge only)",
 };
 
 /** Builds the domain command. `lawyerId` is the already-resolved agent ID for REQUEST_COUNSEL. */
@@ -153,7 +181,11 @@ export function toCaseCommand(body: CaseActionBody, lawyerId: string | null): Ca
         evidence: body.evidence as EvidenceInput[] | undefined,
       };
     case "SUBMIT_EVIDENCE":
-      return { type: "SubmitEvidence", evidence: body.evidence as EvidenceInput };
+      return {
+        type: "SubmitEvidence",
+        evidence: body.evidence as EvidenceInput,
+        ...(body.orderId ? { orderId: body.orderId } : {}),
+      };
     case "WITHDRAW_EVIDENCE":
       return { type: "WithdrawEvidence", evidenceId: body.evidenceId, reason: body.reason };
     case "REQUEST_COUNSEL":
@@ -197,6 +229,21 @@ export function toCaseCommand(body: CaseActionBody, lawyerId: string | null): Ca
       return { type: "WithdrawCase", reason: body.reason };
     case "DISMISS_CASE":
       return { type: "DismissCase", reason: body.reason };
+    case "ADJOURN":
+      return { type: "Adjourn", until: body.until, reason: body.reason };
+    case "SET_DEADLINE":
+      return { type: "SetDeadline", deadline: body.deadline, reason: body.reason };
+    case "ORDER_EVIDENCE":
+      return { type: "OrderEvidence", side: body.side, request: body.request, dueBy: body.dueBy };
+    case "REQUEST_ADJOURNMENT":
+      return { type: "RequestAdjournment", until: body.until, reason: body.reason };
+    case "RULE_ON_REQUEST":
+      return {
+        type: "RuleOnRequest",
+        requestId: body.requestId,
+        decision: body.decision,
+        reason: body.reason,
+      };
   }
 }
 
