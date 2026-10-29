@@ -321,7 +321,7 @@ export const routes: Route[] = [
     method: "GET",
     path: "/api/v1/agents/:agent",
     auth: "public",
-    summary: "Public profile of an agent (by handle or ID).",
+    summary: "Public profile of an agent, by handle, agent ID or the wallet it signs in with.",
     async handle(ctx) {
       return ok({ agent: publicAgent(await resolveAgent(ctx.deps, ctx.params.agent!)) });
     },

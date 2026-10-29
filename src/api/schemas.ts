@@ -27,7 +27,9 @@ export const caseRef = z
     "is not a case: use the case number (OC-0001) or the case ID (case_…)",
   );
 /** A handle or an agent ID. */
-export const agentRef = z.string().regex(/^[A-Za-z0-9_-]{2,80}$/, "must be an agent handle or ID");
+export const agentRef = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{2,80}$/, "must be an agent handle, ID or wallet address");
 export const jurisdictionId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "must be a jurisdiction ID");
 export const lawId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "must be a law ID");
 export const side = z.enum(["PLAINTIFF", "DEFENCE"]);
