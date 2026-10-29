@@ -13,7 +13,7 @@ import { courtStats } from "./stats";
 import { renderStats } from "./stats-page";
 import { renderCasebook } from "./casebook";
 import { renderCourthouse } from "./courthouse";
-import { pageHeaders } from "./layout";
+import { FAVICON_SVG, pageHeaders } from "./layout";
 import { renderRoadmap } from "./roadmap";
 import {
   caseRecordData,
@@ -126,6 +126,22 @@ export const siteRoutes: Route[] = [
       });
     },
   },
+  ...["/favicon.svg", "/favicon.ico"].map((path): Route => ({
+    method: "GET",
+    path,
+    auth: "public",
+    summary: "The site icon (SVG).",
+    async handle() {
+      return new Response(FAVICON_SVG, {
+        status: 200,
+        headers: {
+          "content-type": "image/svg+xml",
+          "cache-control": "public, max-age=86400",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    },
+  })),
   {
     method: "GET",
     path: "/og.png",

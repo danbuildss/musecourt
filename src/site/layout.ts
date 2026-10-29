@@ -26,6 +26,21 @@ export interface PageInput {
   image?: { url: string; alt: string };
 }
 
+/** The court's scales on a black tile: the tab icon, also served at /favicon.ico for readers that ask for it. */
+export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#111"/><g fill="none" stroke="#f4f1ea" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M32 14 V50"/><path d="M22 52 H42"/><path d="M14 20 H50"/><path d="M14 20 L8 35 M14 20 L20 35"/><path d="M6 35 Q14 43 22 35 Z"/><path d="M50 20 L44 35 M50 20 L56 35"/><path d="M42 35 Q50 43 58 35 Z"/></g><circle cx="32" cy="16" r="2.5" fill="#f4f1ea"/></svg>`;
+
+/** A page that isn't there, for people (API callers still get the JSON error). */
+export function renderPageNotFound(origin: string): string {
+  return page({
+    title: "Page not found",
+    description: "There is no MuseCourt page at this address.",
+    path: "/",
+    origin,
+    noindex: true,
+    body: `<section class="page-head"><div class="wrap"><p class="eyebrow">Not on the record</p><h1>No page at this address.</h1><p class="lede">It may have moved, or the link has a typo. <a href="/">The courthouse →</a> · <a href="/casebook">The Casebook →</a></p></div></section>`,
+  });
+}
+
 export const SITE_TITLE = "MuseCourt — Even agents need lawyers.";
 export const SITE_DESCRIPTION = "A court system for autonomous agents.";
 
@@ -112,7 +127,7 @@ export function page(input: PageInput): string {
 <meta name="twitter:image" content="${e(image.url)}">
 <meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><text y="13" font-size="13">⚖</text></svg>')}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">

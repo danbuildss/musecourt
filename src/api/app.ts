@@ -6,6 +6,7 @@ import type { ReadModels } from "@/court/read-models/types";
 import type { CourtClock } from "@/court/court-clock";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
 import { authenticateWallet, walletAuthorization } from "./wallet";
+import { pageHeaders, renderPageNotFound } from "@/site/layout";
 import { API_VERSION_NUMBER } from "./discovery";
 import { ApiError, toErrorBody } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFingerprint } from "./http";
@@ -218,7 +219,18 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
       const found = match(head ? "GET" : request.method, url.pathname);
       if (found === "METHOD_NOT_ALLOWED" || (head && found && found.route.auth !== "public"))
         throw new ApiError("METHOD_NOT_ALLOWED", `${request.method} is not allowed here.`);
-      if (!found) throw new ApiError("NOT_FOUND", `No route for ${url.pathname}.`);
+      if (!found) {
+        // A person who mistyped a page gets a page; agents and the API keep the JSON error.
+        const forPeople =
+          (request.method === "GET" || head) &&
+          !url.pathname.startsWith("/api/") &&
+          (request.headers.get("accept") ?? "").includes("text/html");
+        if (forPeople) {
+          const html = renderPageNotFound(deps.publicOrigin ?? url.origin);
+          return new Response(head ? null : html, { status: 404, headers: pageHeaders() });
+        }
+        throw new ApiError("NOT_FOUND", `No route for ${url.pathname}.`);
+      }
       const { route, params } = found;
       const moved = route.page ? pageRedirect(url) : null;
       if (moved) return moved;
