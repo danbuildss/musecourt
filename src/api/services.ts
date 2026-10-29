@@ -5,7 +5,7 @@ import type { AgentRow } from "@/court/read-models/types";
 import type { ApiDeps } from "./app";
 import { issueCredential } from "./auth";
 import { ApiError, ERROR_CATALOGUE, type ApiErrorCode } from "./errors";
-import { ID_PATTERN } from "./schemas";
+import { CASE_NUMBER_PATTERN, ID_PATTERN } from "./schemas";
 import type { IdempotencyRecord } from "./stores";
 import { requireWalletSignature } from "./wallet";
 
@@ -33,6 +33,14 @@ export async function caseView(deps: ApiDeps, caseId: string, now: Date) {
     ...view,
     stage: view.stage ? { ...view.stage, overdue: isOverdue(view.stage.deadline, now) } : null,
   };
+}
+
+/** The case ID for a case ID or a case number (OC-0001, any case). */
+export async function resolveCaseId(deps: ApiDeps, ref: string): Promise<string> {
+  if (!CASE_NUMBER_PATTERN.test(ref)) return ref;
+  const caseId = await deps.readModels.findCaseIdByNumber(ref);
+  if (!caseId) throw new CourtError("NOT_FOUND", `Case ${ref.toUpperCase()} not found.`);
+  return caseId;
 }
 
 export function publicAgent(row: AgentRow) {

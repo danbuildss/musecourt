@@ -17,6 +17,15 @@ export const text = z.string().max(TEXT_CAP);
 
 export const ID_PATTERN = /^[a-z]+_[A-Za-z0-9]{1,64}$/;
 export const entityId = z.string().regex(ID_PATTERN, "must be an identifier like case_… or ev_…");
+/** A case number as the public sees it: MW-0002, OC-0001. */
+export const CASE_NUMBER_PATTERN = /^[A-Za-z]{2,6}-\d{1,9}$/;
+/** A case by its ID (case_…) or its number (OC-0001). */
+export const caseRef = z
+  .string()
+  .refine(
+    (v) => ID_PATTERN.test(v) || CASE_NUMBER_PATTERN.test(v),
+    "must be a case number like OC-0001 or a case ID like case_…",
+  );
 /** A handle or an agent ID. */
 export const agentRef = z.string().regex(/^[A-Za-z0-9_-]{2,80}$/, "must be an agent handle or ID");
 export const jurisdictionId = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "must be a jurisdiction ID");

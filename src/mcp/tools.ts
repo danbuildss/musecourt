@@ -11,6 +11,7 @@ import type { Principal } from "@/api/auth";
 import { ApiError } from "@/api/errors";
 import {
   agentRef,
+  caseRef,
   connectorId,
   entityId,
   evidenceInput,
@@ -28,6 +29,7 @@ import {
   publicAgent,
   registerWithCredential,
   resolveAgent,
+  resolveCaseId,
   tasksAndOpportunities,
 } from "@/api/services";
 import { MAX_PROOF_LENGTH, issueWorldIdentityChallenge, linkWorldIdentity } from "@/api/world-identity";
@@ -71,7 +73,7 @@ export interface ToolDefinition {
 // Field schemas (with descriptions: the schema is part of the agent's UX)
 // ---------------------------------------------------------------------------
 
-const caseId = entityId.describe("The case ID (case_…).");
+const caseId = caseRef.describe("The case number (OC-0001) or case ID (case_…).");
 const sideField = side.describe("PLAINTIFF or DEFENCE.");
 const evidence = evidenceInput.describe(
   "One of: {kind: WORLD_EVENT, eventId} (an event from the case's world, verified by MuseCourt; only IDs you actually know; it proves the world recorded the event, not that anyone did wrong), {kind: DOCUMENT, title, content} (shown as not independently verified), {kind: TESTIMONY, content} (a party's own account).",
@@ -119,7 +121,7 @@ function caseCommandTool(spec: {
     write: true,
     input: z.strictObject({ caseId, ...spec.shape, idempotencyKey }),
     async run(ctx, args) {
-      const id = args.caseId as string;
+      const id = await resolveCaseId(ctx.deps, args.caseId as string);
       const command = await spec.command(args, ctx);
       await ctx.deps.court.act(id, agentActor(agentIdOf(ctx)), command);
       return ok({ case: await caseView(ctx.deps, id, ctx.now) });
@@ -302,7 +304,9 @@ export const TOOLS: ToolDefinition[] = [
     write: false,
     input: z.strictObject({ caseId }),
     async run(ctx, args) {
-      return ok({ case: await caseView(ctx.deps, args.caseId as string, ctx.now) });
+      return ok({
+        case: await caseView(ctx.deps, await resolveCaseId(ctx.deps, args.caseId as string), ctx.now),
+      });
     },
   },
   {
@@ -313,8 +317,9 @@ export const TOOLS: ToolDefinition[] = [
     write: false,
     input: z.strictObject({ caseId }),
     async run(ctx, args) {
-      const events = await ctx.deps.court.getPublicCaseEvents(args.caseId as string);
-      if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${args.caseId as string} not found.`);
+      const id = await resolveCaseId(ctx.deps, args.caseId as string);
+      const events = await ctx.deps.court.getPublicCaseEvents(id);
+      if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${id} not found.`);
       return ok({ transcript: buildTranscript(events, await ctx.deps.court.getRegistry()) });
     },
   },

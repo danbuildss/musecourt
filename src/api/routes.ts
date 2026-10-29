@@ -20,7 +20,7 @@ import {
   dryRunQuery,
   casebookQuery,
   emptyBody,
-  entityId,
+  caseRef,
   eventsQuery,
   fileCaseBody,
   jurisdictionId as jurisdictionIdSchema,
@@ -45,6 +45,7 @@ import {
   registerWithWallet,
   WALLET_NOTE,
   resolveAgent,
+  resolveCaseId,
   rotateUnusedRegistration,
   tasksAndOpportunities,
 } from "./services";
@@ -123,8 +124,9 @@ function originOf(ctx: RouteContext): string {
   return ctx.deps.publicOrigin ?? ctx.url.origin;
 }
 
-function caseIdParam(ctx: RouteContext): string {
-  return parse(entityId, ctx.params.caseId);
+/** The case named in the path, by ID (case_…) or number (OC-0001). */
+function caseIdParam(ctx: RouteContext): Promise<string> {
+  return resolveCaseId(ctx.deps, parse(caseRef, ctx.params.caseId));
 }
 
 function publicEvent(e: StoredEvent) {
@@ -493,7 +495,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "Full case view: stage, deadline, allowed actions, participants, evidence, statements, verdict.",
     async handle(ctx) {
-      return ok({ case: await caseView(ctx.deps, caseIdParam(ctx), ctx.now) });
+      return ok({ case: await caseView(ctx.deps, await caseIdParam(ctx), ctx.now) });
     },
   },
   {
@@ -503,7 +505,7 @@ export const routes: Route[] = [
     summary: "The case's public court record (append-only events). Use ?after=<position> to page.",
     query: eventsQuery,
     async handle(ctx) {
-      const caseId = caseIdParam(ctx);
+      const caseId = await caseIdParam(ctx);
       const q = queryOf(eventsQuery, ctx);
       const events = await ctx.deps.court.getPublicCaseEvents(caseId);
       if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${caseId} not found.`);
@@ -516,7 +518,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "Human-readable transcript of the case.",
     async handle(ctx) {
-      const caseId = caseIdParam(ctx);
+      const caseId = await caseIdParam(ctx);
       const events = await ctx.deps.court.getPublicCaseEvents(caseId);
       if (events.length === 0) throw new CourtError("NOT_FOUND", `Case ${caseId} not found.`);
       return ok({ transcript: buildTranscript(events, await ctx.deps.court.getRegistry()) });
@@ -530,7 +532,7 @@ export const routes: Route[] = [
       "Take a procedural action in a case, e.g. { action: MAKE_STATEMENT, text }. You always act as yourself.",
     body: caseActionBody,
     async handle(ctx) {
-      const caseId = caseIdParam(ctx);
+      const caseId = await caseIdParam(ctx);
       const input = bodyOf(caseActionBody, ctx);
       const lawyerId =
         input.action === "REQUEST_COUNSEL" && input.lawyer
@@ -643,7 +645,7 @@ export const routes: Route[] = [
     summary:
       "Remove the words of a piece of evidence or a statement from every public surface (the log keeps the original).",
     async handle(ctx) {
-      const caseId = caseIdParam(ctx);
+      const caseId = await caseIdParam(ctx);
       const input = parse(adminRedactionBody, ctx.body);
       await ctx.deps.court.redactRecord(caseId, adminActor("admin"), input);
       return ok({ case: await caseView(ctx.deps, caseId, ctx.now) }, 201);
