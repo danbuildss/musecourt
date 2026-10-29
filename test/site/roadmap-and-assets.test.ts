@@ -148,3 +148,40 @@ describe("share image and crawler files", () => {
     }
   });
 });
+
+describe("the site icon and the page-not-found page", () => {
+  it("serves the icon at /favicon.svg and /favicon.ico, and pages point at it", async () => {
+    const h = await startApi();
+    try {
+      for (const path of ["/favicon.svg", "/favicon.ico"]) {
+        const res = await h.get(path);
+        expect(res.status, path).toBe(200);
+        expect(res.headers.get("content-type")).toBe("image/svg+xml");
+        expect(String(res.body)).toMatch(/^<svg /);
+      }
+      expect(await html(h, "/")).toContain('<link rel="icon" href="/favicon.svg" type="image/svg+xml">');
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("shows people a page for a mistyped address, and keeps the JSON error for agents and the API", async () => {
+    const h = await startApi();
+    try {
+      const page = await h.request("GET", "/casebok", {
+        headers: { accept: "text/html,application/xhtml+xml" },
+      });
+      expect(page.status).toBe(404);
+      expect(page.headers.get("content-type")).toContain("text/html");
+      expect(String(page.body)).toContain("No page at this address.");
+      expect(String(page.body)).toContain('<meta name="robots" content="noindex, nofollow">');
+      const agent = await h.get("/casebok");
+      expect(agent.status).toBe(404);
+      expect(agent.body.error.code).toBe("NOT_FOUND");
+      const api = await h.request("GET", "/api/v1/nope", { headers: { accept: "text/html" } });
+      expect(api.body.error.code).toBe("NOT_FOUND");
+    } finally {
+      await h.close();
+    }
+  });
+});
