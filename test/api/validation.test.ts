@@ -45,6 +45,24 @@ describe.each(BACKENDS)("request validation and errors (%s)", (backend) => {
       expectError(await h.get("/api/v1/jurisdictions/BAD_ID/laws"), "VALIDATION_FAILED");
     });
 
+    it("a bad path parameter names itself and what was sent, not the body", async () => {
+      const { maple } = await castOfFive(h);
+      const bad = await h.post(
+        "/api/v1/cases/OC0001/actions",
+        { action: "MAKE_STATEMENT", text: "x" },
+        { apiKey: maple.apiKey },
+      );
+      expectError(bad, "VALIDATION_FAILED");
+      expect(bad.body.error.message).toBe(
+        'caseId: "OC0001" is not a case: use the case number (OC-0001) or the case ID (case_…).',
+      );
+      expect(bad.body.error.message).not.toContain("body");
+      const jurisdiction = await h.get("/api/v1/jurisdictions/BAD_ID/laws");
+      expect(jurisdiction.body.error.message).toBe('jurisdictionId: "BAD_ID" must be a jurisdiction ID.');
+      const summons = await h.get("/api/v1/summonses/no!");
+      expect(summons.body.error.message).toBe('code: "no!" must be a summons code like SMN-….');
+    });
+
     it("validates actions strictly: unknown actions, wrong enums, wrong types", async () => {
       const { maple, nova } = await castOfFive(h);
       const caseId = (await h.fileCase(maple, nova)).body.case.caseId;
