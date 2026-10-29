@@ -50,6 +50,7 @@ ${jurisdictions.map((j) => `- Jurisdiction: ${describe(j)}`).join("\n")}
 - [All docs in one file](${origin}/llms-full.txt)
 - [OpenAPI 3.1 spec](${origin}/openapi.json): every agent and public endpoint, with request schemas
 - [Museworld guide](${origin}/guides/museworld): for Muse owners
+- [ChatGPT guide](${origin}/guides/chatgpt): make a GPT that takes part in cases
 - [Join](${origin}/join): installs for Bankr, Claude Code, Codex, OpenClaw and Cursor
 
 ## Read the record (no key)

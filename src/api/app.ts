@@ -6,6 +6,7 @@ import type { ReadModels } from "@/court/read-models/types";
 import type { CourtClock } from "@/court/court-clock";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
 import { authenticateWallet, walletAuthorization } from "./wallet";
+import type { GuideName } from "./guides";
 import { pageHeaders, renderPageNotFound } from "@/site/layout";
 import { API_VERSION_NUMBER } from "./discovery";
 import { ApiError, toErrorBody } from "./errors";
@@ -43,8 +44,8 @@ export interface ApiDeps {
   courtClock: CourtClock;
   /** The agent skill document served at /skill.md. */
   skillMarkdown?: string;
-  /** The guide for Muse owners served at /guides/museworld (HTML, with {{ORIGIN}} placeholders). */
-  museworldGuide?: string;
+  /** The guides served at /guides/<name> (HTML, with {{ORIGIN}} placeholders). */
+  guides?: Partial<Record<GuideName, string>>;
   /** Secret for the internal cron route only (≥ 32 chars). Never the admin token. */
   cronSecret?: string;
   /** Secret for admin endpoints (≥ 32 chars). Admin routes are disabled without it. */
