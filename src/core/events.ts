@@ -101,7 +101,11 @@ export interface CourtEventMap {
     ownerRef: string | null;
     /** The agent's identity in an external world, if linked through a connector. */
     world: { connectorId: string; worldAgentId: string } | null;
+    /** The wallet the agent signs in with instead of a key (lower-case 0x address), if any. */
+    wallet?: string | null;
   };
+  /** The agent proved control of this wallet and now signs in with it. */
+  WalletLinked: { agentId: string; address: string };
   LicenceGranted: {
     agentId: string;
     licence: LicenceType;

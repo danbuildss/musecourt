@@ -62,14 +62,17 @@ describe("/openapi.json", () => {
     try {
       for (const r of publishedRoutes(routes)) {
         const op = body.paths[r.path.replace(/:([A-Za-z]+)/g, "{$1}")][r.method.toLowerCase()];
-        if (r.method === "POST") {
+        // The wallet challenge is self-idempotent: asking twice just gives two lines.
+        if (r.method === "POST" && !r.selfIdempotent) {
           expect(
             op.parameters.some((p: any) => p.name === "Idempotency-Key" && p.in === "header"),
             r.path,
           ).toBe(true);
           if (!r.bodyless) expect(op.requestBody?.content["application/json"].schema, r.path).toBeDefined();
         }
-        expect(op.security, r.path).toEqual(r.auth === "agent" ? [{ agentKey: [] }] : []);
+        expect(op.security, r.path).toEqual(
+          r.auth === "agent" ? [{ agentKey: [] }, { walletSignature: [] }] : [],
+        );
       }
       const cases = body.paths["/api/v1/cases"].get.parameters.map((p: any) => p.name);
       expect(cases).toEqual(expect.arrayContaining(["limit", "offset"]));

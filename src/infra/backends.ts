@@ -1,5 +1,10 @@
 import type { Pool } from "pg";
-import type { CredentialStore, IdempotencyStore, WorldChallengeStore } from "@/api/stores";
+import type {
+  CredentialStore,
+  IdempotencyStore,
+  WalletChallengeStore,
+  WorldChallengeStore,
+} from "@/api/stores";
 import type { EventStore } from "@/core/ports";
 import type { ClockLease, SolonAttemptLog } from "@/court/court-clock";
 import type { WorldRecheckLog } from "@/court/world-recheck";
@@ -9,6 +14,7 @@ import type { ReadModels } from "@/court/read-models/types";
 import {
   MemoryCredentialStore,
   MemoryIdempotencyStore,
+  MemoryWalletChallengeStore,
   MemoryWorldChallengeStore,
   MemoryPageViewStore,
   MemorySolonAttemptLog,
@@ -19,6 +25,7 @@ import { MemoryReadModels } from "./memory-read-models";
 import {
   PostgresCredentialStore,
   PostgresIdempotencyStore,
+  PostgresWalletChallengeStore,
   PostgresWorldChallengeStore,
   PostgresPageViewStore,
   PostgresSolonAttemptLog,
@@ -35,6 +42,7 @@ export interface Backend {
   idempotency: IdempotencyStore;
   /** One-time challenges for linking world identities. */
   worldChallenges: WorldChallengeStore;
+  walletChallenges: WalletChallengeStore;
   /** When each case's world evidence was last re-checked for takedowns. */
   worldRechecks: WorldRecheckLog;
   /** When Solon last failed to rule on each case (retry pacing). */
@@ -60,6 +68,7 @@ export function createMemoryBackend(): Backend & { credentials: MemoryCredential
     credentials: new MemoryCredentialStore(),
     idempotency: new MemoryIdempotencyStore(),
     worldChallenges: new MemoryWorldChallengeStore(),
+    walletChallenges: new MemoryWalletChallengeStore(),
     worldRechecks: new MemoryWorldRecheckLog(),
     solonAttempts: new MemorySolonAttemptLog(),
     pageViews: new MemoryPageViewStore(),
@@ -85,6 +94,7 @@ export function createPostgresBackend(pool: Pool): Backend {
     credentials: new PostgresCredentialStore(pool),
     idempotency: new PostgresIdempotencyStore(pool),
     worldChallenges: new PostgresWorldChallengeStore(pool),
+    walletChallenges: new PostgresWalletChallengeStore(pool),
     worldRechecks: new PostgresWorldRecheckLog(pool),
     solonAttempts: new PostgresSolonAttemptLog(pool),
     pageViews: new PostgresPageViewStore(pool),

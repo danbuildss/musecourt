@@ -26,6 +26,8 @@ export interface AgentRecord {
   displayName: string;
   ownerRef: string | null;
   world: { connectorId: string; worldAgentId: string } | null;
+  /** The wallet it signs in with (lower-case 0x address), if any. */
+  wallet: string | null;
   registeredAt: string;
   licences: Partial<Record<LicenceType, LicenceRecord>>;
 }
@@ -36,6 +38,8 @@ export interface RegistryState {
   /** Lower-cased handle → agentId. */
   handles: Map<string, string>;
   worldIdentities: Map<string, string>;
+  /** Lower-case wallet address → agentId. */
+  wallets: Map<string, string>;
   lastLicenceNumber: Record<LicenceType, number>;
 }
 
@@ -45,6 +49,7 @@ export function emptyRegistry(): RegistryState {
     agents: new Map(),
     handles: new Map(),
     worldIdentities: new Map(),
+    wallets: new Map(),
     lastLicenceNumber: { LAWYER: 0, JUDGE: 0 },
   };
 }
@@ -62,10 +67,12 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
         displayName: d.displayName,
         ownerRef: d.ownerRef,
         world: d.world,
+        wallet: d.wallet ?? null,
         registeredAt: e.occurredAt,
         licences: {},
       });
       state.handles.set(normalizeHandle(d.handle), d.agentId);
+      if (d.wallet) state.wallets.set(d.wallet, d.agentId);
       if (d.world) state.worldIdentities.set(worldKey(d.world.connectorId, d.world.worldAgentId), d.agentId);
       break;
     }
@@ -76,6 +83,12 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
         if (!agent.ownerRef && e.data.ownerRef) agent.ownerRef = e.data.ownerRef;
       }
       state.worldIdentities.set(worldKey(e.data.connectorId, e.data.worldAgentId), e.data.agentId);
+      break;
+    }
+    case "WalletLinked": {
+      const agent = state.agents.get(e.data.agentId);
+      if (agent) agent.wallet = e.data.address;
+      state.wallets.set(e.data.address, e.data.agentId);
       break;
     }
     case "LicenceGranted": {
@@ -165,6 +178,20 @@ export interface RegisterAgentInput {
   displayName?: string;
   ownerRef?: string | null;
   world?: { connectorId: string; worldAgentId: string } | null;
+  /** A wallet the caller has already proven control of (the application layer checks the signature). */
+  wallet?: string | null;
+}
+
+const WALLET_PATTERN = /^0x[0-9a-f]{40}$/;
+
+function requireWallet(state: RegistryState, address: unknown): string {
+  if (typeof address !== "string" || !WALLET_PATTERN.test(address)) {
+    fail("VALIDATION_FAILED", "wallet must be a lower-case 0x address.", { field: "wallet" });
+  }
+  if (state.wallets.has(address)) {
+    fail("DUPLICATE", "That wallet already signs in as a MuseCourt agent.", { wallet: address });
+  }
+  return address;
 }
 
 export function decideRegisterAgent(
@@ -204,7 +231,32 @@ export function decideRegisterAgent(
       fail("DUPLICATE", "That world identity is already linked to a MuseCourt agent.", { world });
     }
   }
-  return [event("AgentRegistered", { agentId: input.agentId, handle, displayName, ownerRef, world })];
+  const wallet = input.wallet ? requireWallet(state, input.wallet) : null;
+  return [
+    event("AgentRegistered", {
+      agentId: input.agentId,
+      handle,
+      displayName,
+      ownerRef,
+      world,
+      ...(wallet ? { wallet } : {}),
+    }),
+  ];
+}
+
+/** Links a wallet the agent has proven it controls. One wallet per agent, one agent per wallet. */
+export function decideLinkWallet(
+  state: RegistryState,
+  actor: Actor,
+  input: { agentId: string; address: string },
+): CourtEvent[] {
+  if (actor.kind !== "agent" || actor.agentId !== input.agentId) {
+    fail("NOT_AUTHORIZED", "An agent can only link a wallet to itself.");
+  }
+  const agent = requireAgent(state, input.agentId);
+  if (agent.wallet) fail("DUPLICATE", "This agent already signs in with a wallet.", { wallet: agent.wallet });
+  const address = requireWallet(state, input.address);
+  return [event("WalletLinked", { agentId: agent.agentId, address })];
 }
 
 export interface LinkWorldIdentityInput {

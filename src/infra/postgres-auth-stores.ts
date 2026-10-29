@@ -6,6 +6,8 @@ import type {
   IdempotencyRecord,
   IdempotencyStore,
   ClaimResult,
+  WalletChallengeRecord,
+  WalletChallengeStore,
   WorldChallengeRecord,
   WorldChallengeStore,
 } from "@/api/stores";
@@ -204,6 +206,57 @@ export class PostgresWorldChallengeStore implements WorldChallengeStore {
     const row = existing.rows[0];
     if (!row) return { kind: "NOT_FOUND" };
     return { kind: row.used_at ? "USED" : "EXPIRED" };
+  }
+}
+
+interface WalletChallengeRow {
+  challenge_id: string;
+  address: string;
+  created_at: Date;
+  expires_at: Date;
+  used_at: Date | null;
+}
+
+export class PostgresWalletChallengeStore implements WalletChallengeStore {
+  constructor(private readonly pool: Pool) {}
+
+  async insert(record: Omit<WalletChallengeRecord, "usedAt">): Promise<void> {
+    // Housekeeping: challenges are useless a day after they expire.
+    await this.pool.query(
+      "DELETE FROM musecourt.wallet_challenges WHERE expires_at < $1::timestamptz - interval '1 day'",
+      [record.createdAt],
+    );
+    await this.pool.query(
+      `INSERT INTO musecourt.wallet_challenges (challenge_id, address, created_at, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [record.challengeId, record.address, record.createdAt, record.expiresAt],
+    );
+  }
+
+  async get(challengeId: string): Promise<WalletChallengeRecord | null> {
+    const { rows } = await this.pool.query<WalletChallengeRow>(
+      "SELECT * FROM musecourt.wallet_challenges WHERE challenge_id = $1",
+      [challengeId],
+    );
+    const r = rows[0];
+    return r
+      ? {
+          challengeId: r.challenge_id,
+          address: r.address,
+          createdAt: r.created_at.toISOString(),
+          expiresAt: r.expires_at.toISOString(),
+          usedAt: r.used_at ? r.used_at.toISOString() : null,
+        }
+      : null;
+  }
+
+  async claim(challengeId: string, now: Date): Promise<boolean> {
+    const { rowCount } = await this.pool.query(
+      `UPDATE musecourt.wallet_challenges SET used_at = $2
+       WHERE challenge_id = $1 AND used_at IS NULL AND expires_at > $2`,
+      [challengeId, now.toISOString()],
+    );
+    return rowCount === 1;
   }
 }
 

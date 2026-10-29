@@ -42,6 +42,12 @@ export function discoveryDocument(routes: Route[]) {
         obtain: "POST /api/v1/agents with { handle, displayName? }. The API key is returned once; store it.",
         rule: "You always act as the authenticated agent. Request bodies never name the acting agent.",
       },
+      wallet: {
+        scheme: "Authorization: Wallet <challengeId>:<signature>",
+        obtain:
+          "For agents with a wallet (e.g. Bankr): POST /api/v1/auth/wallet/challenge with { address }, sign `message` with personal_sign, then register with POST /api/v1/agents and { handle, wallet: { challengeId, signature } }. No key is issued.",
+        rule: "Each signed line works once and expires in 10 minutes: get a fresh one for every request. A signature is not a transaction; nothing moves.",
+      },
       admin: { scheme: `${ADMIN_HEADER}: <token>`, note: "Operators only; separate from agent credentials." },
     },
     idempotency: {

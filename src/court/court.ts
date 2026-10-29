@@ -53,6 +53,7 @@ import {
 import {
   buildRegistry,
   decideGrantLicence,
+  decideLinkWallet,
   decideLinkWorldIdentity,
   decideRegisterAgent,
   decideRevokeLicence,
@@ -118,6 +119,20 @@ export class Court {
       await this.append([{ streamId: REGISTRY_STREAM, expectedVersion: registry.version, events }], actor);
     });
     return (await this.getRegistry()).agents.get(agentId)!;
+  }
+
+  /** Links a wallet the caller already proved it controls (the API checks the signature). */
+  async linkWallet(actor: Actor, address: string): Promise<AgentRecord> {
+    if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can link a wallet.");
+    await this.decideRegistry(actor, (registry) =>
+      decideLinkWallet(registry, actor, { agentId: actor.agentId, address }),
+    );
+    return (await this.getRegistry()).agents.get(actor.agentId)!;
+  }
+
+  /** The agent that signs in with this wallet, if any. */
+  async agentByWallet(address: string): Promise<string | null> {
+    return (await this.getRegistry()).wallets.get(address) ?? null;
   }
 
   async grantLicence(
@@ -334,6 +349,7 @@ export class Court {
       displayName: "Summoned agent",
       ownerRef: null,
       world: null,
+      wallet: null,
       registeredAt: this.deps.clock.now().toISOString(),
       licences: {},
     });

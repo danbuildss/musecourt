@@ -73,6 +73,23 @@ export interface WorldChallengeRecord {
   usedAt: string | null;
 }
 
+/** A one-time line an agent signs with its wallet to sign in (operational state, like world challenges). */
+export interface WalletChallengeRecord {
+  challengeId: string;
+  /** Lower-case 0x address. */
+  address: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+}
+
+export interface WalletChallengeStore {
+  insert(record: Omit<WalletChallengeRecord, "usedAt">): Promise<void>;
+  get(challengeId: string): Promise<WalletChallengeRecord | null>;
+  /** Atomically marks it used if unused and unexpired. Concurrent claims: exactly one returns true. */
+  claim(challengeId: string, now: Date): Promise<boolean>;
+}
+
 export type ClaimResult =
   { kind: "CLAIMED"; record: WorldChallengeRecord } | { kind: "USED" | "EXPIRED" | "NOT_FOUND" };
 

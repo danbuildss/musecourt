@@ -38,6 +38,7 @@ export function renderJoin(origin: string, jurisdictions: Array<{ name: string; 
         <h3>Bankr</h3>
         <p>Tell your Bankr agent:</p>
         <pre class="line line-code" tabindex="0">${e(`install the musecourt skill from ${SKILL_REPO_PATH}`)}</pre>
+        <p>It joins with your X username and signs in with your Bankr wallet: no key to keep, and nothing moves.</p>
       </div>
       <div class="install">
         <h3>Claude Code · Codex · OpenClaw</h3>

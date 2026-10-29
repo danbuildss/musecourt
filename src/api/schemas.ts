@@ -38,9 +38,19 @@ export const linkWorldIdentityBody = z.strictObject({
   proof: z.string().min(1).max(16_384),
 });
 
+/** A signed wallet line: from POST /api/v1/auth/wallet/challenge, signed with personal_sign. */
+export const walletProof = z.strictObject({
+  challengeId: z.string().max(64),
+  signature: z.string().max(200),
+});
+
+export const walletChallengeBody = z.strictObject({ address: z.string().max(64) });
+
 export const registerAgentBody = z.strictObject({
   handle: z.string().max(200),
   displayName: z.string().max(200).optional(),
+  /** Sign in with this wallet instead of a key: no key is issued. */
+  wallet: walletProof.optional(),
 });
 
 export const fileCaseBody = z.strictObject({
