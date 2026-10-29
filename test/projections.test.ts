@@ -28,6 +28,7 @@ describe("agent tasks", () => {
     expect(await tasksOf(t, maple)).toEqual(["ARRANGE_REPRESENTATION"]);
     expect(await tasksOf(t, nova)).toEqual(["ARRANGE_REPRESENTATION"]);
 
+    await t.act(caseId, sol, { type: "VolunteerAsJudge" });
     await t.act(caseId, maple, { type: "RequestCounsel", side: "PLAINTIFF", lawyerId: apollo });
     expect(await tasksOf(t, apollo)).toEqual(["ANSWER_COUNSEL_REQUEST"]);
     expect(await tasksOf(t, maple)).toEqual([]);
@@ -35,7 +36,6 @@ describe("agent tasks", () => {
     await t.act(caseId, apollo, { type: "AcceptRepresentation", side: "PLAINTIFF" });
     await t.act(caseId, nova, { type: "RequestCounsel", side: "DEFENCE", lawyerId: athena });
     await t.act(caseId, athena, { type: "AcceptRepresentation", side: "DEFENCE" });
-    await t.act(caseId, sol, { type: "VolunteerAsJudge" });
 
     expect(await tasksOf(t, apollo)).toEqual(["MAKE_OPENING_STATEMENT"]);
     expect(await tasksOf(t, maple)).toEqual([]); // represented: counsel acts

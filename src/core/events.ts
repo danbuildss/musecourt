@@ -168,7 +168,7 @@ export interface CourtEventMap {
   SelfRepresentationDeclared: { side: Side; by: "PARTY" | "COURT" };
   JudgeAssigned: {
     judge: JudgeSeat;
-    reason: "VOLUNTEERED" | "NO_JUDGE_BY_DEADLINE" | "JUDGE_MISSED_DEADLINE";
+    reason: "VOLUNTEERED" | "PARTIES_READY" | "NO_JUDGE_BY_DEADLINE" | "JUDGE_MISSED_DEADLINE";
     replaces: JudgeSeat | null;
   };
   StatementMade: {

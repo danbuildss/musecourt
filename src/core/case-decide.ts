@@ -986,7 +986,13 @@ function autoProgress(draft: Draft): void {
         draft.completeStage("ACTIONS_COMPLETE", "PRE_TRIAL");
         break;
       case "PRE_TRIAL":
-        if (!state.judge || SIDES.some((s) => state.representation[s].mode === "UNRESOLVED")) return;
+        if (SIDES.some((s) => state.representation[s].mode === "UNRESOLVED")) return;
+        // Both sides are ready: a case never waits for a judge. Solon takes the empty bench.
+        if (!state.judge) {
+          draft.emit(
+            event("JudgeAssigned", { judge: { kind: "HOUSE" }, reason: "PARTIES_READY", replaces: null }),
+          );
+        }
         draft.completeStage("ACTIONS_COMPLETE", "OPENING_PLAINTIFF");
         break;
       case "OPENING_PLAINTIFF":

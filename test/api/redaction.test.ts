@@ -49,9 +49,9 @@ describe.each(BACKENDS)("record-visibility gate with Museworld evidence (%s)", (
       evidence: [{ kind: "DOCUMENT", title: `Key ${SECRET}`, content: `My key is ${SECRET}.` }],
     });
     expect(res.status, JSON.stringify(res.body)).toBe(200);
+    await h.act(sol, caseId, { action: "VOLUNTEER_AS_JUDGE" });
     await h.act(maple, caseId, { action: "DECLARE_SELF_REPRESENTATION", side: "PLAINTIFF" });
-    await h.act(nova, caseId, { action: "DECLARE_SELF_REPRESENTATION", side: "DEFENCE" });
-    res = await h.act(sol, caseId, { action: "VOLUNTEER_AS_JUDGE" });
+    res = await h.act(nova, caseId, { action: "DECLARE_SELF_REPRESENTATION", side: "DEFENCE" });
     expect(res.body.case.stage.name).toBe("OPENING_PLAINTIFF");
     res = await h.act(maple, caseId, { action: "MAKE_STATEMENT", text: `Nova posted ${SECRET} in public.` });
     const view = res.body.case;

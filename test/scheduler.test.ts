@@ -98,12 +98,23 @@ describe("court clock: abandoned cases always reach the right next state", () =>
     });
   });
 
-  it("5. no volunteer judge: Solon takes the bench at the pre-trial deadline and skips questions", async () => {
+  it("5a. no volunteer judge: Solon takes the bench the moment both sides are ready, with no wait", async () => {
     const t = await createTestCourt();
     const { caseId } = await fileStandardCase(t);
     await t.act(caseId, t.agents.nova, { type: "RespondToComplaint", response: "Denied." });
     await t.act(caseId, t.agents.maple, { type: "DeclareSelfRepresentation", side: "PLAINTIFF" });
-    await t.act(caseId, t.agents.nova, { type: "DeclareSelfRepresentation", side: "DEFENCE" });
+    const state = await t.act(caseId, t.agents.nova, { type: "DeclareSelfRepresentation", side: "DEFENCE" });
+    expect(state.judge).toEqual({ kind: "HOUSE" });
+    expect(state.stage).toBe("OPENING_PLAINTIFF");
+    const assigned = (await t.court.getCaseEvents(caseId)).find((e) => e.type === "JudgeAssigned");
+    expect(assigned?.data).toMatchObject({ reason: "PARTIES_READY" });
+  });
+
+  it("5b. a side that never gets ready: at the pre-trial deadline it represents itself and Solon takes the bench, skipping questions", async () => {
+    const t = await createTestCourt();
+    const { caseId } = await fileStandardCase(t);
+    await t.act(caseId, t.agents.nova, { type: "RespondToComplaint", response: "Denied." });
+    await t.act(caseId, t.agents.maple, { type: "DeclareSelfRepresentation", side: "PLAINTIFF" });
     await jumpToDeadline(t, caseId);
     await t.courtClock().tick();
     expect((await t.court.getCase(caseId))!.judge).toEqual({ kind: "HOUSE" });
@@ -338,12 +349,12 @@ describe("invariant: no case gets permanently stuck because agents stop particip
   const script = (t: TestCourt): Array<[string, CaseCommand]> => {
     const { maple, nova, apollo, athena, sol } = t.agents;
     return [
+      [sol, { type: "VolunteerAsJudge" }],
       [nova, { type: "RespondToComplaint", response: "Denied." }],
       [maple, { type: "RequestCounsel", side: "PLAINTIFF", lawyerId: apollo }],
       [apollo, { type: "AcceptRepresentation", side: "PLAINTIFF" }],
       [nova, { type: "RequestCounsel", side: "DEFENCE", lawyerId: null }],
       [athena, { type: "AcceptRepresentation", side: "DEFENCE" }],
-      [sol, { type: "VolunteerAsJudge" }],
       [apollo, { type: "MakeStatement", text: "Opening." }],
       [athena, { type: "MakeStatement", text: "Opening." }],
       [apollo, { type: "ConcludeStage" }],

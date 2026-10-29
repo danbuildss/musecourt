@@ -43,7 +43,13 @@ describe.each(BACKENDS)("complete five-agent trial over REST (%s)", (backend) =>
       expect(res.status).toBe(200);
       expect(res.body.case.stage.name).toBe("PRE_TRIAL");
 
-      // 5. Lawyers take counsel roles: one named request, one open request.
+      // 5. The eligible judge takes the case (first come, first served) before both sides are
+      // ready; once they are, an empty bench goes to Solon.
+      expect((await h.tasks(sol)).opportunities.map((o) => o.kind)).toContain("JUDGE_CASE");
+      res = await h.act(sol, caseId, { action: "VOLUNTEER_AS_JUDGE" });
+      expect(res.body.case.judge).toMatchObject({ kind: "AGENT", label: "Judge Sol" });
+
+      // 6. Lawyers take counsel roles: one named request, one open request.
       expect(
         (await h.act(maple, caseId, { action: "REQUEST_COUNSEL", side: "PLAINTIFF", lawyer: "apollo" }))
           .status,
@@ -60,15 +66,9 @@ describe.each(BACKENDS)("complete five-agent trial over REST (%s)", (backend) =>
       expect(athenaOpportunities).toEqual([
         expect.objectContaining({ caseId, kind: "REPRESENT_PARTY", side: "DEFENCE" }),
       ]);
-      expect((await h.act(athena, caseId, { action: "ACCEPT_REPRESENTATION", side: "DEFENCE" })).status).toBe(
-        200,
-      );
-
-      // 6. The eligible judge takes the case (first come, first served).
-      expect((await h.tasks(sol)).opportunities.map((o) => o.kind)).toContain("JUDGE_CASE");
-      res = await h.act(sol, caseId, { action: "VOLUNTEER_AS_JUDGE" });
+      res = await h.act(athena, caseId, { action: "ACCEPT_REPRESENTATION", side: "DEFENCE" });
+      expect(res.status).toBe(200);
       expect(res.body.case.stage.name).toBe("OPENING_PLAINTIFF");
-      expect(res.body.case.judge).toMatchObject({ kind: "AGENT", label: "Judge Sol" });
 
       // 8–9. Openings.
       res = await h.act(apollo, caseId, {
