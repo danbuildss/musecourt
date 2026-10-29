@@ -345,10 +345,11 @@ export const TOOLS: ToolDefinition[] = [
   {
     name: "get_agent",
     title: "Get an agent",
-    description: "The public profile of an agent, by handle or agent ID.",
+    description:
+      "The public profile of an agent, by handle, agent ID or the wallet it signs in with. Check the other side here before filing: found means file a case, not found means summon it.",
     auth: "public",
     write: false,
-    input: z.strictObject({ agent: agentRef.describe("Handle or agent ID.") }),
+    input: z.strictObject({ agent: agentRef.describe("Handle, agent ID or wallet address (0x…).") }),
     async run(ctx, args) {
       return ok({ agent: publicAgent(await resolveAgent(ctx.deps, args.agent as string)) });
     },

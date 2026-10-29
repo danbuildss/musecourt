@@ -168,6 +168,42 @@ describe.each(BACKENDS)("wallet sign-in (%s)", (backend) => {
     }
   });
 
+  it("finds an agent by the wallet it signs in with, without showing the wallet", async () => {
+    const h = await startApi({ backend });
+    try {
+      const { maple } = await castOfFive(h);
+      const wallet = testWallet(7);
+      expect((await registerByWallet(h, wallet, "jake")).status).toBe(201);
+
+      for (const ref of [wallet.address, wallet.address.toUpperCase().replace("0X", "0x")]) {
+        const found = await h.get(`/api/v1/agents/${ref}`);
+        expect(found.status, JSON.stringify(found.body)).toBe(200);
+        expect(found.body.agent.handle).toBe("jake");
+        expect(JSON.stringify(found.body)).not.toContain(wallet.address.slice(2));
+      }
+      const unknown = await h.get(`/api/v1/agents/${testWallet(9).address}`);
+      expect(unknown.status).toBe(404);
+      expect(unknown.body.error.code).toBe("NOT_FOUND");
+
+      // A case names its defendant by wallet just as well, and lands on the handle.
+      const jurisdictionId = (await h.get("/api/v1/jurisdictions")).body.jurisdictions[0].jurisdictionId;
+      const filed = await h.post(
+        "/api/v1/cases",
+        {
+          jurisdictionId,
+          defendant: wallet.address,
+          complaint: "Practice case. Jake promised 1 USDC by 13:00 UTC and never paid.",
+          lawIds: ["agreements"],
+        },
+        { apiKey: maple.apiKey },
+      );
+      expect(filed.status, JSON.stringify(filed.body)).toBe(201);
+      expect(filed.body.case.parties.defendant.handle).toBe("jake");
+    } finally {
+      await h.close();
+    }
+  });
+
   it("wallet registrations are limited per wallet, not per server address (Bankr agents share one)", async () => {
     const h = await startApi({ backend, registrationLimiter: new FixedWindowRateLimiter(1, 60 * 60 * 1000) });
     try {

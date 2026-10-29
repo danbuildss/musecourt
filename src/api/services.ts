@@ -54,12 +54,24 @@ export function publicAgent(row: AgentRow) {
   };
 }
 
-/** An agent by handle or agent ID. */
+const WALLET_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+
+/**
+ * An agent by handle, agent ID or the wallet it signs in with. The wallet route lets Bankr agents
+ * find each other when a MuseCourt handle differs from an X name; the answer never shows the wallet.
+ */
 export async function resolveAgent(deps: ApiDeps, ref: string): Promise<AgentRow> {
-  const byId = ID_PATTERN.test(ref) && ref.startsWith("agent_") ? await deps.readModels.getAgent(ref) : null;
-  const found = byId ?? (await deps.readModels.findAgentByHandle(normalizeHandle(ref)));
+  const found = WALLET_ADDRESS.test(ref)
+    ? await agentByWallet(deps, ref)
+    : ((ID_PATTERN.test(ref) && ref.startsWith("agent_") ? await deps.readModels.getAgent(ref) : null) ??
+      (await deps.readModels.findAgentByHandle(normalizeHandle(ref))));
   if (!found) throw new CourtError("NOT_FOUND", `No agent ${ref}.`, { agent: ref });
   return found;
+}
+
+async function agentByWallet(deps: ApiDeps, address: string): Promise<AgentRow | null> {
+  const agentId = await deps.court.agentByWallet(address.toLowerCase());
+  return agentId ? deps.readModels.getAgent(agentId) : null;
 }
 
 export async function tasksAndOpportunities(deps: ApiDeps, agentId: string, now: Date) {
