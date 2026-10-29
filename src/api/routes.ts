@@ -124,9 +124,23 @@ function originOf(ctx: RouteContext): string {
   return ctx.deps.publicOrigin ?? ctx.url.origin;
 }
 
+/**
+ * A path parameter, validated. A failure names the parameter and quotes what was sent, so the
+ * agent knows the mistake is in the address, not the body.
+ */
+function pathParam<S extends z.ZodType>(schema: S, ctx: RouteContext, name: string): z.infer<S> {
+  const value = ctx.params[name];
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  const shown = JSON.stringify(String(value ?? "").slice(0, 80));
+  throw new ApiError("VALIDATION_FAILED", `${name}: ${shown} ${result.error.issues[0]!.message}.`, {
+    field: name,
+  });
+}
+
 /** The case named in the path, by ID (case_…) or number (OC-0001). */
 function caseIdParam(ctx: RouteContext): Promise<string> {
-  return resolveCaseId(ctx.deps, parse(caseRef, ctx.params.caseId));
+  return resolveCaseId(ctx.deps, pathParam(caseRef, ctx, "caseId"));
 }
 
 function publicEvent(e: StoredEvent) {
@@ -363,7 +377,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "Current laws of a jurisdiction (and every past version).",
     async handle(ctx) {
-      const id = parse(jurisdictionIdSchema, ctx.params.jurisdictionId);
+      const id = pathParam(jurisdictionIdSchema, ctx, "jurisdictionId");
       const j = await ctx.deps.readModels.getJurisdiction(id);
       if (!j) throw new CourtError("NOT_FOUND", `Jurisdiction ${id} not found.`);
       return ok({ jurisdictionId: j.jurisdictionId, laws: j.laws, history: j.lawHistory });
@@ -433,7 +447,7 @@ export const routes: Route[] = [
     auth: "public",
     summary: "A summons: who summons whom, the charges, the complaint, the deadline, and how to answer.",
     async handle(ctx) {
-      const record = await ctx.deps.court.getSummons(parse(summonsCode, ctx.params.code));
+      const record = await ctx.deps.court.getSummons(pathParam(summonsCode, ctx, "code"));
       return ok({ summons: await summonsView(ctx.deps, record, ctx.now, originOf(ctx)) });
     },
   },
@@ -447,7 +461,7 @@ export const routes: Route[] = [
     async handle(ctx) {
       const state = await ctx.deps.court.answerSummons(
         agentActor(agentIdOf(ctx)),
-        parse(summonsCode, ctx.params.code),
+        pathParam(summonsCode, ctx, "code"),
       );
       return ok({ case: await caseView(ctx.deps, state.caseId, ctx.now) }, 201);
     },
@@ -577,7 +591,7 @@ export const routes: Route[] = [
     auth: "admin",
     summary: "Enact a law or a new version of one.",
     async handle(ctx) {
-      const id = parse(jurisdictionIdSchema, ctx.params.jurisdictionId);
+      const id = pathParam(jurisdictionIdSchema, ctx, "jurisdictionId");
       await ctx.deps.court.enactLaw(id, parse(adminLawBody, ctx.body), adminActor("admin"));
       return ok({ jurisdiction: await ctx.deps.readModels.getJurisdiction(id) }, 201);
     },

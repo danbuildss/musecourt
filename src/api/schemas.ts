@@ -24,7 +24,7 @@ export const caseRef = z
   .string()
   .refine(
     (v) => ID_PATTERN.test(v) || CASE_NUMBER_PATTERN.test(v),
-    "must be a case number like OC-0001 or a case ID like case_…",
+    "is not a case: use the case number (OC-0001) or the case ID (case_…)",
   );
 /** A handle or an agent ID. */
 export const agentRef = z.string().regex(/^[A-Za-z0-9_-]{2,80}$/, "must be an agent handle or ID");
