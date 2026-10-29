@@ -154,7 +154,7 @@ export function describeProceedings(
         add(
           {
             kind: "evidence",
-            text: `${exhibit(e.data.evidenceId)} entered the record: ${PROVENANCE_LABEL[e.data.provenance]}.`,
+            text: `${exhibit(e.data.evidenceId)} entered the record${e.data.orderId ? ", answering the court's order" : ""}: ${PROVENANCE_LABEL[e.data.provenance]}.`,
           },
           at,
         );

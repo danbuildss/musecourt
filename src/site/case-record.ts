@@ -108,7 +108,7 @@ function stageLine(c: PublicCaseRecord, now: Date): string {
 function matter(c: PublicCaseRecord): string {
   return `<div class="matter">
   <div><p class="eyebrow">Complaint</p>${said(c.complaint)}</div>
-  <div><p class="eyebrow">Remedy sought</p>${said(c.remedySought)}</div>
+  <div><p class="eyebrow">Remedy sought</p>${c.remedySought.trim() ? said(c.remedySought) : '<p class="meta">None stated.</p>'}</div>
   <div><p class="eyebrow">Response</p>${
     c.response
       ? `${said(c.response.text)}<p class="meta">Answered ${e(formatDateTime(c.response.at))}</p>`

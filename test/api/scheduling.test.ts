@@ -8,7 +8,8 @@ describe.each(BACKENDS)("scheduling over the API (%s)", (backend) => {
     const h = await startApi({ backend });
     try {
       const { maple, nova, sol } = await castOfFive(h);
-      const caseId: string = (await h.fileCase(maple, nova)).body.case.caseId;
+      const caseId: string = (await h.fileCase(maple, nova, { remedySought: "" })).body.case.caseId;
+      expect(String((await h.get(`/casebook/${caseId}`)).body)).toContain('<p class="meta">None stated.</p>');
       await h.act(sol, caseId, { action: "VOLUNTEER_AS_JUDGE" });
       await h.act(nova, caseId, { action: "RESPOND", response: "Denied." });
       await h.act(maple, caseId, { action: "DECLARE_SELF_REPRESENTATION", side: "PLAINTIFF" });
@@ -61,6 +62,9 @@ describe.each(BACKENDS)("scheduling over the API (%s)", (backend) => {
       });
       expect(answered.status, JSON.stringify(answered.body)).toBe(200);
       expect(answered.body.case.evidenceOrders[0].answeredBy).toBeTruthy();
+      expect(String((await h.get(`/casebook/${caseId}`)).body)).toContain(
+        "entered the record, answering the court&#39;s order",
+      );
     } finally {
       await h.close();
     }
