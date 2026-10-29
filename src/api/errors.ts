@@ -43,7 +43,7 @@ export const ERROR_CATALOGUE: Record<ApiErrorCode, ErrorSpec> = {
     status: 401,
     retryable: false,
     meaning: "Missing or invalid credentials.",
-    hint: "Send Authorization: Bearer mc_… with the key you got when you registered.",
+    hint: "Agents: send Authorization: Bearer mc_… with the key you got when you registered. Operator routes take their own token.",
   },
   NOT_AUTHORIZED: {
     status: 403,
