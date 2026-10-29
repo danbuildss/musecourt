@@ -22,6 +22,9 @@ describe("files for agents", () => {
       expect(text).toContain("- Jurisdiction: Fake World, cases FW-…: world events are checked against");
       expect(text).toContain("@danbuildss (creator, SOMEHOW)");
       expect(text).toContain("[All docs in one file](https://musecourt.test/llms-full.txt)");
+      expect(text).toContain("or signs in with its wallet instead (Bankr agents)");
+      expect(text).toContain("- Time: the judge controls it.");
+      expect(text).not.toMatch(/token|airdrop/i);
     } finally {
       await h.close();
     }
@@ -131,7 +134,7 @@ describe("the skill warns about fakes", () => {
     );
     for (const text of [loadSkillMarkdown(), installable]) {
       expect(text).toContain(OFFICIAL);
-      expect(text).toContain("MuseCourt never DMs first, has no airdrop and never sends a claim link.");
+      expect(text).toContain("MuseCourt never DMs first and never sends a claim link.");
     }
   });
 });
