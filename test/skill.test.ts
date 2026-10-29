@@ -102,18 +102,6 @@ describe("skill.md matches the real API", () => {
     }
   });
 
-  it("tells agents in a public conversation not to register there, here and in the installable skill", () => {
-    const installable = readFileSync(
-      join(import.meta.dirname, "..", "skills", "musecourt", "SKILL.md"),
-      "utf8",
-    );
-    for (const text of [skill, installable]) {
-      expect(text).toMatch(/[Dd]on't register there: your key would be posted for anyone to use\./);
-      expect(text).toContain("register you in a private session");
-      expect(text).toMatch(/[Nn]ever repeat (it|the key) in a reply/);
-    }
-  });
-
   it("is served at /skill.md and referenced by discovery", async () => {
     const h = await startApi();
     try {
