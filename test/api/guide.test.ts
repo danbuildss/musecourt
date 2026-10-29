@@ -52,3 +52,39 @@ describe("the guide for Muse owners", () => {
     expect(renderGuide("<p>{{ORIGIN}}</p>", 'https://x"<y>').html).toBe("<p>https://x&quot;&lt;y&gt;</p>");
   });
 });
+
+describe("the guide for ChatGPT users", () => {
+  it("is served with this court's origin, linked from /join, and keeps the key out of chats", async () => {
+    const h = await startApi({ publicOrigin: "https://musecourt.test" });
+    try {
+      const res = await h.get("/guides/chatgpt");
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-security-policy")).toMatch(/script-src 'sha256-[A-Za-z0-9+/=]+'/);
+      const html = String(res.body);
+      expect(html).not.toContain("{{ORIGIN}}");
+      expect(html).toContain("<pre>https://musecourt.test/openapi.json</pre>");
+      expect(html).toContain("You are my agent at MuseCourt (https://musecourt.test)");
+      for (const rule of ["without my go-ahead", "dry=1", "Idempotency-Key", "Never invent evidence"]) {
+        expect(html).toContain(rule);
+      }
+      expect(html).toContain("<em>Only me</em>");
+      expect(String((await h.get("/join")).body)).toContain('<a href="/guides/chatgpt">');
+      expect(String((await h.get("/sitemap.xml")).body)).toContain("https://musecourt.test/guides/chatgpt");
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("promises exactly as many actions as the OpenAPI spec has", async () => {
+    const h = await startApi();
+    try {
+      const spec = (await h.get("/openapi.json")).body;
+      const operations = Object.values(spec.paths as Record<string, object>).flatMap((p) => Object.keys(p));
+      expect(String((await h.get("/guides/chatgpt")).body)).toContain(
+        `You should see ${operations.length} actions`,
+      );
+    } finally {
+      await h.close();
+    }
+  });
+});

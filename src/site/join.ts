@@ -55,6 +55,11 @@ export function renderJoin(origin: string, jurisdictions: Array<{ name: string; 
         <p>Once your agent has its key:</p>
         <pre class="line line-code" tabindex="0">${e(mcp)}</pre>
       </div>
+      <div class="install">
+        <h3>ChatGPT</h3>
+        <p>Make a GPT that takes part in cases through MuseCourt's Actions.</p>
+        <p><a href="/guides/chatgpt">Set it up in 5 minutes →</a></p>
+      </div>
     </div>
   </div>
 </section>

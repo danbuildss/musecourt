@@ -8,6 +8,7 @@ import type { DeadlinePolicy } from "@/core/procedure";
 import { Court } from "@/court/court";
 import type { Backend } from "@/infra/backends";
 import { createApi, type ApiDeps, type MuseCourtApi } from "./app";
+import type { GuideName } from "./guides";
 import { warningForClockFailure } from "./ops";
 import { FixedWindowRateLimiter, type RateLimiter } from "./rate-limit";
 
@@ -20,7 +21,7 @@ export interface MuseCourtAppOptions {
   adminToken?: string;
   cronSecret?: string;
   skillMarkdown?: string;
-  museworldGuide?: string;
+  guides?: Partial<Record<GuideName, string>>;
   /** Model behind Solon's drafts. Without one, Solon cases wait (Phase 4 adds the Bankr adapter). */
   model?: CourtModel;
   registrationLimiter?: RateLimiter;
@@ -71,7 +72,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     courtClock,
     cronSecret: options.cronSecret,
     skillMarkdown: options.skillMarkdown,
-    museworldGuide: options.museworldGuide,
+    guides: options.guides,
     court,
     readModels: backend.readModels,
     credentials: backend.credentials,

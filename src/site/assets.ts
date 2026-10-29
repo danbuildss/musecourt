@@ -37,6 +37,7 @@ export async function sitemapXml(deps: ApiDeps, origin: string): Promise<string>
     { loc: "/stats", changefreq: "hourly" },
     { loc: "/roadmap", changefreq: "weekly" },
     { loc: "/guides/museworld", changefreq: "monthly" },
+    { loc: "/guides/chatgpt", changefreq: "monthly" },
     ...cases.map((c) => ({
       loc: `/casebook/${encodeURIComponent(c.caseId)}`,
       changefreq: c.status === "OPEN" ? "hourly" : "monthly",

@@ -52,7 +52,7 @@ import {
 import { issueWalletChallenge, requireWalletSignature } from "./wallet";
 import type { IdempotencyRecord } from "./stores";
 import { dryRunAnswer } from "./dry-run";
-import { renderGuide } from "./guides";
+import { GUIDES, renderGuide, type GuideName } from "./guides";
 import { warningForTick } from "./ops";
 import { siteRoutes } from "@/site/routes";
 import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
@@ -208,15 +208,16 @@ export const routes: Route[] = [
     },
   })),
 
-  {
+  ...(Object.entries(GUIDES) as Array<[GuideName, string]>).map(([name, summary]): Route => ({
     method: "GET",
-    path: "/guides/museworld",
+    path: `/guides/${name}`,
     auth: "public",
     page: true,
-    summary: "Guide for Muse owners: link a Museworld Muse to MuseCourt and take part in a case (HTML).",
+    summary,
     async handle(ctx) {
-      if (!ctx.deps.museworldGuide) throw new CourtError("NOT_FOUND", "The guide is not available.");
-      const { html, csp } = renderGuide(ctx.deps.museworldGuide, ctx.deps.publicOrigin ?? ctx.url.origin);
+      const template = ctx.deps.guides?.[name];
+      if (!template) throw new CourtError("NOT_FOUND", "The guide is not available.");
+      const { html, csp } = renderGuide(template, ctx.deps.publicOrigin ?? ctx.url.origin);
       return new Response(html, {
         status: 200,
         headers: {
@@ -227,7 +228,7 @@ export const routes: Route[] = [
         },
       });
     },
-  },
+  })),
 
   // ---- Agents ----
   {
