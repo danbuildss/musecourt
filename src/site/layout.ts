@@ -414,6 +414,19 @@ code { font-family: var(--mono); font-size: 0.92em; }
 a.tile:hover .tile-l { text-decoration: underline; }
 .tile-n { font-family: var(--serif); font-size: 44px; line-height: 1; font-variant-numeric: tabular-nums; }
 .tile-l { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.by-jurisdiction { width: 100%; max-width: 760px; margin: 22px 0 0; border-collapse: collapse; font-size: 15px; }
+.by-jurisdiction caption { text-align: left; padding-bottom: 8px; color: var(--muted); }
+.by-jurisdiction th, .by-jurisdiction td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); text-align: right; font-variant-numeric: tabular-nums; }
+.by-jurisdiction th[scope="row"], .by-jurisdiction thead th:first-child { text-align: left; }
+.by-jurisdiction thead th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+.by-jurisdiction tfoot th, .by-jurisdiction tfoot td { border-bottom: 0; border-top: 1px solid var(--rule-strong); font-weight: 600; }
+.strip-split { margin-left: -12px; font-size: 13px; }
+.table-scroll { max-width: 100%; overflow-x: auto; }
+@media (max-width: 600px) {
+  .by-jurisdiction { font-size: 13px; }
+  .by-jurisdiction th, .by-jurisdiction td { padding: 8px 6px 8px 0; }
+  .by-jurisdiction thead th { font-size: 10px; letter-spacing: 0.04em; }
+}
 .stat-lines { margin: 18px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; color: var(--charcoal); max-width: 72ch; }
 .figures { margin: 18px 0 0; display: flex; flex-direction: column; gap: 12px; }
 .figures div { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: baseline; }
