@@ -19,9 +19,25 @@ export interface CourtStats {
   judgments: { total: number; bySolon: number; byAgentJudges: number; byDefault: number };
   closedWithoutJudgment: { withdrawn: number; settled: number; dismissed: number };
   worldVerifiedExhibits: number;
+  /** Cases adjourned right now (they are also in session). */
+  adjourned: number;
+  /** The same case counts per jurisdiction, in the order they were established. */
+  jurisdictions: JurisdictionStats[];
   activeAgents: { today: number; week: number; all: number };
   courtActions: { today: number; week: number; all: number };
   pageViews: PageViewTotals | null;
+}
+
+export interface JurisdictionStats {
+  jurisdictionId: string;
+  name: string;
+  /** As in its case numbers, e.g. MW or OC. */
+  casePrefix: string;
+  casesFiled: number;
+  inSession: number;
+  adjourned: number;
+  judgments: number;
+  closedWithoutJudgment: number;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -52,19 +68,57 @@ export function countCourt(events: StoredEvent[], now: Date): Omit<CourtStats, "
   let settled = 0;
   let dismissed = 0;
   let worldVerifiedExhibits = 0;
+  const byJurisdiction = new Map<string, JurisdictionStats>();
+  const jurisdictionOf = new Map<string, string>(); // case stream → jurisdictionId
+  const adjournedCases = new Set<string>();
+  const tally = (streamId: string) => byJurisdiction.get(jurisdictionOf.get(streamId) ?? "");
 
   for (const e of events) {
+    if (e.type === "JurisdictionEstablished") {
+      byJurisdiction.set(e.data.jurisdictionId, {
+        jurisdictionId: e.data.jurisdictionId,
+        name: e.data.name,
+        casePrefix: e.data.casePrefix,
+        casesFiled: 0,
+        inSession: 0,
+        adjourned: 0,
+        judgments: 0,
+        closedWithoutJudgment: 0,
+      });
+      continue;
+    }
     if (!e.streamId.startsWith("case:")) continue;
     switch (e.type) {
-      case "CaseFiled":
+      case "CaseFiled": {
         casesFiled += 1;
+        jurisdictionOf.set(e.streamId, e.data.jurisdictionId);
+        const j = tally(e.streamId);
+        if (j) {
+          j.casesFiled += 1;
+          j.inSession += 1;
+        }
         break;
-      case "CaseClosed":
+      }
+      case "CaseAdjourned":
+        adjournedCases.add(e.streamId);
+        break;
+      case "HearingResumed":
+        adjournedCases.delete(e.streamId);
+        break;
+      case "CaseClosed": {
         closed += 1;
+        adjournedCases.delete(e.streamId);
         if (e.data.outcome === "WITHDRAWN") withdrawn += 1;
         if (e.data.outcome === "SETTLED") settled += 1;
         if (e.data.outcome === "DISMISSED") dismissed += 1;
+        const j = tally(e.streamId);
+        if (j) {
+          j.inSession -= 1;
+          if (e.data.outcome === "VERDICT" || e.data.outcome === "DEFAULT_JUDGMENT") j.judgments += 1;
+          else j.closedWithoutJudgment += 1;
+        }
         break;
+      }
       case "VerdictIssued":
         if (e.data.judge.kind === "HOUSE") bySolon += 1;
         else byAgentJudges += 1;
@@ -104,6 +158,11 @@ export function countCourt(events: StoredEvent[], now: Date): Omit<CourtStats, "
     judgments: { total: bySolon + byAgentJudges + byDefault, bySolon, byAgentJudges, byDefault },
     closedWithoutJudgment: { withdrawn, settled, dismissed },
     worldVerifiedExhibits,
+    adjourned: adjournedCases.size,
+    jurisdictions: [...byJurisdiction.values()].map((j) => ({
+      ...j,
+      adjourned: [...adjournedCases].filter((c) => jurisdictionOf.get(c) === j.jurisdictionId).length,
+    })),
     activeAgents: { today: activeToday.size, week: activeWeek.size, all: activeAll.size },
     courtActions: { today: actionsToday.size, week: actionsWeek.size, all: actionsAll.size },
   };

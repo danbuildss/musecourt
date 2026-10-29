@@ -87,6 +87,72 @@ describe("Court Records (/stats)", () => {
     }
   });
 
+  it("splits cases by jurisdiction, with a total, on /stats and the homepage strip", async () => {
+    const h = await startApi();
+    try {
+      const { maple, nova, apollo, sol } = await castOfFive(h);
+      await h.post(
+        "/api/v1/admin/jurisdictions",
+        { jurisdictionId: "open", name: "Open Court", casePrefix: "OC", connectorId: null },
+        { admin: true },
+      );
+      await h.post(
+        "/api/v1/admin/jurisdictions/open/laws",
+        { lawId: "agreements", article: 2, title: "Agreements", text: "Honor accepted agreements." },
+        { admin: true },
+      );
+      await h.fileCase(maple, nova); // Fake World, in session
+      const gone = (await h.fileCase(maple, apollo)).body.case.caseId; // Fake World, withdrawn
+      await h.post(
+        `/api/v1/cases/${gone}/actions`,
+        { action: "WITHDRAW_CASE", reason: "Done." },
+        { apiKey: maple.apiKey },
+      );
+      const oc = (await h.fileCase(nova, maple, { jurisdictionId: "open", lawIds: ["agreements"] })).body.case
+        .caseId;
+      await h.act(sol, oc, { action: "VOLUNTEER_AS_JUDGE" });
+      const until = new Date(h.clock.now().getTime() + 24 * 3600 * 1000).toISOString();
+      expect((await h.act(sol, oc, { action: "ADJOURN", until, reason: "Next week." })).status).toBe(200);
+
+      const stats = countCourt(await h.backend.store.readAll(), h.clock.now());
+      expect(stats.adjourned).toBe(1);
+      expect(stats.jurisdictions.map(({ jurisdictionId, ...j }) => [jurisdictionId, j])).toEqual([
+        [
+          "fake",
+          {
+            name: "Fake World",
+            casePrefix: "FW",
+            casesFiled: 2,
+            inSession: 1,
+            adjourned: 0,
+            judgments: 0,
+            closedWithoutJudgment: 1,
+          },
+        ],
+        [
+          "open",
+          {
+            name: "Open Court",
+            casePrefix: "OC",
+            casesFiled: 1,
+            inSession: 1,
+            adjourned: 1,
+            judgments: 0,
+            closedWithoutJudgment: 0,
+          },
+        ],
+      ]);
+      const page = String((await h.get("/stats")).body);
+      expect(page).toContain('<a href="/casebook?jurisdiction=open">Open Court</a></th><td>1</td>');
+      expect(page).toContain(
+        '<a href="/casebook">All jurisdictions</a></th><td>3</td><td>2 <span class="meta">(1 adjourned)</span></td>',
+      );
+      expect(String((await h.get("/")).body)).toContain("(FW 2 · OC 1)");
+    } finally {
+      await h.close();
+    }
+  });
+
   it("shows the strip on the homepage", async () => {
     const h = await startApi();
     try {

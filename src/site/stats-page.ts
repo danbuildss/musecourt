@@ -1,7 +1,7 @@
 import { escapeHtml as e } from "@/api/http";
 import { formatDate, formatDateTime } from "./format";
 import { page } from "./layout";
-import type { CourtStats } from "./stats";
+import type { CourtStats, JurisdictionStats } from "./stats";
 
 const n = (x: number) => x.toLocaleString("en-US");
 
@@ -44,6 +44,7 @@ export function renderStats(s: CourtStats, origin: string): string {
       ${tile(s.judgments.total, "Judgments entered", "/casebook?status=closed")}
       ${tile(s.closedWithoutJudgment.withdrawn + s.closedWithoutJudgment.settled + s.closedWithoutJudgment.dismissed, "Closed without judgment", "/casebook?status=closed")}
     </div>
+    ${byJurisdiction(s)}
     <ul class="stat-lines">
       <li>Judgments: ${n(s.judgments.bySolon)} by Solon · ${n(s.judgments.byAgentJudges)} by agent judges · ${n(s.judgments.byDefault)} by default</li>
       <li>Closed without judgment: ${n(s.closedWithoutJudgment.withdrawn)} withdrawn · ${n(s.closedWithoutJudgment.settled)} settled · ${n(s.closedWithoutJudgment.dismissed)} dismissed</li>
@@ -98,13 +99,46 @@ export function renderStats(s: CourtStats, origin: string): string {
   });
 }
 
+/** Each jurisdiction's cases, then the total: the same counts as the tiles above. */
+function byJurisdiction(s: CourtStats): string {
+  if (s.jurisdictions.length === 0) return "";
+  const closedWithout =
+    s.closedWithoutJudgment.withdrawn + s.closedWithoutJudgment.settled + s.closedWithoutJudgment.dismissed;
+  const session = (inSession: number, adjourned: number) =>
+    `${n(inSession)}${adjourned ? ` <span class="meta">(${n(adjourned)} adjourned)</span>` : ""}`;
+  const row = (
+    name: string,
+    href: string,
+    c: Omit<JurisdictionStats, "jurisdictionId" | "name" | "casePrefix">,
+  ) =>
+    `<tr><th scope="row"><a href="${href}">${e(name)}</a></th><td>${n(c.casesFiled)}</td><td>${session(c.inSession, c.adjourned)}</td><td>${n(c.judgments)}</td><td>${n(c.closedWithoutJudgment)}</td></tr>`;
+  return `<div class="table-scroll"><table class="by-jurisdiction">
+      <caption class="eyebrow">By jurisdiction</caption>
+      <thead><tr><th scope="col">Jurisdiction</th><th scope="col">Filed</th><th scope="col">In session</th><th scope="col">Judgments</th><th scope="col">Closed, no judgment</th></tr></thead>
+      <tbody>
+        ${s.jurisdictions.map((j) => row(j.name, `/casebook?jurisdiction=${encodeURIComponent(j.jurisdictionId)}`, j)).join("")}
+      </tbody>
+      <tfoot>${row("All jurisdictions", "/casebook", {
+        casesFiled: s.casesFiled,
+        inSession: s.inSession,
+        adjourned: s.adjourned,
+        judgments: s.judgments.total,
+        closedWithoutJudgment: closedWithout,
+      })}</tfoot>
+    </table></div>`;
+}
+
 /** The slim strip under the homepage hero. */
 export function statsStrip(s: CourtStats | null): string {
   if (!s) return "";
   const item = (label: string, value: number) =>
     `<span><span class="eyebrow">${label}</span> <b>${n(value)}</b></span>`;
   return `<div class="strip"><div class="wrap strip-row">
-  ${item("Agents", s.agents)}${item("Museworld verified", s.museworldVerified)}${item("Cases", s.casesFiled)}${item("Judgments", s.judgments.total)}${s.pageViews ? item("Views today", s.pageViews.today) : ""}
+  ${item("Agents", s.agents)}${item("Museworld verified", s.museworldVerified)}${item("Cases", s.casesFiled)}${
+    s.jurisdictions.length > 1
+      ? `<span class="meta strip-split" title="${e(s.jurisdictions.map((j) => `${j.name}: ${j.casesFiled}`).join(" · "))}">(${s.jurisdictions.map((j) => `${e(j.casePrefix)} ${n(j.casesFiled)}`).join(" · ")})</span>`
+      : ""
+  }${item("Judgments", s.judgments.total)}${s.pageViews ? item("Views today", s.pageViews.today) : ""}
   <a class="strip-link" href="/stats">Court records →</a>
 </div></div>`;
 }
