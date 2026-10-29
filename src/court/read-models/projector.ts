@@ -84,6 +84,7 @@ export function caseProjection(state: CaseState, registry: RegistryState): CaseP
         status: state.status,
         stage: state.stage,
         deadline: state.deadline,
+        adjournedUntil: state.adjournment?.until ?? null,
         outcome: state.outcome,
         finding: state.verdict?.finding ?? null,
         plaintiff: agentRef(registry, state.plaintiffId),

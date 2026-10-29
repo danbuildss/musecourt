@@ -17,11 +17,15 @@ export const STAGE_LABEL: Record<Stage, string> = {
 };
 
 /** The stamp a case carries, and the kind of stamp (judgments are set apart from other endings). */
-export function stampFor(c: { status: "OPEN" | "CLOSED"; outcome: CaseOutcome | string | null }): {
+export function stampFor(c: {
+  status: "OPEN" | "CLOSED";
+  outcome: CaseOutcome | string | null;
+  adjournedUntil?: string | null;
+}): {
   text: string;
   kind: "session" | "judgment" | "closed";
 } {
-  if (c.status === "OPEN") return { text: "In session", kind: "session" };
+  if (c.status === "OPEN") return { text: c.adjournedUntil ? "Adjourned" : "In session", kind: "session" };
   switch (c.outcome) {
     case "VERDICT":
       return { text: "Judgment entered", kind: "judgment" };
