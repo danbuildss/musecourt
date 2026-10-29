@@ -12,6 +12,7 @@ import { systemClock } from "@/core/clock";
 import { randomIds } from "@/core/ids";
 import { createPostgresBackend } from "@/infra/backends";
 import { migrate } from "@/infra/migrate";
+import { makeResilient } from "@/infra/resilient-pool";
 import { MOONWAKE_JURISDICTION } from "@/seed/laws";
 import { courtModelFromEnv } from "@/model/llm-court-model";
 import { seedJurisdiction } from "@/seed/seed-court";
@@ -40,7 +41,13 @@ export function restoreOriginalUrl(url: string): string {
 async function init(): Promise<Handler> {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
-  const pool = new pg.Pool({ connectionString: url, max: 5 });
+  // Few connections per instance (many instances share the database's pooler), quick to give up a
+  // stuck connect, and connect-only retries for brief pooler trouble (the 28 Oct 500s).
+  const pool = makeResilient(
+    new pg.Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 5_000 }),
+  );
+  // An idle connection the database drops must not crash the instance.
+  pool.on("error", (error) => console.warn("[musecourt] idle database connection dropped", error.message));
   // Idempotent and lock-protected; cheap after the first cold start.
   await migrate(pool, join(import.meta.dirname, "migrations"));
 
