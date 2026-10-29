@@ -127,15 +127,18 @@ export async function fileStandardCase(
   });
 }
 
-/** Defendant answers; Apollo (plaintiff) and Athena (defence) are appointed; Sol takes the bench. */
+/**
+ * Sol takes the bench; the defendant answers; Apollo (plaintiff) and Athena (defence) are appointed.
+ * The judge volunteers first: once both sides are ready, an empty bench goes to Solon at once.
+ */
 export async function driveToTrial(t: TestCourt, caseId: string): Promise<CaseState> {
   const { maple, nova, apollo, athena, sol } = t.agents;
+  await t.act(caseId, sol, { type: "VolunteerAsJudge" });
   await t.act(caseId, nova, { type: "RespondToComplaint", response: "I had permission to gather there." });
   await t.act(caseId, maple, { type: "RequestCounsel", side: "PLAINTIFF", lawyerId: apollo });
   await t.act(caseId, apollo, { type: "AcceptRepresentation", side: "PLAINTIFF" });
   await t.act(caseId, nova, { type: "RequestCounsel", side: "DEFENCE", lawyerId: athena });
-  await t.act(caseId, athena, { type: "AcceptRepresentation", side: "DEFENCE" });
-  return t.act(caseId, sol, { type: "VolunteerAsJudge" });
+  return t.act(caseId, athena, { type: "AcceptRepresentation", side: "DEFENCE" });
 }
 
 /** Runs the whole trial to DELIBERATION with counsel speaking and Sol asking both sides a question. */

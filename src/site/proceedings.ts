@@ -28,6 +28,7 @@ const TIMEOUT: Record<string, string> = {
 
 const JUDGE_REASON: Record<string, string> = {
   VOLUNTEERED: "volunteered",
+  PARTIES_READY: "both sides were ready and no judge had volunteered",
   NO_JUDGE_BY_DEADLINE: "no judge volunteered by the deadline",
   JUDGE_MISSED_DEADLINE: "the judge missed the deadline",
 };

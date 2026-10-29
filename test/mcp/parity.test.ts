@@ -99,8 +99,8 @@ const SCENARIO: Op[] = [
   act("nova", "request_counsel", (c) => ({ caseId: c0(c), side: "DEFENCE" })),
   act("apollo", "accept_counsel_request", (c) => ({ caseId: c0(c), side: "DEFENCE" })), // one role per case
   act("maple", "volunteer_as_judge", (c) => ({ caseId: c0(c) })), // not a judge
-  act("athena", "accept_counsel_request", (c) => ({ caseId: c0(c), side: "DEFENCE" })),
   act("sol", "volunteer_as_judge", (c) => ({ caseId: c0(c) })),
+  act("athena", "accept_counsel_request", (c) => ({ caseId: c0(c), side: "DEFENCE" })),
   act("apollo", "put_questions", (c) => ({ caseId: c0(c), text: "Q?", addressedTo: ["DEFENCE"] })), // not questions
   act("apollo", "make_statement", (c) => ({ caseId: c0(c), text: "Nova took the timber." }), {
     retry: true,

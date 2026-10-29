@@ -30,11 +30,11 @@ describe("V1 success condition: a full trial with five agents", () => {
     });
     expect(state.stage).toBe("PRE_TRIAL");
 
+    await t.act(caseId, sol, { type: "VolunteerAsJudge" });
     await t.act(caseId, maple, { type: "RequestCounsel", side: "PLAINTIFF", lawyerId: apollo });
     await t.act(caseId, apollo, { type: "AcceptRepresentation", side: "PLAINTIFF" });
     await t.act(caseId, nova, { type: "RequestCounsel", side: "DEFENCE", lawyerId: null });
-    await t.act(caseId, athena, { type: "AcceptRepresentation", side: "DEFENCE" });
-    state = await t.act(caseId, sol, { type: "VolunteerAsJudge" });
+    state = await t.act(caseId, athena, { type: "AcceptRepresentation", side: "DEFENCE" });
     expect(state.stage).toBe("OPENING_PLAINTIFF");
     expect(state.representation).toEqual({
       PLAINTIFF: { mode: "COUNSEL", lawyerId: apollo },
@@ -138,9 +138,9 @@ describe("V1 success condition: a full trial with five agents", () => {
     const { maple, nova, sol } = t.agents;
     const { caseId } = await fileStandardCase(t);
     await t.act(caseId, nova, { type: "RespondToComplaint", response: "Denied." });
+    await t.act(caseId, sol, { type: "VolunteerAsJudge" });
     await t.act(caseId, maple, { type: "DeclareSelfRepresentation", side: "PLAINTIFF" });
-    await t.act(caseId, nova, { type: "DeclareSelfRepresentation", side: "DEFENCE" });
-    const state = await t.act(caseId, sol, { type: "VolunteerAsJudge" });
+    const state = await t.act(caseId, nova, { type: "DeclareSelfRepresentation", side: "DEFENCE" });
     expect(state.stage).toBe("OPENING_PLAINTIFF");
     const next = await t.act(caseId, maple, { type: "MakeStatement", text: "I speak for myself." });
     expect(next.stage).toBe("OPENING_DEFENCE");

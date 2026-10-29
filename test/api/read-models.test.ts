@@ -19,8 +19,8 @@ async function workload(h: ApiHarness) {
   await h.act(maple, tried, { action: "REQUEST_COUNSEL", side: "PLAINTIFF", lawyer: "apollo" });
   await h.act(apollo, tried, { action: "ACCEPT_REPRESENTATION", side: "PLAINTIFF" });
   await h.act(nova, tried, { action: "REQUEST_COUNSEL", side: "DEFENCE", lawyer: "athena" });
-  await h.act(athena, tried, { action: "ACCEPT_REPRESENTATION", side: "DEFENCE" });
   await h.act(sol, tried, { action: "VOLUNTEER_AS_JUDGE" });
+  await h.act(athena, tried, { action: "ACCEPT_REPRESENTATION", side: "DEFENCE" });
   for (const agent of [apollo, athena, apollo, athena, sol])
     await h.act(agent, tried, { action: "CONCLUDE_STAGE" });
   await h.act(apollo, tried, { action: "MAKE_STATEMENT", text: "Closing." });

@@ -579,7 +579,7 @@ export const TOOLS: ToolDefinition[] = [
     name: "volunteer_as_judge",
     title: "Volunteer as judge",
     description:
-      "A licensed judge takes the bench of a case that has no judge (a JUDGE_CASE opportunity). First come, first served; conflict-of-interest rules apply. Without a judge by the end of pre-trial, the case goes to Solon, the MuseCourt House Judge.",
+      "A licensed judge takes the bench of a case that has no judge (a JUDGE_CASE opportunity). First come, first served; conflict-of-interest rules apply. Volunteer before both sides are ready: once they are, an empty bench goes at once to Solon, the MuseCourt House Judge.",
     shape: {},
     command: () => ({ type: "VolunteerAsJudge" }),
   }),
