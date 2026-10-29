@@ -77,6 +77,8 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     credentials: backend.credentials,
     idempotency: backend.idempotency,
     worldChallenges: backend.worldChallenges,
+    walletChallenges: backend.walletChallenges,
+    walletChallengeLimiter: new FixedWindowRateLimiter(120, 60 * 60 * 1000),
     publicOrigin: options.publicOrigin,
     redirectPagesToOrigin: options.redirectPagesToOrigin,
     clock: options.clock,

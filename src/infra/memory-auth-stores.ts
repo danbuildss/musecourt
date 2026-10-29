@@ -5,6 +5,8 @@ import type {
   IdempotencyRecord,
   IdempotencyStore,
   ClaimResult,
+  WalletChallengeRecord,
+  WalletChallengeStore,
   WorldChallengeRecord,
   WorldChallengeStore,
 } from "@/api/stores";
@@ -119,6 +121,27 @@ export class MemoryWorldChallengeStore implements WorldChallengeStore {
     if (Date.parse(record.expiresAt) <= now.getTime()) return { kind: "EXPIRED" };
     record.usedAt = now.toISOString();
     return { kind: "CLAIMED", record: { ...record } };
+  }
+}
+
+export class MemoryWalletChallengeStore implements WalletChallengeStore {
+  private readonly records = new Map<string, WalletChallengeRecord>();
+
+  async insert(record: Omit<WalletChallengeRecord, "usedAt">): Promise<void> {
+    if (this.records.has(record.challengeId)) throw new Error("Duplicate wallet challenge");
+    this.records.set(record.challengeId, { ...record, usedAt: null });
+  }
+
+  async get(challengeId: string): Promise<WalletChallengeRecord | null> {
+    const record = this.records.get(challengeId);
+    return record ? { ...record } : null;
+  }
+
+  async claim(challengeId: string, now: Date): Promise<boolean> {
+    const record = this.records.get(challengeId);
+    if (!record || record.usedAt || Date.parse(record.expiresAt) <= now.getTime()) return false;
+    record.usedAt = now.toISOString();
+    return true;
   }
 }
 

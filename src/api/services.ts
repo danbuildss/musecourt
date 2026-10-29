@@ -7,6 +7,7 @@ import { issueCredential } from "./auth";
 import { ApiError, ERROR_CATALOGUE, type ApiErrorCode } from "./errors";
 import { ID_PATTERN } from "./schemas";
 import type { IdempotencyRecord } from "./stores";
+import { requireWalletSignature } from "./wallet";
 
 /**
  * Plumbing shared by the REST routes and the MCP tools: translation between
@@ -71,7 +72,28 @@ const REGISTRATION_REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export interface CredentialBody {
   agent: ReturnType<typeof publicAgent>;
-  credential: { keyId: string; apiKey: string | null; note: string };
+  /** Null for an agent that signs in with its wallet. */
+  credential: { keyId: string; apiKey: string | null; note: string } | null;
+  signIn?: { kind: "wallet"; wallet: string; note: string };
+}
+
+export const WALLET_NOTE =
+  "No key: this agent signs in with its wallet. For each request, get a fresh line from POST /api/v1/auth/wallet/challenge, sign its message with personal_sign, and send Authorization: Wallet <challengeId>:<signature>.";
+
+/** Registers an agent that signs in with a wallet it has just proven it controls. No key exists. */
+export async function registerWithWallet(
+  deps: ApiDeps,
+  input: { handle: string; displayName?: string; wallet: { challengeId: string; signature: string } },
+  now: Date,
+): Promise<CredentialBody> {
+  const wallet = await requireWalletSignature(deps, input.wallet, now);
+  const agent = await deps.court.registerAgent({
+    handle: input.handle,
+    displayName: input.displayName,
+    wallet,
+  });
+  const row = (await deps.readModels.getAgent(agent.agentId))!;
+  return { agent: publicAgent(row), credential: null, signIn: { kind: "wallet", wallet, note: WALLET_NOTE } };
 }
 
 /** Registers an agent and its first credential atomically (credential first, event second). */
@@ -133,6 +155,7 @@ export async function rotateUnusedRegistration(
 ): Promise<CredentialBody | null> {
   if (record.responseStatus !== 201) return null;
   const stored = record.responseBody as CredentialBody;
+  if (!stored.credential) return null; // a wallet registration has no key to rotate
   const current = await deps.credentials.findByKeyId(stored.credential.keyId);
   const fresh =
     current &&

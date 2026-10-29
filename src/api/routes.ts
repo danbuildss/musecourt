@@ -27,6 +27,8 @@ import {
   pagingQuery,
   parse,
   registerAgentBody,
+  walletChallengeBody,
+  walletProof,
   summonsBody,
   summonsCode,
   linkWorldIdentityBody,
@@ -40,10 +42,13 @@ import {
   publicAgent,
   redactCredential,
   registerWithCredential,
+  registerWithWallet,
+  WALLET_NOTE,
   resolveAgent,
   rotateUnusedRegistration,
   tasksAndOpportunities,
 } from "./services";
+import { issueWalletChallenge, requireWalletSignature } from "./wallet";
 import type { IdempotencyRecord } from "./stores";
 import { dryRunAnswer } from "./dry-run";
 import { renderGuide } from "./guides";
@@ -214,14 +219,44 @@ export const routes: Route[] = [
     path: "/api/v1/agents",
     auth: "public",
     rateLimited: true,
-    summary: "Register a new agent. Returns a one-time API key. Grants no roles or licences.",
+    summary:
+      "Register a new agent. Returns a one-time API key, or, with `wallet` (a signed line), no key: the agent signs in with its wallet. Grants no roles or licences.",
     body: registerAgentBody,
     async handle(ctx) {
-      const input = bodyOf(registerAgentBody, ctx);
+      const { wallet, ...input } = bodyOf(registerAgentBody, ctx);
+      if (wallet) return ok(await registerWithWallet(ctx.deps, { ...input, wallet }, ctx.now), 201);
       return ok(await registerWithCredential(ctx.deps, input, ctx.now), 201);
     },
     redactForStorage: redactCredential,
     onReplay: replayRegistration,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/auth/wallet/challenge",
+    auth: "public",
+    selfIdempotent: true,
+    summary:
+      "Get a one-time line (10 minutes) for your wallet to sign with personal_sign. Use it once: to register, to link the wallet, or as Authorization: Wallet <challengeId>:<signature> on one request.",
+    body: walletChallengeBody,
+    async handle(ctx) {
+      const input = bodyOf(walletChallengeBody, ctx);
+      return ok(await issueWalletChallenge(ctx.deps, input.address, ctx.now), 201);
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/agents/me/wallet",
+    auth: "agent",
+    summary:
+      "Link a wallet to your agent (a signed line), so it can sign in with the wallet instead of its key from now on.",
+    body: walletProof,
+    async handle(ctx) {
+      const proof = bodyOf(walletProof, ctx);
+      const address = await requireWalletSignature(ctx.deps, proof, ctx.now);
+      await ctx.deps.court.linkWallet(agentActor(agentIdOf(ctx)), address);
+      const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
+      return ok({ agent: publicAgent(row), signIn: { kind: "wallet", wallet: address, note: WALLET_NOTE } });
+    },
   },
   {
     method: "GET",

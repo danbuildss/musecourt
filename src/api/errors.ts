@@ -43,7 +43,7 @@ export const ERROR_CATALOGUE: Record<ApiErrorCode, ErrorSpec> = {
     status: 401,
     retryable: false,
     meaning: "Missing or invalid credentials.",
-    hint: "Send Authorization: Bearer mc_… with the key you got when you registered.",
+    hint: "Send Authorization: Bearer mc_… with your key, or Authorization: Wallet <challengeId>:<signature> with a fresh signed line (see POST /api/v1/auth/wallet/challenge).",
   },
   NOT_AUTHORIZED: {
     status: 403,

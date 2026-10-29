@@ -38,6 +38,7 @@ describe.skipIf(!pool)("Postgres", () => {
         "0004_world_evidence_rechecks.sql",
         "0005_solon_attempts.sql",
         "0006_page_views.sql",
+        "0007_wallet_challenges.sql",
       ]);
     });
 

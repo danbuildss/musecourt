@@ -5,6 +5,7 @@ import type { Court } from "@/court/court";
 import type { ReadModels } from "@/court/read-models/types";
 import type { CourtClock } from "@/court/court-clock";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
+import { authenticateWallet, walletAuthorization } from "./wallet";
 import { API_VERSION_NUMBER } from "./discovery";
 import { ApiError, toErrorBody } from "./errors";
 import { DEFAULT_MAX_BODY_BYTES, errorResponse, json, readJsonBody, requestFingerprint } from "./http";
@@ -14,7 +15,13 @@ import { routes, type Route, type RouteContext, type RouteResult } from "./route
 import { isDryRun, parse, queryObject } from "./schemas";
 import { MCP_PATH, handleMcpHttp } from "@/mcp/server";
 import { assertIdempotencyKey, runIdempotent } from "./services";
-import type { CredentialStore, IdempotencyRecord, IdempotencyStore, WorldChallengeStore } from "./stores";
+import type {
+  CredentialStore,
+  IdempotencyRecord,
+  IdempotencyStore,
+  WalletChallengeStore,
+  WorldChallengeStore,
+} from "./stores";
 
 export interface ApiDeps {
   court: Court;
@@ -23,6 +30,10 @@ export interface ApiDeps {
   idempotency: IdempotencyStore;
   /** One-time challenges for linking world identities. */
   worldChallenges: WorldChallengeStore;
+  /** One-time lines agents sign with their wallet to sign in without a key. */
+  walletChallenges: WalletChallengeStore;
+  /** Limits wallet challenges per wallet (Bankr agents share server addresses, so not per IP). */
+  walletChallengeLimiter?: RateLimiter;
   /** MuseCourt's exact public origin (e.g. https://musecourt.example). World identity proofs must name it. */
   publicOrigin?: string;
   clock: Clock;
@@ -216,23 +227,29 @@ export function createApi(deps: ApiDeps): MuseCourtApi {
 
       let principal: Principal | null = null;
       if (route.auth === "agent") {
-        principal = await authenticateAgent(request, deps.credentials, now, async (agentId) =>
-          Boolean(await deps.readModels.getAgent(agentId)),
-        );
+        const wallet = walletAuthorization(request.headers.get("authorization"));
+        principal = wallet
+          ? await authenticateWallet(deps, wallet, now)
+          : await authenticateAgent(request, deps.credentials, now, async (agentId) =>
+              Boolean(await deps.readModels.getAgent(agentId)),
+            );
       }
       if (route.auth === "admin") principal = authenticateAdmin(request, deps.adminToken);
       if (route.auth === "cron") principal = authenticateCron(request, deps.cronSecret);
 
+      const body =
+        route.method === "POST" && !route.bodyless ? await readJsonBody(request, maxBodyBytes) : undefined;
+
+      // Wallet registrations are limited per wallet (one agent each) instead: Bankr agents share addresses.
+      const byWallet = Boolean((body as { wallet?: unknown } | undefined)?.wallet);
       if (
         route.rateLimited &&
+        !byWallet &&
         deps.registrationLimiter &&
         !deps.registrationLimiter.hit(`register:${clientIp}`, now)
       ) {
         throw new ApiError("RATE_LIMITED", "Too many registrations from this address. Retry later.");
       }
-
-      const body =
-        route.method === "POST" && !route.bodyless ? await readJsonBody(request, maxBodyBytes) : undefined;
       const ctx = { request, url, params, body, principal, deps, now, clientIp };
 
       // Reads, and the self-idempotent clock, skip the Idempotency-Key machinery.

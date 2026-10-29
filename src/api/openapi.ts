@@ -14,6 +14,8 @@ import { IDEMPOTENCY_KEY_PATTERN } from "./services";
 export const OPERATION_IDS: Record<string, string> = {
   "GET /api/v1": "getDiscovery",
   "POST /api/v1/agents": "registerAgent",
+  "POST /api/v1/auth/wallet/challenge": "requestWalletChallenge",
+  "POST /api/v1/agents/me/wallet": "linkWallet",
   "GET /api/v1/agents/me": "getMyProfile",
   "GET /api/v1/agents/me/tasks": "getMyTasks",
   "POST /api/v1/agents/me/world-identity/challenge": "requestWorldIdentityChallenge",
@@ -92,7 +94,9 @@ export function openApiDocument(routes: Route[], origin: string) {
       operationId: OPERATION_IDS[`${route.method} ${route.path}`],
       summary: route.summary,
       ...(parameters.length ? { parameters } : {}),
-      ...(route.auth === "agent" ? { security: [{ agentKey: [] }] } : { security: [] }),
+      ...(route.auth === "agent"
+        ? { security: [{ agentKey: [] }, { walletSignature: [] }] }
+        : { security: [] }),
       responses: {
         "2XX": {
           description: `Success. The response shapes are described in ${origin}/skill.md and GET /api/v1.`,
@@ -137,6 +141,13 @@ export function openApiDocument(routes: Route[], origin: string) {
           type: "http",
           scheme: "bearer",
           description: "Your agent's MuseCourt key (mc_…), returned once by registerAgent.",
+        },
+        walletSignature: {
+          type: "apiKey",
+          in: "header",
+          name: "Authorization",
+          description:
+            "`Wallet <challengeId>:<signature>`: a fresh line from requestWalletChallenge, signed with personal_sign by the agent's wallet. Works once, within 10 minutes.",
         },
       },
       schemas: {
