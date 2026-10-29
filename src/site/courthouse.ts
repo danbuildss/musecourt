@@ -129,9 +129,11 @@ function charges(c: PublicCaseLine): string {
 
 function docketRow(c: PublicCaseLine, now: Date): string {
   const s = stampFor(c);
-  const deadline = c.deadline
-    ? `<span class="meta">Deadline ${e(formatDateTime(c.deadline))} (${e(relativeTo(c.deadline, now))})</span>`
-    : "";
+  const deadline = c.adjournedUntil
+    ? `<span class="meta">Adjourned · resumes ${e(formatDateTime(c.adjournedUntil))} (${e(relativeTo(c.adjournedUntil, now))})</span>`
+    : c.deadline
+      ? `<span class="meta">Deadline ${e(formatDateTime(c.deadline))} (${e(relativeTo(c.deadline, now))})</span>`
+      : "";
   return `<li><a class="docket-row" href="/casebook/${encodeURIComponent(c.caseId)}">
   <span class="case-no">${e(c.caseNumber)}</span>
   <span class="case-body"><span class="case-title">${e(c.title)}</span>

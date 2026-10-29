@@ -48,6 +48,8 @@ export interface CaseSummary {
   status: "OPEN" | "CLOSED";
   stage: Stage | null;
   deadline: string | null;
+  /** When an adjourned hearing resumes (then `deadline` is the same time). Absent on rows written before adjournments existed. */
+  adjournedUntil?: string | null;
   outcome: string | null;
   finding: "LIABLE" | "NOT_LIABLE" | null;
   plaintiff: AgentRef;

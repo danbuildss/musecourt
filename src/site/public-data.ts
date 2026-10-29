@@ -18,6 +18,8 @@ export interface PublicCaseLine {
   status: "OPEN" | "CLOSED";
   stage: Stage | null;
   deadline: string | null;
+  /** When an adjourned hearing resumes, if the case is adjourned. */
+  adjournedUntil: string | null;
   judge: string | null;
   outcome: CaseOutcome | null;
   finding: "LIABLE" | "NOT_LIABLE" | null;
@@ -52,6 +54,7 @@ export async function courthouseData(deps: ApiDeps): Promise<CourthouseData> {
     status: "OPEN",
     stage: c.stage,
     deadline: c.deadline,
+    adjournedUntil: c.adjournedUntil ?? null,
     judge: c.judge?.label ?? null,
     outcome: null,
     finding: null,
@@ -68,6 +71,7 @@ export async function courthouseData(deps: ApiDeps): Promise<CourthouseData> {
     status: "CLOSED",
     stage: null,
     deadline: null,
+    adjournedUntil: null,
     judge: c.judge?.label ?? null,
     outcome: c.outcome,
     finding: c.finding,
@@ -175,6 +179,7 @@ export async function casebookData(deps: ApiDeps, filters: CasebookFilters): Pro
       status: c.status,
       stage: c.stage,
       deadline: c.deadline,
+      adjournedUntil: c.adjournedUntil ?? null,
       judge,
       outcome: c.outcome as CaseOutcome | null,
       finding: c.finding,
@@ -393,6 +398,7 @@ export async function roadmapData(deps: ApiDeps): Promise<RoadmapData> {
     status: c.status,
     stage: c.stage,
     deadline: c.deadline,
+    adjournedUntil: c.adjournedUntil ?? null,
     judge: c.judge?.label ?? null,
     outcome: c.outcome as CaseOutcome | null,
     finding: c.finding,

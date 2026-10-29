@@ -35,6 +35,15 @@ describe.each(BACKENDS)("scheduling over the API (%s)", (backend) => {
       expect(page).toContain("<strong>adjourned</strong>");
       expect(page).toContain("The hearing resumes");
       expect(page).toContain(": ADJOURNED"); // the share card's alt text
+      // Every surface says the same: the case page stamp, the homepage docket and the Casebook.
+      const adjournedStamp = '<span class="stamp stamp-session">Adjourned</span>';
+      expect(page).toContain(adjournedStamp);
+      const home = String((await h.get("/")).body);
+      expect(home).toContain(adjournedStamp);
+      expect(home).toContain("Adjourned · resumes");
+      const casebook = String((await h.get("/casebook")).body);
+      expect(casebook).toContain("adjourned, resumes");
+      expect(casebook.split(adjournedStamp).length - 1).toBe(2); // the row, and the key
 
       const order = await h.act(sol, caseId, {
         action: "ORDER_EVIDENCE",

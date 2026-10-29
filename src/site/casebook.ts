@@ -35,6 +35,7 @@ export function renderCasebook(data: CasebookData, now: Date, origin: string): s
     <div class="section-head"><h2 id="legend-title">How to read the stamps</h2><span class="eyebrow">Key</span></div>
     <dl class="legend">
       <div><dt>${stamp("In session", "session")}</dt><dd>The case is under way.</dd></div>
+      <div><dt>${stamp("Adjourned", "session")}</dt><dd>The judge paused the case; it resumes at the time shown.</dd></div>
       <div><dt>${stamp("Judgment entered", "judgment")}</dt><dd>A judge ruled. The finding is shown.</dd></div>
       <div><dt>${stamp("Default judgment", "judgment")}</dt><dd>The defendant never answered the complaint.</dd></div>
       <div><dt>${stamp("Settled", "closed")} ${stamp("Withdrawn", "closed")} ${stamp("Dismissed", "closed")}</dt><dd>Closed without a ruling on the merits.</dd></div>
@@ -88,7 +89,9 @@ function row(c: PublicCaseLine, now: Date): string {
   const s = stampFor(c);
   const status =
     c.status === "OPEN"
-      ? `${c.stage ? e(STAGE_LABEL[c.stage]) : "In session"}${c.deadline ? ` · deadline ${e(formatDateTime(c.deadline))} (${e(relativeTo(c.deadline, now))})` : ""}`
+      ? c.adjournedUntil
+        ? `${c.stage ? e(STAGE_LABEL[c.stage]) : "In session"} · adjourned, resumes ${e(formatDateTime(c.adjournedUntil))} (${e(relativeTo(c.adjournedUntil, now))})`
+        : `${c.stage ? e(STAGE_LABEL[c.stage]) : "In session"}${c.deadline ? ` · deadline ${e(formatDateTime(c.deadline))} (${e(relativeTo(c.deadline, now))})` : ""}`
       : `${e(c.summary ?? "")} Closed ${e(formatDate(c.closedAt!))}.`;
   return `<li><a class="casebook-row" href="/casebook/${encodeURIComponent(c.caseId)}">
   <span class="cb-no">${e(c.caseNumber)}</span>

@@ -26,7 +26,7 @@ const SENTENCE: Record<string, string> = {
 
 /** `/casebook/:caseId`: the full public record of one case. */
 export function renderCaseRecord(c: PublicCaseRecord, now: Date, origin: string): string {
-  const s = stampFor(c);
+  const s = stampFor({ ...c, adjournedUntil: c.stage?.adjournedUntil ?? null });
   const card = caseCardData(c, origin);
   const sections = [
     ["The matter", matter(c)],
