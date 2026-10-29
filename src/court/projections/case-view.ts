@@ -39,9 +39,21 @@ export function toCaseView(state: CaseState, registry: RegistryState) {
           name: state.stage,
           description: PROCEDURE[state.stage].description,
           deadline: state.deadline,
+          /** While adjourned, `deadline` is when the hearing resumes. */
+          adjournedUntil: state.adjournment?.until ?? null,
           allowedActions: PROCEDURE[state.stage].allowedActions,
         }
       : null,
+    adjournment: state.adjournment
+      ? { ...state.adjournment, judge: judgeView(registry, state.adjournment.judge) }
+      : null,
+    adjournments: state.adjournments.map((a) => ({ ...a, judge: judgeView(registry, a.judge) })),
+    evidenceOrders: state.evidenceOrders.map((o) => ({ ...o, judge: judgeView(registry, o.judge) })),
+    adjournmentRequests: state.adjournmentRequests.map((r) => ({
+      ...r,
+      by: agentRef(registry, r.byAgentId),
+      ruling: r.ruling ? { ...r.ruling, judge: judgeView(registry, r.ruling.judge) } : null,
+    })),
     parties: {
       plaintiff: agentRef(registry, state.plaintiffId),
       defendant: agentRef(registry, state.defendantId),
@@ -68,6 +80,7 @@ export function toCaseView(state: CaseState, registry: RegistryState) {
       at: e.at,
       withdrawn: e.withdrawn,
       redaction: e.redaction,
+      orderId: e.orderId,
     })),
     statements: state.statements.map((s) => ({ ...s, speakerLabel: speakerLabel(s.speaker) })),
     offers: state.offers.map((o) => ({ ...o, by: agentRef(registry, o.byAgentId) })),

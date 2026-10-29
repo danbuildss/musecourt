@@ -23,6 +23,8 @@ export interface CaseCardData {
   charges: Array<{ article: number; title: string }>;
   status: "OPEN" | "CLOSED";
   stage: Stage | null;
+  /** When an adjourned hearing resumes. */
+  adjournedUntil: string | null;
   outcome: string | null;
   finding: "LIABLE" | "NOT_LIABLE" | null;
   filedAt: string;
@@ -48,6 +50,7 @@ export function caseCardData(c: PublicCaseRecord, origin: string): CaseCardData 
     charges: c.charges.map(({ article, title }) => ({ article, title })),
     status: c.status,
     stage: c.stage?.name ?? null,
+    adjournedUntil: c.stage?.adjournedUntil ?? null,
     outcome: c.outcome,
     finding: c.verdict?.finding ?? null,
     filedAt: c.filedAt,
@@ -60,6 +63,7 @@ export function caseCardData(c: PublicCaseRecord, origin: string): CaseCardData 
 /** The stamp on the card: what state the case is in, in two lines. */
 export function cardStamp(c: CaseCardData): { main: string; sub: string } {
   if (c.status === "OPEN") {
+    if (c.adjournedUntil) return { main: "ADJOURNED", sub: `UNTIL ${cardDate(c.adjournedUntil)}` };
     if (c.stage === "AWAITING_RESPONSE" || !c.stage) return { main: "FILED", sub: "AWAITING ANSWER" };
     return { main: "IN SESSION", sub: STAGE_LABEL[c.stage].toUpperCase() };
   }
@@ -82,11 +86,20 @@ export function cardStamp(c: CaseCardData): { main: string; sub: string } {
   }
 }
 
+/** "2026-11-02T15:00:00Z" → "2 NOV, 15:00 UTC" */
+function cardDate(iso: string): string {
+  const d = new Date(iso);
+  const month = d.toLocaleString("en-GB", { month: "short", timeZone: "UTC" }).toUpperCase();
+  const time = d.toISOString().slice(11, 16);
+  return `${d.getUTCDate()} ${month}, ${time} UTC`;
+}
+
 /** A changing part of a card URL, so link previews fetch a new card when the case moves on. */
-export function cardVersion(c: Pick<CaseCardData, "status" | "stage" | "outcome">): string {
-  return (c.status === "OPEN" ? (c.stage ?? "FILED") : (c.outcome ?? "CLOSED"))
-    .toLowerCase()
-    .replaceAll("_", "-");
+export function cardVersion(
+  c: Pick<CaseCardData, "status" | "stage" | "outcome"> & { adjournedUntil?: string | null },
+): string {
+  const open = c.adjournedUntil ? `adjourned-${Date.parse(c.adjournedUntil) / 1000}` : (c.stage ?? "FILED");
+  return (c.status === "OPEN" ? open : (c.outcome ?? "CLOSED")).toLowerCase().replaceAll("_", "-");
 }
 
 // ---------------------------------------------------------------------------

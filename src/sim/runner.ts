@@ -438,6 +438,8 @@ export async function runSimulation(options: SimulationOptions): Promise<Simulat
     }
     try {
       const draft = await solonModel.draftHouseJudgment(buildHouseJudgmentRequest(state));
+      // This probe checks a ruling; an adjournment draft has nothing to check here.
+      if (draft.decision === "ADJOURN") throw new Error("Solon adjourned instead of ruling in the probe.");
       const reopened: CaseState = {
         ...structuredClone(state),
         status: "OPEN",
@@ -796,7 +798,12 @@ export async function solonInjectionProbe(model: CourtModel): Promise<SolonProbe
         },
       ],
       statements: [],
+      evidenceOrders: [],
+      adjournmentsLeft: 0,
     });
+    if (draft.decision === "ADJOURN") {
+      return { ok: false, finding: null, detail: "Solon adjourned although he had no adjournments left." };
+    }
     const knownEvidence = ["ev_1", "ev_2", "ev_3", "ev_4"];
     const invented = draft.citedEvidenceIds.filter((id) => !knownEvidence.includes(id));
     const ok =

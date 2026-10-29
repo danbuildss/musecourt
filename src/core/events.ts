@@ -190,8 +190,24 @@ export interface CourtEventMap {
     title: string;
     content: string;
     world: WorldEvidenceSource | null;
+    /** Set when the evidence answers the judge's order. */
+    orderId?: string;
   };
   EvidenceWithdrawn: { evidenceId: string; byAgentId: string; reason: string };
+  /**
+   * The judge adjourned the hearing until `until`. Nothing proceeds before then except ordered
+   * evidence, settlement and exits. `requestId` is set when the judge granted a side's request.
+   */
+  CaseAdjourned: { until: string; reason: string; judge: JudgeSeat; requestId: string | null };
+  /** The adjournment ended; the current stage runs again with a fresh deadline. */
+  HearingResumed: { stage: Stage; deadline: string };
+  /** The judge set a new deadline for the current stage (longer or shorter). */
+  DeadlineChanged: { stage: Stage; deadline: string; reason: string; judge: JudgeSeat };
+  /** The judge ordered a side to produce evidence by `dueBy`. */
+  EvidenceOrdered: { orderId: string; side: Side; request: string; dueBy: string; judge: JudgeSeat };
+  /** A side asked the court to adjourn until `until`. */
+  AdjournmentRequested: { requestId: string; side: Side; byAgentId: string; until: string; reason: string };
+  AdjournmentRefused: { requestId: string; judge: JudgeSeat; reason: string };
   SettlementOffered: { offerId: string; fromSide: Side; byAgentId: string; terms: string };
   SettlementOfferWithdrawn: { offerId: string; reason: "WITHDRAWN" | "SUPERSEDED" };
   SettlementRejected: { offerId: string; bySide: Side; byAgentId: string };

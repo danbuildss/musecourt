@@ -2,7 +2,7 @@ import type { StoredEvent } from "@/core/events";
 import type { Side } from "@/core/procedure";
 import type { RegistryState } from "@/core/registry";
 import { PROVENANCE_LABEL, agentRef, judgeView } from "@/court/projections/labels";
-import { STAGE_LABEL } from "./format";
+import { STAGE_LABEL, formatDateTime } from "./format";
 
 /**
  * The case's proceedings in plain language, oldest first, built from the PUBLIC events (removed
@@ -220,6 +220,61 @@ export function describeProceedings(
         break;
       case "CaseClosed":
         add({ kind: "court", text: "The case was closed." }, at);
+        break;
+      case "CaseAdjourned":
+        add(
+          {
+            kind: "court",
+            text: `${judgeView(registry, e.data.judge).label} adjourned the case until ${formatDateTime(e.data.until)}${
+              e.data.requestId ? ", granting a request for time" : ""
+            }:`,
+            quote: e.data.reason,
+          },
+          at,
+        );
+        break;
+      case "HearingResumed":
+        add({ kind: "stage", text: `The hearing resumed: ${STAGE_LABEL[e.data.stage].toLowerCase()}.` }, at);
+        break;
+      case "DeadlineChanged":
+        add(
+          {
+            kind: "court",
+            text: `${judgeView(registry, e.data.judge).label} set the deadline for ${STAGE_LABEL[e.data.stage].toLowerCase()} to ${formatDateTime(e.data.deadline)}:`,
+            quote: e.data.reason,
+          },
+          at,
+        );
+        break;
+      case "EvidenceOrdered":
+        add(
+          {
+            kind: "court",
+            text: `${judgeView(registry, e.data.judge).label} ordered the ${SIDE[e.data.side]} side to produce evidence by ${formatDateTime(e.data.dueBy)}:`,
+            quote: e.data.request,
+          },
+          at,
+        );
+        break;
+      case "AdjournmentRequested":
+        add(
+          {
+            kind: "statement",
+            text: `${name(e.data.byAgentId)} asked the court to adjourn until ${formatDateTime(e.data.until)}:`,
+            quote: e.data.reason,
+          },
+          at,
+        );
+        break;
+      case "AdjournmentRefused":
+        add(
+          {
+            kind: "court",
+            text: `${judgeView(registry, e.data.judge).label} refused the request for time:`,
+            quote: e.data.reason,
+          },
+          at,
+        );
         break;
       case "RecordRedacted": {
         const what = e.data.target.kind === "EVIDENCE" ? exhibit(e.data.target.evidenceId) : "a statement";

@@ -54,6 +54,11 @@ export type CaseAction =
   | "WITHDRAW_CASE"
   | "DISMISS_CASE";
 
+/** The judge's (and parties') scheduling actions: not tied to a stage. */
+export type SchedulingAction =
+  "ADJOURN" | "SET_DEADLINE" | "ORDER_EVIDENCE" | "REQUEST_ADJOURNMENT" | "RULE_ON_REQUEST";
+export const JUDGE_SCHEDULING: readonly SchedulingAction[] = ["ADJOURN", "SET_DEADLINE", "ORDER_EVIDENCE"];
+
 export type TimeoutAction =
   /** Defendant never answered: the case proceeds and the judge decides on the record. */
   | "PROCEED_WITHOUT_RESPONSE"
@@ -302,4 +307,14 @@ export const LIMITS = {
   sentenceItemsMax: 5,
   lawTitleMax: 100,
   lawTextMax: 2000,
+  /** Scheduling: the earliest and latest a judge may set a time, from now. */
+  scheduleMinMs: 10 * 60 * 1000,
+  scheduleMaxMs: 30 * 24 * 60 * 60 * 1000,
+  /** Adjournments per case, and how many of them Solon may order himself. */
+  adjournmentsMax: 5,
+  houseAdjournmentsMax: 2,
+  /** Solon grants each side one request for time, up to this far ahead. */
+  houseGrantMaxMs: 7 * 24 * 60 * 60 * 1000,
+  evidenceOrdersMax: 10,
+  orderRequestMax: 1000,
 } as const;

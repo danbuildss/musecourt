@@ -20,6 +20,7 @@ import {
   summonsCode,
   side,
   text,
+  dateTime,
 } from "@/api/schemas";
 import {
   caseView,
@@ -641,14 +642,94 @@ export const TOOLS: ToolDefinition[] = [
     command: (a) => ({ type: "DismissCase", reason: a.reason as string }),
   }),
 
+  // ---- Scheduling: the judge controls time ----
+  caseCommandTool({
+    name: "adjourn",
+    title: "Adjourn the hearing",
+    description:
+      "The judge adjourns the case until a set time (10 minutes to 30 days ahead), with a reason: for example to let a side gather evidence, or to hear the case next week. Until then nothing proceeds except ordered evidence, settlement and exits; then the current stage resumes with its full time.",
+    shape: {
+      until: dateTime.describe("When the hearing resumes (ISO 8601, e.g. 2026-11-02T15:00:00Z)."),
+      reason: text.describe("Why (up to 1000 characters)."),
+    },
+    command: (a) => ({ type: "Adjourn", until: a.until as string, reason: a.reason as string }),
+  }),
+  caseCommandTool({
+    name: "set_deadline",
+    title: "Set the stage deadline",
+    description:
+      "The judge sets a new deadline for the current stage, longer or shorter (10 minutes to 30 days ahead), with a reason.",
+    shape: {
+      deadline: dateTime.describe("The new deadline (ISO 8601)."),
+      reason: text.describe("Why (up to 1000 characters)."),
+    },
+    command: (a) => ({ type: "SetDeadline", deadline: a.deadline as string, reason: a.reason as string }),
+  }),
+  caseCommandTool({
+    name: "order_evidence",
+    title: "Order evidence",
+    description:
+      "The judge orders a side to produce specific evidence by a time. The side answers with submit_evidence and the orderId, at any stage, even while the case is adjourned.",
+    shape: {
+      side: sideField,
+      request: text.describe("What the side must produce (up to 1000 characters)."),
+      dueBy: dateTime.describe("When it is due (ISO 8601)."),
+    },
+    command: (a) => ({
+      type: "OrderEvidence",
+      side: a.side as "PLAINTIFF" | "DEFENCE",
+      request: a.request as string,
+      dueBy: a.dueBy as string,
+    }),
+  }),
+  caseCommandTool({
+    name: "request_adjournment",
+    title: "Ask the court for time",
+    description:
+      "A party (or its counsel) asks the judge to adjourn until a time, with a reason. Solon rules at once: each side may have one request granted, up to 7 days ahead. An agent judge rules with rule_on_request.",
+    shape: {
+      until: dateTime.describe("When you ask the hearing to resume (ISO 8601)."),
+      reason: text.describe("Why you need the time (up to 1000 characters)."),
+    },
+    command: (a) => ({ type: "RequestAdjournment", until: a.until as string, reason: a.reason as string }),
+  }),
+  caseCommandTool({
+    name: "rule_on_request",
+    title: "Rule on a request for time",
+    description:
+      "The judge grants a side's request for time (the case is adjourned until the time asked) or refuses it, giving a reason.",
+    shape: {
+      requestId: entityId.describe("The request ID (req_…)."),
+      decision: z.enum(["GRANT", "REFUSE"]),
+      reason: text.optional().describe("Required to refuse (up to 1000 characters)."),
+    },
+    command: (a) => ({
+      type: "RuleOnRequest",
+      requestId: a.requestId as string,
+      decision: a.decision as "GRANT" | "REFUSE",
+      reason: a.reason as string | undefined,
+    }),
+  }),
+
   // ---- Evidence ----
   caseCommandTool({
     name: "submit_evidence",
     title: "Submit evidence",
     description:
       "Add one item of evidence for your side (evidence stages; the defence may also attach evidence to its response). Up to 10 items per side. MuseCourt verifies WORLD_EVENT items with the case's world; unknown event IDs are rejected.",
-    shape: { evidence },
-    command: (a) => ({ type: "SubmitEvidence", evidence: a.evidence as EvidenceInput }),
+    shape: {
+      evidence,
+      orderId: entityId
+        .optional()
+        .describe(
+          "The judge's evidence order this answers (order_…). Ordered evidence may be given at any stage until it is due.",
+        ),
+    },
+    command: (a) => ({
+      type: "SubmitEvidence",
+      evidence: a.evidence as EvidenceInput,
+      ...(a.orderId ? { orderId: a.orderId as string } : {}),
+    }),
   }),
   caseCommandTool({
     name: "withdraw_evidence",

@@ -136,15 +136,30 @@ export interface HouseJudgmentRequest {
     content: string;
   }>;
   statements: Array<{ stage: string; kind: string; side: string | null; speakerRole: string; text: string }>;
+  /** Evidence Solon ordered earlier, and whether it was produced (evidenceId) or not. */
+  evidenceOrders: Array<{ orderId: string; side: string; request: string; answeredBy: string | null }>;
+  /** How many more times Solon may adjourn to order evidence (0: he must rule now). */
+  adjournmentsLeft: number;
 }
 
-export interface HouseJudgmentDraft {
+export interface HouseVerdictDraft {
+  decision?: "VERDICT";
   finding: Finding;
   reasoning: string;
   sentence: SentenceItem[];
   citedLawIds: string[];
   citedEvidenceIds: string[];
 }
+
+/** The record is not enough to rule: adjourn for `days` and order this evidence. */
+export interface HouseAdjournmentDraft {
+  decision: "ADJOURN";
+  reason: string;
+  days: number;
+  orders: Array<{ side: "PLAINTIFF" | "DEFENCE"; request: string }>;
+}
+
+export type HouseJudgmentDraft = HouseVerdictDraft | HouseAdjournmentDraft;
 
 export interface BarExamGradingRequest {
   examId: string;

@@ -56,6 +56,38 @@ export interface EvidenceRecord {
   withdrawn: { byAgentId: string; reason: string; at: string } | null;
   /** Set when the evidence's words were removed from public view (or the world had already removed them). */
   redaction: Redaction | null;
+  /** The judge's order this evidence answers, if any. */
+  orderId: string | null;
+}
+
+export interface AdjournmentRecord {
+  until: string;
+  reason: string;
+  judge: JudgeSeat;
+  requestId: string | null;
+  at: string;
+}
+
+export interface EvidenceOrderRecord {
+  orderId: string;
+  side: Side;
+  request: string;
+  dueBy: string;
+  judge: JudgeSeat;
+  at: string;
+  /** The evidence that answered the order, if any. */
+  answeredBy: string | null;
+}
+
+export interface AdjournmentRequestRecord {
+  requestId: string;
+  side: Side;
+  byAgentId: string;
+  until: string;
+  reason: string;
+  at: string;
+  status: "OPEN" | "GRANTED" | "REFUSED" | "LAPSED";
+  ruling: { judge: JudgeSeat; reason: string | null; at: string } | null;
 }
 
 export interface SettlementOfferRecord {
@@ -115,6 +147,12 @@ export interface CaseState {
   activity: StageActivity;
   /** Sides the judge addressed with questions in this case's JUDGE_QUESTIONS stage. */
   questionsAddressedTo: Side[];
+  /** The adjournment in force: until it ends, `deadline` is the time the hearing resumes. */
+  adjournment: AdjournmentRecord | null;
+  /** Every adjournment ever ordered in this case, in order. */
+  adjournments: AdjournmentRecord[];
+  evidenceOrders: EvidenceOrderRecord[];
+  adjournmentRequests: AdjournmentRequestRecord[];
 
   response: { text: string; byAgentId: string; at: string } | null;
   representation: Record<Side, Representation>;
@@ -174,6 +212,10 @@ export function evolveCase(state: CaseState | null, e: StoredEvent): CaseState |
       deadline: null,
       activity: freshActivity(),
       questionsAddressedTo: [],
+      adjournment: null,
+      adjournments: [],
+      evidenceOrders: [],
+      adjournmentRequests: [],
       response: null,
       representation: { PLAINTIFF: { mode: "UNRESOLVED" }, DEFENCE: { mode: "UNRESOLVED" } },
       counselRequests: { PLAINTIFF: null, DEFENCE: null },
@@ -249,9 +291,15 @@ export function evolveCase(state: CaseState | null, e: StoredEvent): CaseState |
       if (d.kind === "QUESTION") state.questionsAddressedTo = [...d.addressedTo];
       break;
     }
-    case "EvidenceRecorded":
+    case "EvidenceRecorded": {
+      const { orderId, ...data } = e.data;
+      if (orderId) {
+        const order = state.evidenceOrders.find((o) => o.orderId === orderId);
+        if (order) order.answeredBy = data.evidenceId;
+      }
       state.evidence.push({
-        ...e.data,
+        ...data,
+        orderId: orderId ?? null,
         at: e.occurredAt,
         withdrawn: null,
         // Admitted already redacted: the world served only the redacted form, which is what we hold.
@@ -260,6 +308,42 @@ export function evolveCase(state: CaseState | null, e: StoredEvent): CaseState |
           : null,
       });
       break;
+    }
+    case "CaseAdjourned": {
+      const record = { ...e.data, at: e.occurredAt };
+      state.adjournment = record;
+      state.adjournments.push(record);
+      state.deadline = e.data.until;
+      if (e.data.requestId) {
+        const request = state.adjournmentRequests.find((r) => r.requestId === e.data.requestId);
+        if (request) {
+          request.status = "GRANTED";
+          request.ruling = { judge: e.data.judge, reason: null, at: e.occurredAt };
+        }
+      }
+      break;
+    }
+    case "HearingResumed":
+      state.adjournment = null;
+      state.deadline = e.data.deadline;
+      break;
+    case "DeadlineChanged":
+      state.deadline = e.data.deadline;
+      break;
+    case "EvidenceOrdered":
+      state.evidenceOrders.push({ ...e.data, at: e.occurredAt, answeredBy: null });
+      break;
+    case "AdjournmentRequested":
+      state.adjournmentRequests.push({ ...e.data, at: e.occurredAt, status: "OPEN", ruling: null });
+      break;
+    case "AdjournmentRefused": {
+      const request = state.adjournmentRequests.find((r) => r.requestId === e.data.requestId);
+      if (request) {
+        request.status = "REFUSED";
+        request.ruling = { judge: e.data.judge, reason: e.data.reason, at: e.occurredAt };
+      }
+      break;
+    }
     case "RecordRedacted": {
       const r = { reason: e.data.reason, source: e.data.source, at: e.occurredAt };
       const t = e.data.target;
@@ -327,6 +411,9 @@ export function evolveCase(state: CaseState | null, e: StoredEvent): CaseState |
       break;
     case "CaseClosed":
       for (const offer of state.offers) if (offer.status === "OPEN") offer.status = "LAPSED";
+      for (const request of state.adjournmentRequests)
+        if (request.status === "OPEN") request.status = "LAPSED";
+      state.adjournment = null;
       state.status = "CLOSED";
       state.outcome = e.data.outcome;
       state.closedAt = e.occurredAt;
