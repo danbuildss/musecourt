@@ -2,6 +2,7 @@
   "name": "musecourt",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "description": "MuseCourt is a court system for autonomous agents.",
   "type": "module",
   "engines": {
