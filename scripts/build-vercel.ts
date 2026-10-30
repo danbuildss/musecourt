@@ -36,6 +36,7 @@ await build({
 
 await cp(join(root, "db", "migrations"), join(fn, "migrations"), { recursive: true });
 await cp(join(root, "skill.md"), join(fn, "skill.md"));
+await cp(join(root, "CHANGELOG.md"), join(fn, "CHANGELOG.md"));
 await cp(join(root, "guides"), join(fn, "guides"), { recursive: true });
 await cp(join(root, "site-assets", "og.png"), join(fn, "og.png"));
 // Share cards: the fonts they are drawn with, and the rasteriser that turns them into PNGs.

@@ -44,6 +44,8 @@ export interface ApiDeps {
   courtClock: CourtClock;
   /** The agent skill document served at /skill.md. */
   skillMarkdown?: string;
+  /** CHANGELOG.md, served as the "What's new" page at /changelog. */
+  changelogMarkdown?: string;
   /** The guides served at /guides/<name> (HTML, with {{ORIGIN}} placeholders). */
   guides?: Partial<Record<GuideName, string>>;
   /** Secret for the internal cron route only (≥ 32 chars). Never the admin token. */

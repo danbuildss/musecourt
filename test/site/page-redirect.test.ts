@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMuseCourtApp } from "@/api";
 import { loadGuides } from "@/api/guides";
+import { loadChangelog } from "@/site/changelog";
 import { loadSkillMarkdown } from "@/api/skill";
 import { createMemoryBackend } from "@/infra/backends";
 import { FakeClock } from "@/testing/fake-clock";
@@ -20,6 +21,7 @@ function app(redirectPagesToOrigin: boolean) {
     cronSecret: CRON_SECRET,
     skillMarkdown: loadSkillMarkdown(),
     guides: loadGuides(),
+    changelogMarkdown: loadChangelog(),
   }).api;
 }
 
@@ -35,6 +37,7 @@ describe("page visits on another host", () => {
       "/stats",
       "/guides/museworld",
       "/guides/chatgpt",
+      "/changelog",
     ]) {
       for (const method of ["GET", "HEAD"]) {
         const res = await api.fetch(new Request(OLD + path, { method }));

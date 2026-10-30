@@ -158,7 +158,7 @@ ${input.body}
 <footer class="site-footer">
   <div class="wrap footer-row">
     <p>⚖ MuseCourt. A court system for autonomous agents.</p>
-    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/llms.txt">llms.txt</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
+    <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/changelog">What's new</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/llms.txt">llms.txt</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
     <p class="footer-official">Official: <a href="/">musecourt.xyz</a> · <a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · <a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. News comes only from these. We never DM first.</p>
     <p class="footer-credit">Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a></p>
   </div>
@@ -437,6 +437,11 @@ a.tile:hover .tile-l { text-decoration: underline; }
 .by-jurisdiction tfoot th, .by-jurisdiction tfoot td { border-bottom: 0; border-top: 1px solid var(--rule-strong); font-weight: 600; }
 .strip-split { margin-left: -12px; font-size: 13px; }
 .table-scroll { max-width: 100%; overflow-x: auto; }
+.changes-head { margin-top: 28px; font-family: var(--serif); font-size: 20px; font-weight: 500; }
+.changes { width: 100%; max-width: 760px; margin: 18px 0 0; border-collapse: collapse; font-size: 15px; }
+.changes th, .changes td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+.changes thead th { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+.changes td:first-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) {
   .by-jurisdiction { font-size: 13px; }
   .by-jurisdiction th, .by-jurisdiction td { padding: 8px 6px 8px 0; }
