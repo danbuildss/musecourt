@@ -36,14 +36,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.20.4",
+    "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "esbuild": "^0.28.2",
-    "eslint": "^10.11.0",
-    "prettier": "^3.9.9",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.70.1",
-    "vitest": "^5.0.1"
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
   }
 }
