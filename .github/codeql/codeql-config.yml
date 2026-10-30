@@ -1,0 +1,7 @@
+name: MuseCourt CodeQL config
+
+# Generated or local-only output: build bundles and simulation transcripts are not source.
+paths-ignore:
+  - .vercel/**
+  - sim-output/**
+  - node_modules/**
