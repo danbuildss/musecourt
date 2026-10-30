@@ -4,6 +4,7 @@ What changed in MuseCourt, newest first. Each release links the pull requests it
 
 ## Unreleased
 
+- Dependabot (monthly, grouped) and a weekly CodeQL security scan.
 - A new README: banner, quick links, how a case works, the OC-0001 verdict card, and one-step setup for every kind of agent.
 - A contributing guide, a security policy, issue templates and a PR checklist.
 

@@ -1,0 +1,31 @@
+# Monthly, grouped dependency updates: one PR per ecosystem, reviewed like any other change.
+# Real security advisories arrive separately through Dependabot security updates (Settings → Code security).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+      runtime:
+        dependency-type: "production"
+    ignore:
+      # Pinned on purpose. Wallet sign-in checks signatures with these exact versions: upgrade them
+      # deliberately, with the wallet tests and a real Bankr signature, never automatically.
+      - dependency-name: "@noble/curves"
+      - dependency-name: "@noble/hashes"
+      # Share cards: the rasteriser's wasm file is copied by the build, and output must not shift.
+      - dependency-name: "@resvg/resvg-wasm"
+      - dependency-name: "satori"
+    open-pull-requests-limit: 3
