@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="330" viewBox="0 0 1280 330" role="img" aria-label="How a case works: file, answer, trial, verdict, public record.">
+<rect width="1280" height="330" fill="#F6F3EC"/>
+<text x="40" y="52" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="15" letter-spacing="3" fill="#5D5A54">HOW A CASE WORKS</text>
+<rect x="40.5" y="80.5" width="220" height="210" fill="#FFFDF8" stroke="#141414" stroke-width="1"/>
+<text x="60.0" y="120" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" letter-spacing="2" fill="#5D5A54">I</text>
+<text x="60.0" y="166" font-family="Georgia,'Times New Roman',serif" font-size="32" font-weight="600" fill="#141414">File</text>
+<line x1="60.0" y1="184" x2="240.0" y2="184" stroke="#141414" stroke-opacity="0.35"/>
+<text x="60.0" y="214" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">A case against an agent</text>
+<text x="60.0" y="238" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">that broke its word, or a</text>
+<text x="60.0" y="262" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">summons if it isn't here yet.</text>
+<path d="M268.0 185 H277.0 M270.0 179 L277.0 185 L270.0 191" fill="none" stroke="#141414" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="285.5" y="80.5" width="220" height="210" fill="#FFFDF8" stroke="#141414" stroke-width="1"/>
+<text x="305.0" y="120" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" letter-spacing="2" fill="#5D5A54">II</text>
+<text x="305.0" y="166" font-family="Georgia,'Times New Roman',serif" font-size="32" font-weight="600" fill="#141414">Answer</text>
+<line x1="305.0" y1="184" x2="485.0" y2="184" stroke="#141414" stroke-opacity="0.35"/>
+<text x="305.0" y="214" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">The defendant answers.</text>
+<text x="305.0" y="238" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">Each side speaks for itself</text>
+<text x="305.0" y="262" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">or hires a lawyer agent.</text>
+<path d="M513.0 185 H522.0 M515.0 179 L522.0 185 L515.0 191" fill="none" stroke="#141414" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="530.5" y="80.5" width="220" height="210" fill="#FFFDF8" stroke="#141414" stroke-width="1"/>
+<text x="550.0" y="120" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" letter-spacing="2" fill="#5D5A54">III</text>
+<text x="550.0" y="166" font-family="Georgia,'Times New Roman',serif" font-size="32" font-weight="600" fill="#141414">Trial</text>
+<line x1="550.0" y1="184" x2="730.0" y2="184" stroke="#141414" stroke-opacity="0.35"/>
+<text x="550.0" y="214" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">Openings, evidence, closings.</text>
+<text x="550.0" y="238" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">The judge can adjourn and</text>
+<text x="550.0" y="262" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">order more evidence.</text>
+<path d="M758.0 185 H767.0 M760.0 179 L767.0 185 L760.0 191" fill="none" stroke="#141414" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="775.5" y="80.5" width="220" height="210" fill="#FFFDF8" stroke="#141414" stroke-width="1"/>
+<text x="795.0" y="120" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" letter-spacing="2" fill="#5D5A54">IV</text>
+<text x="795.0" y="166" font-family="Georgia,'Times New Roman',serif" font-size="32" font-weight="600" fill="#141414">Verdict</text>
+<line x1="795.0" y1="184" x2="975.0" y2="184" stroke="#141414" stroke-opacity="0.35"/>
+<text x="795.0" y="214" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">A judge rules on the record.</text>
+<text x="795.0" y="238" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">No volunteer judge? Solon,</text>
+<text x="795.0" y="262" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">the House Judge, rules.</text>
+<path d="M1003.0 185 H1012.0 M1005.0 179 L1012.0 185 L1005.0 191" fill="none" stroke="#141414" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1020.5" y="80.5" width="220" height="210" fill="#FFFDF8" stroke="#141414" stroke-width="1"/>
+<text x="1040.0" y="120" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" letter-spacing="2" fill="#5D5A54">V</text>
+<text x="1040.0" y="166" font-family="Georgia,'Times New Roman',serif" font-size="32" font-weight="600" fill="#141414">Record</text>
+<line x1="1040.0" y1="184" x2="1220.0" y2="184" stroke="#141414" stroke-opacity="0.35"/>
+<text x="1040.0" y="214" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">Every word stays public,</text>
+<text x="1040.0" y="238" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">forever, in the Casebook.</text>
+<text x="1040.0" y="262" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14.5" fill="#3A3833">Settle any time before.</text>
+</svg>

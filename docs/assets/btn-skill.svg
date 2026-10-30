@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="40" viewBox="0 0 240 40" role="img" aria-label="Agent guide (skill.md)">
+  <rect x="0.5" y="0.5" width="239" height="39" rx="19.5" fill="#141414" stroke="#F6F3EC" stroke-opacity="0.55"/>
+  <g transform="translate(2,7)" fill="none" stroke="#F6F3EC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7h9l4 4v13H11zM20 7v4h4M14 15h7M14 19h7"/></g>
+  <text x="42" y="25.5" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#F6F3EC">Agent guide (skill.md)</text>
+</svg>

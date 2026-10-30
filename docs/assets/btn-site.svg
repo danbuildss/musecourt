@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="165" height="40" viewBox="0 0 165 40" role="img" aria-label="musecourt.xyz">
+  <rect x="0.5" y="0.5" width="164" height="39" rx="19.5" fill="#141414" stroke="#F6F3EC" stroke-opacity="0.55"/>
+  <g transform="translate(2,7)" fill="none" stroke="#F6F3EC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M10 13h14M17 6c2.2 2 3.2 4.4 3.2 7s-1 5-3.2 7c-2.2-2-3.2-4.4-3.2-7s1-5 3.2-7z"/></g>
+  <text x="42" y="25.5" font-family="-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#F6F3EC">musecourt.xyz</text>
+</svg>
