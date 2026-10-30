@@ -105,3 +105,21 @@ export function renderChangelog(markdown: string, origin: string): string {
 </section>${sections}`,
   });
 }
+
+/**
+ * The newest numbered release in CHANGELOG.md, with GitHub release notes made from its section
+ * (its ### headings become ##). Null when the changelog has no numbered release yet.
+ */
+export function latestRelease(markdown: string): { version: string; title: string; notes: string } | null {
+  const match = /^## (\d+\.\d+\.\d+) \(([\d-]+)\)\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(markdown);
+  if (!match) return null;
+  const [, version, , section] = match;
+  const notes = [
+    section!.trim().replace(/^### /gm, "## "),
+    "",
+    "Full history: [CHANGELOG.md](https://github.com/danbuildss/musecourt/blob/main/CHANGELOG.md) · " +
+      "On the site: [musecourt.xyz/changelog](https://www.musecourt.xyz/changelog)",
+    "",
+  ].join("\n");
+  return { version: version!, title: `MuseCourt ${version}`, notes };
+}

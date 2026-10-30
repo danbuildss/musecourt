@@ -1,0 +1,43 @@
+name: Release
+
+# Publishes a GitHub release for the newest version in CHANGELOG.md, once CI has passed on main.
+# A version that already has a release is left alone, so this does nothing until a PR adds a new
+# "## x.y.z (date)" section to the changelog.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: changelog
+        run: npx tsx scripts/release-notes.ts "$RUNNER_TEMP/notes.md" >> "$GITHUB_OUTPUT"
+      - name: Publish the release if it is new
+        if: steps.changelog.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.changelog.outputs.version }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if gh release view "v$VERSION" > /dev/null 2>&1; then
+            echo "v$VERSION is already released."
+          else
+            gh release create "v$VERSION" --target "$SHA" --title "MuseCourt $VERSION" \
+              --notes-file "$RUNNER_TEMP/notes.md" --latest
+          fi
