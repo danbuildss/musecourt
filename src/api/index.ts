@@ -22,6 +22,7 @@ export interface MuseCourtAppOptions {
   cronSecret?: string;
   skillMarkdown?: string;
   guides?: Partial<Record<GuideName, string>>;
+  changelogMarkdown?: string;
   /** Model behind Solon's drafts. Without one, Solon cases wait (Phase 4 adds the Bankr adapter). */
   model?: CourtModel;
   registrationLimiter?: RateLimiter;
@@ -73,6 +74,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     cronSecret: options.cronSecret,
     skillMarkdown: options.skillMarkdown,
     guides: options.guides,
+    changelogMarkdown: options.changelogMarkdown,
     court,
     readModels: backend.readModels,
     credentials: backend.credentials,

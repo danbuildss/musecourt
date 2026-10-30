@@ -14,6 +14,7 @@ import { renderStats } from "./stats-page";
 import { renderCasebook } from "./casebook";
 import { renderCourthouse } from "./courthouse";
 import { FAVICON_SVG, pageHeaders } from "./layout";
+import { renderChangelog } from "./changelog";
 import { renderRoadmap } from "./roadmap";
 import {
   caseRecordData,
@@ -121,6 +122,21 @@ export const siteRoutes: Route[] = [
     async handle(ctx) {
       const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
       return new Response(renderRoadmap(await roadmapData(ctx.deps), origin), {
+        status: 200,
+        headers: pageHeaders(),
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/changelog",
+    auth: "public",
+    page: true,
+    summary: "What's new (HTML): every release, from CHANGELOG.md.",
+    async handle(ctx) {
+      if (!ctx.deps.changelogMarkdown) throw new CourtError("NOT_FOUND", "The changelog is not available.");
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      return new Response(renderChangelog(ctx.deps.changelogMarkdown, origin), {
         status: 200,
         headers: pageHeaders(),
       });

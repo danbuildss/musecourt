@@ -4,6 +4,7 @@ import { createMuseCourtApp } from "@/api";
 import { DEFAULT_MAX_BODY_BYTES } from "@/api/http";
 import { createNodeServer } from "@/api/node-server";
 import { loadGuides } from "@/api/guides";
+import { loadChangelog } from "@/site/changelog";
 import type { OpsWarning } from "@/api/ops";
 import { loadSkillMarkdown } from "@/api/skill";
 import type { RateLimiter } from "@/api/rate-limit";
@@ -93,6 +94,7 @@ export async function startApi(
     model: options.model,
     skillMarkdown: loadSkillMarkdown(),
     guides: loadGuides(),
+    changelogMarkdown: loadChangelog(),
     registrationLimiter: options.registrationLimiter,
     maxBodyBytes: options.maxBodyBytes,
     idempotencyWaitMs: 3000,
