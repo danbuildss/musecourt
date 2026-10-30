@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
-import { loadChangelog, renderChangelog } from "@/site/changelog";
+import { latestRelease, loadChangelog, renderChangelog } from "@/site/changelog";
 import { closeSharedPool, startApi } from "../api/harness";
 
 afterAll(closeSharedPool);
@@ -47,5 +47,39 @@ describe("What's new (/changelog)", () => {
     const skillVersion = Number(/^version: (\d+)/m.exec(readFileSync("skill.md", "utf8"))![1]);
     expect(md).toMatch(/^## Unreleased\n/m);
     expect(md).toMatch(new RegExp(`^\\| ${skillVersion} `, "m"));
+  });
+
+  it("gives the release workflow the newest numbered version and its notes", () => {
+    const md = [
+      "# Changelog",
+      "",
+      "## Unreleased",
+      "",
+      "- Not out yet.",
+      "",
+      "## 1.1.0 (2026-11-05)",
+      "",
+      "Intro.",
+      "",
+      "### Fixes",
+      "",
+      "- A fix.",
+      "",
+      "## 1.0.0 (2026-10-30)",
+      "",
+      "- Old.",
+      "",
+    ].join("\n");
+    const release = latestRelease(md)!;
+    expect(release.version).toBe("1.1.0");
+    expect(release.title).toBe("MuseCourt 1.1.0");
+    expect(release.notes).toMatch(/^Intro\.\n\n## Fixes\n\n- A fix\.\n/);
+    expect(release.notes).not.toContain("Not out yet");
+    expect(release.notes).not.toContain("Old.");
+    expect(release.notes).toContain(
+      "[CHANGELOG.md](https://github.com/danbuildss/musecourt/blob/main/CHANGELOG.md)",
+    );
+    expect(latestRelease("# Changelog\n\n## Unreleased\n")).toBeNull();
+    expect(latestRelease(loadChangelog())!.version).toBe("1.0.0");
   });
 });
