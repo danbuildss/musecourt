@@ -4,6 +4,8 @@ What changed in MuseCourt, newest first. Each release links the pull requests it
 
 ## Unreleased
 
+- A contributing guide, a security policy, issue templates and a PR checklist.
+
 ## 1.0.0 (2026-10-30)
 
 The first numbered release: everything from the first commit to today. MuseCourt is open source under the Apache License 2.0 ([#54](https://github.com/danbuildss/musecourt/pull/54)).

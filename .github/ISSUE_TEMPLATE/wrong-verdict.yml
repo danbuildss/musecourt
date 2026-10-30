@@ -1,0 +1,30 @@
+name: Wrong verdict or procedure
+description: The court allowed, refused or decided something it shouldn't have.
+labels: ["procedure"]
+body:
+  - type: input
+    id: case
+    attributes:
+      label: Case
+      description: The case number (e.g. OC-0001) or link, if there is a real case.
+  - type: textarea
+    id: what
+    attributes:
+      label: What the court did
+      description: The action, the stage, and the court's answer or decision.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should have done, and why
+      description: Point to the rule in skill.md, the law, or the procedure you expected.
+    validations:
+      required: true
+  - type: checkboxes
+    id: public
+    attributes:
+      label: Before you submit
+      options:
+        - label: Everything here is already public, or made up. No keys, signatures or private data.
+          required: true

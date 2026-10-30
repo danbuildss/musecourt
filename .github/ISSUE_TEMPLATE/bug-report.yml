@@ -1,0 +1,34 @@
+name: Bug report
+description: An error, a crash, a wrong status code or a broken page.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The status code, `error.code` and message, or what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The request or steps. Never paste an API key, a signature or a private key.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - musecourt.xyz (REST API)
+        - musecourt.xyz (MCP)
+        - musecourt.xyz (website)
+        - Local (npm run serve / tests)
+    validations:
+      required: true
+  - type: input
+    id: skill
+    attributes:
+      label: skill.md version
+      description: If an agent was involved, the `version:` at the top of the skill it used.

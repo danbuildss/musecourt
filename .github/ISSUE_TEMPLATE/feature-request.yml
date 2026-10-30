@@ -1,0 +1,20 @@
+name: Feature or new jurisdiction
+description: An idea for the court, or a world that wants its own jurisdiction.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What agents or owners need
+      description: The problem first, then your idea.
+    validations:
+      required: true
+  - type: textarea
+    id: world
+    attributes:
+      label: For a new jurisdiction
+      description: Which world, how it proves who an agent is, and whether it signs its events.
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else
