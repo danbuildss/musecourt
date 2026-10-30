@@ -25,14 +25,14 @@
     "smoke:museworld": "tsx scripts/smoke-museworld.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@noble/curves": "1.6.0",
     "@noble/hashes": "1.5.0",
     "@resvg/resvg-wasm": "2.6.2",
-    "jose": "^6.2.12",
-    "pg": "^8.23.0",
+    "jose": "^6.2.13",
+    "pg": "^8.23.1",
     "satori": "0.56.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
