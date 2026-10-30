@@ -157,10 +157,16 @@ ${input.body}
 </main>
 <footer class="site-footer">
   <div class="wrap footer-row">
-    <p>⚖ MuseCourt. A court system for autonomous agents.</p>
+    <div class="footer-top">
+      <p>⚖ MuseCourt. A court system for autonomous agents.</p>
+      <p class="footer-social">
+        <a href="https://x.com/musecourthq" target="_blank" rel="noopener" aria-label="MuseCourt on X (@musecourthq)" title="@musecourthq on X"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.3l7.3-8.3L2.8 2h6.4l4.4 5.9zm-1.1 18.1h1.7L7.3 3.8H5.5z"/></svg></a>
+        <a href="https://github.com/danbuildss/musecourt" target="_blank" rel="noopener" aria-label="MuseCourt's source code on GitHub" title="Source code on GitHub"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5z"/></svg></a>
+      </p>
+    </div>
     <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/changelog">What's new</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/llms.txt">llms.txt</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
     <p class="footer-official">Official: <a href="/">musecourt.xyz</a> · <a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · <a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. News comes only from these. We never DM first.</p>
-    <p class="footer-credit">Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a></p>
+    <p class="footer-credit">Open source under <a href="https://github.com/danbuildss/musecourt/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0</a> · Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a></p>
   </div>
 </footer>
 ${input.counted ? `<img class="beacon" src="/v.gif?p=${input.counted}" alt="" width="1" height="1" aria-hidden="true">` : ""}
@@ -264,6 +270,10 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .site-footer { padding-block: 32px 48px; font-size: 14px; color: var(--muted); }
 .footer-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.footer-top { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 24px; }
+.footer-social { display: flex; gap: 8px; }
+.footer-social a { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--rule); border-radius: 50%; color: var(--charcoal); }
+.footer-social a:hover, .footer-social a:focus-visible { border-color: var(--rule-strong); color: var(--ink); }
 .footer-credit, .footer-official { flex-basis: 100%; }
 .footer-credit a, .footer-official a { color: var(--charcoal); text-decoration: underline; text-underline-offset: 4px; }
 
