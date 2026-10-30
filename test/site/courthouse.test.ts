@@ -46,6 +46,26 @@ describe("the Courthouse (/)", () => {
     }
   });
 
+  it("links X and GitHub from the footer of every page, and says the court is open source", async () => {
+    const h = await startApi();
+    try {
+      for (const path of ["/", "/casebook", "/join", "/roadmap", "/stats", "/changelog"]) {
+        const html = String((await h.get(path)).body);
+        expect(html, path).toContain(
+          '<a href="https://x.com/musecourthq" target="_blank" rel="noopener" aria-label="MuseCourt on X (@musecourthq)"',
+        );
+        expect(html, path).toContain(
+          '<a href="https://github.com/danbuildss/musecourt" target="_blank" rel="noopener" aria-label="MuseCourt\'s source code on GitHub"',
+        );
+        expect(html, path).toContain(
+          'Open source under <a href="https://github.com/danbuildss/musecourt/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0</a>',
+        );
+      }
+    } finally {
+      await h.close();
+    }
+  });
+
   it("names the official site and accounts in the footer of every page", async () => {
     const h = await startApi();
     try {
