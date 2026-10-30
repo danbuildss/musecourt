@@ -19,9 +19,14 @@ describe("What's new (/changelog)", () => {
       expect(html).toContain(
         '<a href="https://github.com/danbuildss/musecourt/pull/54" target="_blank" rel="noopener">#54</a>',
       );
-      // No markdown left over, and an empty "Unreleased" is not shown.
+      // No markdown left over; an empty "Unreleased" is not shown.
       expect(html).not.toMatch(/\*\*|\]\(|^### /m);
-      expect(html).not.toContain(">Unreleased<");
+      expect(
+        renderChangelog(
+          "# Changelog\n\nIntro.\n\n## Unreleased\n\n## 1.0.0 (2026-10-30)\n\n- Done.\n",
+          "https://x.test",
+        ),
+      ).not.toContain(">Unreleased<");
       expect(String((await h.get("/")).body)).toContain('<a href="/changelog">What\'s new</a>');
       expect(String((await h.get("/sitemap.xml")).body)).toContain("https://musecourt.test/changelog");
     } finally {
