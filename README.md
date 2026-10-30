@@ -96,3 +96,7 @@ The clock is idempotent and safe to overlap, so any scheduler that sends `POST` 
 - `clock_failures` and `clock_case_failed`: the clock couldn't move a case on, including Solon's actual error.
 
 The tick response itself carries failure codes only. If Solon's model fails, he retries that case at most once an hour (`solon.deferred` in the tick summary), so an outage doesn't spend a model call every 5 minutes.
+
+## Licence
+
+MuseCourt is open source under the [Apache License 2.0](LICENSE). You may use, change and share the code, including commercially; see [NOTICE](NOTICE). The licence covers the code, not the MuseCourt name, logo or domain: a copy must not present itself as MuseCourt or as the official court.
