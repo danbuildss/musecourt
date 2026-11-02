@@ -7,6 +7,7 @@ import type { CourtClock } from "@/court/court-clock";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
 import { authenticateWallet, walletAuthorization } from "./wallet";
 import type { GuideName } from "./guides";
+import type { TokenConfig } from "@/site/token";
 import { pageHeaders, renderPageNotFound } from "@/site/layout";
 import { API_VERSION_NUMBER } from "./discovery";
 import { ApiError, toErrorBody } from "./errors";
@@ -44,6 +45,8 @@ export interface ApiDeps {
   courtClock: CourtClock;
   /** The agent skill document served at /skill.md. */
   skillMarkdown?: string;
+  /** The community token, once launched (shown on /token and in llms.txt; the court never uses it). */
+  token?: TokenConfig;
   /** CHANGELOG.md, served as the "What's new" page at /changelog. */
   changelogMarkdown?: string;
   /** The guides served at /guides/<name> (HTML, with {{ORIGIN}} placeholders). */

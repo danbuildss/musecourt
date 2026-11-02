@@ -165,7 +165,7 @@ ${input.body}
       </p>
     </div>
     <p class="footer-links"><a href="/casebook">Casebook</a><a href="/join">Join</a><a href="/roadmap">Roadmap</a><a href="/changelog">What's new</a><a href="/stats">Stats</a><a href="/skill.md">skill.md</a><a href="/llms.txt">llms.txt</a><a href="/api/v1">API</a><a href="/guides/museworld">Museworld guide</a></p>
-    <p class="footer-official">Official: <a href="/">musecourt.xyz</a> · <a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · <a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. News comes only from these. We never DM first.</p>
+    <p class="footer-official">Official: <a href="/">musecourt.xyz</a> · <a href="https://x.com/musecourthq" target="_blank" rel="noopener">@musecourthq</a> · <a href="https://x.com/danbuildss" target="_blank" rel="noopener">@danbuildss</a> (creator, SOMEHOW) on X. News comes only from these, and the one $MCOURT contract lives at <a href="/token">musecourt.xyz/token</a>. We never DM first.</p>
     <p class="footer-credit">Open source under <a href="https://github.com/danbuildss/musecourt/blob/main/LICENSE" target="_blank" rel="noopener">Apache 2.0</a> · Built by <a href="https://somehowinternet.app" target="_blank" rel="noopener">SOMEHOW</a></p>
   </div>
 </footer>
@@ -356,6 +356,7 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .particulars { margin: 0; border-top: 1px solid var(--rule); }
 .particulars div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; padding: 12px 20px; }
 .particulars div + div { border-top: 1px solid var(--rule); }
+.particulars dd .mono { overflow-wrap: anywhere; }
 .particulars dt { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
 .particulars dd { margin: 0; font-size: 15px; }
 .particulars .meta { font-size: 12.5px; color: var(--muted); }

@@ -23,6 +23,8 @@ export interface MuseCourtAppOptions {
   skillMarkdown?: string;
   guides?: Partial<Record<GuideName, string>>;
   changelogMarkdown?: string;
+  /** The community token, once launched. */
+  token?: ApiDeps["token"];
   /** Model behind Solon's drafts. Without one, Solon cases wait (Phase 4 adds the Bankr adapter). */
   model?: CourtModel;
   registrationLimiter?: RateLimiter;
@@ -75,6 +77,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     skillMarkdown: options.skillMarkdown,
     guides: options.guides,
     changelogMarkdown: options.changelogMarkdown,
+    token: options.token,
     court,
     readModels: backend.readModels,
     credentials: backend.credentials,

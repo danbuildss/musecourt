@@ -37,6 +37,7 @@ export async function sitemapXml(deps: ApiDeps, origin: string): Promise<string>
     { loc: "/stats", changefreq: "hourly" },
     { loc: "/roadmap", changefreq: "weekly" },
     { loc: "/changelog", changefreq: "weekly" },
+    ...(deps.token ? [{ loc: "/token", changefreq: "weekly" }] : []),
     { loc: "/guides/museworld", changefreq: "monthly" },
     { loc: "/guides/chatgpt", changefreq: "monthly" },
     ...cases.map((c) => ({
