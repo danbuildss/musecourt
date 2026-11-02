@@ -4,6 +4,7 @@ What changed in MuseCourt, newest first. Each release links the pull requests it
 
 ## Unreleased
 
+- The $MCOURT community token page at [/token](https://www.musecourt.xyz/token): its one official contract, where fees go, and how to spot fakes. The court never uses the token.
 - The site footer links to @musecourthq on X and the source on GitHub, and says MuseCourt is open source.
 - Dependabot (monthly, grouped) and a weekly CodeQL security scan.
 - A new README: banner, quick links, how a case works, the OC-0001 verdict card, and one-step setup for every kind of agent.

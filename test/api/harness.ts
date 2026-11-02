@@ -5,6 +5,7 @@ import { DEFAULT_MAX_BODY_BYTES } from "@/api/http";
 import { createNodeServer } from "@/api/node-server";
 import { loadGuides } from "@/api/guides";
 import { loadChangelog } from "@/site/changelog";
+import type { TokenConfig } from "@/site/token";
 import type { OpsWarning } from "@/api/ops";
 import { loadSkillMarkdown } from "@/api/skill";
 import type { RateLimiter } from "@/api/rate-limit";
@@ -69,6 +70,8 @@ export async function startApi(
     connectors?: (clock: FakeClock) => WorldConnector[];
     /** MuseCourt's public origin for world identity proofs (null disables linking). */
     publicOrigin?: string | null;
+    /** The community token, once launched. */
+    token?: TokenConfig;
   } = {},
 ) {
   const backend = options.backend === "postgres" ? await freshPostgres() : createMemoryBackend();
@@ -95,6 +98,7 @@ export async function startApi(
     skillMarkdown: loadSkillMarkdown(),
     guides: loadGuides(),
     changelogMarkdown: loadChangelog(),
+    token: options.token,
     registrationLimiter: options.registrationLimiter,
     maxBodyBytes: options.maxBodyBytes,
     idempotencyWaitMs: 3000,

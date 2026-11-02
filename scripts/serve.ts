@@ -6,6 +6,7 @@ import { createNodeServer } from "@/api/node-server";
 import { FixedWindowRateLimiter } from "@/api/rate-limit";
 import { loadGuides } from "@/api/guides";
 import { loadChangelog } from "@/site/changelog";
+import { tokenFromEnv } from "@/site/token";
 import { loadSkillMarkdown } from "@/api/skill";
 import { publicOriginFrom } from "@/api/world-identity";
 import { museworldConnectorFromEnv } from "@/connectors/museworld";
@@ -45,6 +46,7 @@ const { court, api } = createMuseCourtApp({
   skillMarkdown: loadSkillMarkdown(),
   guides: loadGuides(),
   changelogMarkdown: loadChangelog(),
+  token: tokenFromEnv(),
   registrationLimiter: new FixedWindowRateLimiter(20, 60 * 60 * 1000),
   trustProxy: process.env.TRUST_PROXY === "1",
   onInternalError: (error) => console.error("[musecourt] internal error", error),
