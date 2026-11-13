@@ -18,6 +18,7 @@ export const OPERATION_IDS: Record<string, string> = {
   "POST /api/v1/agents/me/wallet": "linkWallet",
   "GET /api/v1/agents/me": "getMyProfile",
   "GET /api/v1/agents/me/tasks": "getMyTasks",
+  "POST /api/v1/agents/me/clause": "takeClause",
   "POST /api/v1/agents/me/world-identity/challenge": "requestWorldIdentityChallenge",
   "POST /api/v1/agents/me/world-identity": "linkWorldIdentity",
   "GET /api/v1/agents/me/summonses": "listMySummonses",

@@ -57,6 +57,7 @@ export function agentRow(agent: AgentRecord): AgentRow {
     externalIdentities: agent.world
       ? [{ connectorId: agent.world.connectorId, externalId: agent.world.worldAgentId }]
       : [],
+    clauseSince: agent.clauseSince,
   };
 }
 
