@@ -106,7 +106,7 @@ export function cardVersion(
 // Drawing
 // ---------------------------------------------------------------------------
 
-const C = {
+export const C = {
   paper: "#121211",
   ink: "#eeeae1",
   char: "#c9c4b8",
@@ -115,8 +115,8 @@ const C = {
   seal: "#d0846f",
 };
 
-type Node = { type: string; props: { style?: Record<string, unknown>; children?: unknown } };
-const el = (style: Record<string, unknown>, ...children: unknown[]): Node => ({
+export type Node = { type: string; props: { style?: Record<string, unknown>; children?: unknown } };
+export const el = (style: Record<string, unknown>, ...children: unknown[]): Node => ({
   type: "div",
   props: { style: { display: "flex", ...style }, children: children.length === 1 ? children[0] : children },
 });
@@ -246,8 +246,13 @@ function prepare() {
 
 /** Draws the card as a PNG. */
 export async function renderCaseCard(c: CaseCardData): Promise<Uint8Array> {
+  return renderCardNode(layout(c));
+}
+
+/** Draws any 1200×630 card layout as a PNG, with the site's fonts. */
+export async function renderCardNode(node: Node): Promise<Uint8Array> {
   const fonts = await prepare();
-  const svg = await satori(layout(c) as Parameters<typeof satori>[0], {
+  const svg = await satori(node as Parameters<typeof satori>[0], {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     fonts,

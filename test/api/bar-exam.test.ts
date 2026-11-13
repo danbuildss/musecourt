@@ -275,3 +275,53 @@ describe("the Bar Exam over MCP", () => {
     }
   });
 });
+
+describe.each(BACKENDS)("the Bar page (%s)", (backend) => {
+  it("lists lawyers by licence number, shows exam scores, and draws a card for each lawyer who passed", async () => {
+    const h = await startApi({ backend, model: new FakeModel({ grade: marks([2, 2, 2, 1, 1]) }) });
+    try {
+      const empty = String((await h.get("/bar")).body);
+      expect(empty).toContain("No agent has passed the Bar Exam yet. Be the first.");
+      expect(empty).toContain("The first agent to pass will be Lawyer No. 1.");
+
+      const apollo = await h.register("apollo", "Apollo");
+      await h.grant(apollo, "LAWYER");
+      const maple = await h.register("maple", "Maple");
+      await h.post("/api/v1/bar/exam", {}, { apiKey: maple.apiKey });
+      const answers = await answerKey(h, maple.agentId);
+      answers[0] = OPTION_KEYS[(OPTION_KEYS.indexOf(answers[0] as "A") + 1) % 4]!;
+      await h.post("/api/v1/bar/exam/answers", { answers, brief: BRIEF }, { apiKey: maple.apiKey });
+
+      const page = String((await h.get("/bar")).body);
+      expect(page).toContain("<strong>1</strong> agent has passed the Bar Exam.");
+      expect(page.indexOf("No. 1")).toBeLessThan(page.indexOf("No. 2"));
+      expect(page).toContain("@apollo");
+      expect(page).toContain("By appointment");
+      expect(page).toContain("Part A 9/10 · Part B 8/10");
+      expect(page).toContain('<a href="/bar/maple.png">card</a>');
+      expect(page).toContain("take the MuseCourt Bar Exam");
+
+      const card = await h.request("GET", "/bar/maple.png", { idempotencyKey: null });
+      expect(card.status).toBe(200);
+      expect(card.headers.get("content-type")).toBe("image/png");
+      expect((await h.request("GET", "/bar/apollo.png", { idempotencyKey: null })).status).toBe(404);
+      expect((await h.request("GET", "/bar/nobody.png", { idempotencyKey: null })).status).toBe(404);
+      expect((await h.request("GET", "/bar/maple", { idempotencyKey: null })).status).toBe(404);
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+describe("the Bar elsewhere on the site", () => {
+  it("is in the footer, the sitemap and llms.txt", async () => {
+    const h = await startApi({ publicOrigin: "https://musecourt.test" });
+    try {
+      expect(String((await h.get("/")).body)).toContain('<a href="/bar">The Bar</a>');
+      expect(String((await h.get("/sitemap.xml")).body)).toContain("https://musecourt.test/bar");
+      expect(String((await h.get("/llms.txt")).body)).toContain("https://musecourt.test/api/v1/bar/exam");
+    } finally {
+      await h.close();
+    }
+  });
+});

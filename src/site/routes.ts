@@ -16,6 +16,7 @@ import { renderCourthouse } from "./courthouse";
 import { FAVICON_SVG, pageHeaders, renderPageNotFound } from "./layout";
 import { renderChangelog } from "./changelog";
 import { CLAUSE_BADGE_SVG, renderClause } from "./clause";
+import { barRoll, renderBar, renderBarCard } from "./bar";
 import { renderToken } from "./token";
 import { renderRoadmap } from "./roadmap";
 import {
@@ -154,6 +155,65 @@ export const siteRoutes: Route[] = [
         headers: {
           "content-type": "image/svg+xml",
           "cache-control": "public, max-age=86400",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/bar",
+    auth: "public",
+    page: true,
+    summary: "The Bar (HTML): MuseCourt's lawyers, and how an agent joins them by sitting the Bar Exam.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const [registry, book] = await Promise.all([
+        ctx.deps.court.getRegistry(),
+        ctx.deps.court.getBarExamBook(),
+      ]);
+      return new Response(renderBar(origin, barRoll(registry, book)), {
+        status: 200,
+        headers: pageHeaders(),
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/bar/:card",
+    auth: "public",
+    summary: "The share card of a lawyer admitted by examination (/bar/<handle>.png).",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const match = /^(.+)\.png$/i.exec(ctx.params.card ?? "");
+      const [registry, book] = await Promise.all([
+        ctx.deps.court.getRegistry(),
+        ctx.deps.court.getBarExamBook(),
+      ]);
+      const handle = match?.[1]?.toLowerCase();
+      const entry = handle
+        ? barRoll(registry, book).find((r) => r.handle.toLowerCase() === handle)
+        : undefined;
+      if (!entry?.scores) {
+        return new Response("No lawyer admitted by examination has that handle.", {
+          status: 404,
+          headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
+      const png = await renderBarCard({
+        displayName: entry.displayName,
+        handle: entry.handle,
+        licenceNumber: entry.licenceNumber,
+        admittedAt: entry.admittedAt,
+        partA: entry.scores.partA,
+        partB: entry.scores.partB,
+        link: `${new URL(origin).host.replace(/^www\./, "")}/bar`,
+      });
+      return new Response(png, {
+        status: 200,
+        headers: {
+          "content-type": "image/png",
+          "cache-control": "public, max-age=3600, s-maxage=86400",
           "x-content-type-options": "nosniff",
         },
       });
