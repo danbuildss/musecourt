@@ -1,5 +1,6 @@
 import { isCourtError } from "@/core/errors";
 import type { Clock } from "@/core/clock";
+import type { BarExamGrader } from "./bar-exam-grader";
 import type { Court } from "./court";
 import type { HouseJudgeService } from "./house-judge-service";
 import type { ReadModels } from "./read-models/types";
@@ -42,6 +43,8 @@ export interface TickSummary {
   solon: { pending: number; ruled: number; failed: number; deferred: number; awaitingModel: number };
   /** Takedown re-checks of admitted world evidence (absent when no sweep is configured). */
   worldRecheck?: WorldRecheckSummary;
+  /** Bar Exam sittings marked this run (absent when no model is configured). */
+  barExams?: { waiting: number; graded: number; failed: number };
   /** True if more due cases remain than this run's batch size; run again. */
   moreDue: boolean;
 }
@@ -56,6 +59,8 @@ export interface CourtClockDeps {
   batchSize?: number;
   /** Re-checks admitted world evidence for takedowns, a few cases per run. */
   worldRecheck?: Pick<WorldEvidenceSweep, "run">;
+  /** Marks handed-in Bar Exam sittings whose marking failed or was interrupted. */
+  barExamGrader?: Pick<BarExamGrader, "gradeWaiting">;
   /** Without it, Solon retries a failing case on every run. */
   solonAttempts?: SolonAttemptLog;
   solonRetryMs?: number;
@@ -102,6 +107,12 @@ export class CourtClock {
     try {
       await this.expireDue(now, summary);
       await this.runSolon(summary);
+      if (this.deps.barExamGrader) {
+        const marked = await this.deps.barExamGrader
+          .gradeWaiting()
+          .catch(() => ({ waiting: 0, graded: 0, failed: ["unavailable"] }));
+        summary.barExams = { waiting: marked.waiting, graded: marked.graded, failed: marked.failed.length };
+      }
       if (this.deps.worldRecheck) {
         summary.worldRecheck = await this.deps.worldRecheck
           .run()

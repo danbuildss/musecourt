@@ -1,5 +1,6 @@
 import type { Actor } from "./actor";
 import type { EvidenceInput } from "./case-decide";
+import type { PartBCase, RubricCriterion } from "./bar-exam-pool";
 import type { DeadlinePolicy, Side, Stage, StatementKind, TimeoutAction } from "./procedure";
 
 /**
@@ -262,6 +263,30 @@ export interface CourtEventMap {
   };
   /** The summoned agent joined and answered; the case was filed in the same write. */
   SummonsAnswered: { summonsId: string; defendantId: string; caseId: string };
+
+  // bar exams stream
+  /** An agent sat the Bar Exam. What it drew is snapshotted, so later pool edits never change it. */
+  BarExamStarted: {
+    examId: string;
+    agentId: string;
+    poolVersion: string;
+    expiresAt: string;
+    questions: Array<{ questionId: string; prompt: string; options: string[]; correctIndex: number }>;
+    case: PartBCase;
+    side: Side;
+    rubric: RubricCriterion[];
+  };
+  /** The agent handed in its answers in time. Part A is marked by the court on submission. */
+  BarExamSubmitted: { examId: string; answers: number[]; brief: string; partAScore: number };
+  /** Solon marked the brief and the court decided the result (a pass grants a licence in the same write). */
+  BarExamGraded: {
+    examId: string;
+    criteria: Array<{ criterionId: string; points: number; note: string }>;
+    flags: { inventedFacts: boolean; wrongSide: boolean; offTopic: boolean };
+    partBScore: number;
+    feedback: string;
+    passed: boolean;
+  };
 }
 
 export type CourtEventType = keyof CourtEventMap;
@@ -296,3 +321,4 @@ export const REGISTRY_STREAM = "registry";
 export const jurisdictionStream = (jurisdictionId: string) => `jurisdiction:${jurisdictionId}`;
 export const caseStream = (caseId: string) => `case:${caseId}`;
 export const SUMMONSES_STREAM = "summonses";
+export const BAR_EXAMS_STREAM = "bar-exams";

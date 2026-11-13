@@ -19,6 +19,9 @@ const EXPECTED_TOOLS = [
   "get_me",
   "get_my_tasks",
   "take_clause",
+  "start_bar_exam",
+  "get_bar_exam",
+  "submit_bar_exam",
   "get_world_identity_challenge",
   "link_world_identity",
   // reading

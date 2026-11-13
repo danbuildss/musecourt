@@ -10,6 +10,16 @@ import { buildCase, isSeatedJudgeAgent, type CaseState } from "@/core/case-state
 import type { Clock } from "@/core/clock";
 import { CourtError, fail, isCourtError } from "@/core/errors";
 import {
+  buildBarExamBook,
+  decideGradeBarExam,
+  decideStartBarExam,
+  decideSubmitBarExam,
+  type BarExamBook,
+  type BarExamRecord,
+} from "@/core/bar-exam";
+import type { BarExamGrade } from "@/core/ports";
+import {
+  BAR_EXAMS_STREAM,
   REGISTRY_STREAM,
   SUMMONSES_STREAM,
   caseStream,
@@ -503,6 +513,65 @@ export class Court {
 
   private async getSummonsBook(): Promise<SummonsBook> {
     return buildSummonsBook(await this.deps.store.readStream(SUMMONSES_STREAM));
+  }
+
+  // -------------------------------------------------------------------------
+  // The Bar Exam
+  // -------------------------------------------------------------------------
+
+  /** The agent starts a sitting: the court draws its questions and case, and the 2-hour clock starts. */
+  async startBarExam(actor: Actor): Promise<BarExamRecord> {
+    const examId = this.deps.ids.next("exam");
+    const seed = this.deps.ids.next("seed");
+    await this.retrying(async () => {
+      const book = await this.getBarExamBook();
+      const events = decideStartBarExam(
+        book,
+        { actor, now: this.deps.clock.now(), registry: await this.getRegistry() },
+        { examId, seed },
+      );
+      await this.append([{ streamId: BAR_EXAMS_STREAM, expectedVersion: book.version, events }], actor);
+    });
+    return (await this.getBarExamBook()).byId.get(examId)!;
+  }
+
+  /** The agent hands in its sitting. Part A is marked on the spot; Part B waits for Solon. */
+  async submitBarExam(
+    actor: Actor,
+    input: { examId: string; answers: unknown[]; brief: string },
+  ): Promise<BarExamRecord> {
+    await this.retrying(async () => {
+      const book = await this.getBarExamBook();
+      const events = decideSubmitBarExam(book, { actor, now: this.deps.clock.now() }, input);
+      await this.append([{ streamId: BAR_EXAMS_STREAM, expectedVersion: book.version, events }], actor);
+    });
+    return (await this.getBarExamBook()).byId.get(input.examId)!;
+  }
+
+  /** Records Solon's marks; on a pass the lawyer licence is granted in the same write. */
+  async recordBarExamGrade(examId: string, grade: BarExamGrade): Promise<BarExamRecord> {
+    await this.retrying(async () => {
+      const [book, registry] = await Promise.all([this.getBarExamBook(), this.getRegistry()]);
+      const { examEvents, registryEvents } = decideGradeBarExam(
+        book,
+        { actor: SYSTEM, now: this.deps.clock.now(), registry },
+        { examId, grade },
+      );
+      await this.append(
+        [
+          { streamId: BAR_EXAMS_STREAM, expectedVersion: book.version, events: examEvents },
+          ...(registryEvents.length
+            ? [{ streamId: REGISTRY_STREAM, expectedVersion: registry.version, events: registryEvents }]
+            : []),
+        ],
+        SYSTEM,
+      );
+    });
+    return (await this.getBarExamBook()).byId.get(examId)!;
+  }
+
+  async getBarExamBook(): Promise<BarExamBook> {
+    return buildBarExamBook(await this.deps.store.readStream(BAR_EXAMS_STREAM));
   }
 
   /** Every case action goes through here: the core decides, the store records. */

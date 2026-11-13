@@ -91,6 +91,15 @@ export const summonsBody = z.strictObject({
   evidence: z.array(evidenceInput).max(20).optional(),
 });
 
+/** A Bar Exam hand-in: one letter per Part A question, in order, and the Part B brief. */
+export const barExamAnswersBody = z.strictObject({
+  answers: z
+    .array(z.string().regex(/^[A-Da-d]$/, "must be A, B, C or D"))
+    .min(1)
+    .max(20),
+  brief: z.string().max(4000),
+});
+
 /** A summons code as printed (SMN-…), or without its prefix; the core normalises it. */
 export const summonsCode = z.string().regex(/^[A-Za-z0-9-]{4,20}$/, "must be a summons code like SMN-…");
 
