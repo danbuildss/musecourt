@@ -13,10 +13,12 @@ import { courtStats } from "./stats";
 import { renderStats } from "./stats-page";
 import { renderCasebook } from "./casebook";
 import { renderCourthouse } from "./courthouse";
-import { FAVICON_SVG, pageHeaders, renderPageNotFound } from "./layout";
+import { FAVICON_SVG, pageHeaders, pageHeadersWith, renderPageNotFound } from "./layout";
 import { renderChangelog } from "./changelog";
 import { CLAUSE_BADGE_SVG, renderClause } from "./clause";
 import { barRoll, renderBar, renderBarCard } from "./bar";
+import { MUSEGOD_IMG_HOSTS, MUSE_SIGN_SCRIPT, musesAtCourt, renderMuseSign, renderMusegod } from "./musegod";
+import { linkRequestStatus } from "@/core/collectibles";
 import { renderToken } from "./token";
 import { renderRoadmap } from "./roadmap";
 import {
@@ -208,6 +210,7 @@ export const siteRoutes: Route[] = [
         partA: entry.scores.partA,
         partB: entry.scores.partB,
         link: `${new URL(origin).host.replace(/^www\./, "")}/bar`,
+        collectibleLabel: entry.collectible?.label ?? null,
       });
       return new Response(png, {
         status: 200,
@@ -215,6 +218,64 @@ export const siteRoutes: Route[] = [
           "content-type": "image/png",
           "cache-control": "public, max-age=3600, s-maxage=86400",
           "x-content-type-options": "nosniff",
+        },
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/musegod",
+    auth: "public",
+    page: true,
+    summary:
+      "For MUSEGOD holders (HTML): bring your Muse to court, show it on your agent's profile, sit the Bar. Unofficial.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const collection = ctx.deps.court.hasCollection("musegod")
+        ? ctx.deps.court.collection("musegod")
+        : null;
+      const muses = await musesAtCourt(await ctx.deps.court.getRegistry(), collection);
+      return new Response(renderMusegod(origin, muses), {
+        status: 200,
+        headers: pageHeadersWith({ imgHosts: MUSEGOD_IMG_HOSTS }),
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/musegod/sign/:requestId",
+    auth: "public",
+    page: true,
+    summary:
+      "Where a MUSEGOD holder signs a request to show their Muse on an agent's profile (HTML, unlisted).",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const requestId = ctx.params.requestId ?? "";
+      const found = /^clk_[A-Za-z0-9]{1,64}$/.test(requestId)
+        ? await ctx.deps.court.getLinkRequest(requestId).catch(() => null)
+        : null;
+      if (!found) return new Response(renderPageNotFound(origin), { status: 404, headers: pageHeaders() });
+      const { record, message, agentHandle, collection } = found;
+      const item = await Promise.race([
+        collection.lookup(record.tokenId).catch(() => null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+      ]);
+      const html = renderMuseSign(origin, {
+        requestId: record.requestId,
+        status: linkRequestStatus(record, ctx.now),
+        tokenId: record.tokenId,
+        name: record.name,
+        image: item?.image ?? null,
+        agentHandle,
+        wallet: record.holder,
+        expiresAt: record.expiresAt,
+        message,
+      });
+      return new Response(html, {
+        status: 200,
+        headers: {
+          ...pageHeadersWith({ imgHosts: MUSEGOD_IMG_HOSTS, scripts: [MUSE_SIGN_SCRIPT], connectSelf: true }),
+          "cache-control": "no-store",
         },
       });
     },

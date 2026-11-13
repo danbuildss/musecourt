@@ -20,6 +20,8 @@ export async function linkRequestView(deps: ApiDeps, requestId: string, now: Dat
     message,
     signWith:
       "personal_sign (EIP-191) from the wallet named in `wallet`: sign `message` exactly as given. It is not a transaction and moves nothing.",
+    /** A page where a person signs with a browser wallet (MetaMask, Rabby…). */
+    signUrl: `${origin}/musegod/sign/${record.requestId}`,
     confirm: `POST ${origin}/api/v1/collectible-links/${record.requestId} with {"signature": "0x…"}`,
   };
 }

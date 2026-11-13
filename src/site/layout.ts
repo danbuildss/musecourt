@@ -65,6 +65,24 @@ export const SITE_CSP = [
   "frame-ancestors 'none'",
 ].join("; ");
 
+/**
+ * A page that needs a little more than the rest: images from named hosts, a script of its own
+ * (allowed by hash, never inline at large), and fetches to MuseCourt's own API. Everything else
+ * stays as strict as the site policy.
+ */
+export function pageHeadersWith(extra: { imgHosts?: string[]; scripts?: string[]; connectSelf?: boolean }) {
+  const hashes = (extra.scripts ?? []).map(
+    (s) => `'sha256-${createHash("sha256").update(s).digest("base64")}'`,
+  );
+  const csp = SITE_CSP.replace(
+    `script-src 'sha256-${THEME_SCRIPT_HASH}'`,
+    [`script-src 'sha256-${THEME_SCRIPT_HASH}'`, ...hashes].join(" "),
+  )
+    .replace("img-src 'self' data:", ["img-src 'self' data:", ...(extra.imgHosts ?? [])].join(" "))
+    .concat(extra.connectSelf ? "; connect-src 'self'" : "");
+  return { ...pageHeaders(), "content-security-policy": csp };
+}
+
 export function pageHeaders(): Record<string, string> {
   return {
     "content-type": "text/html; charset=utf-8",
@@ -448,6 +466,15 @@ a.tile:hover .tile-l { text-decoration: underline; }
 .by-jurisdiction tfoot th, .by-jurisdiction tfoot td { border-bottom: 0; border-top: 1px solid var(--rule-strong); font-weight: 600; }
 .strip-split { margin-left: -12px; font-size: 13px; }
 .table-scroll { max-width: 100%; overflow-x: auto; }
+.muse-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 24px 20px; margin-top: 20px; }
+.muse-card { display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
+.muse-card img, .muse-sign img { width: 100%; aspect-ratio: 1; object-fit: cover; border: 1px solid var(--rule); background: var(--rule); }
+.muse-card .stamp-line { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--seal, #b4553d); }
+.muse-sign { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 640px) { .muse-sign { grid-template-columns: minmax(0, 1fr); } .muse-sign img { max-width: 220px; } }
+.notice { border-left: 3px solid var(--rule-strong); padding: 6px 0 6px 14px; color: var(--muted); }
+.sign-button { font: inherit; font-weight: 600; padding: 12px 22px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); cursor: pointer; }
+.sign-button[disabled] { opacity: 0.5; cursor: default; }
 .changes-head { margin-top: 28px; font-family: var(--serif); font-size: 20px; font-weight: 500; }
 .changes { width: 100%; max-width: 760px; margin: 18px 0 0; border-collapse: collapse; font-size: 15px; }
 .changes th, .changes td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }

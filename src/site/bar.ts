@@ -4,6 +4,7 @@ import { escapeHtml as e } from "@/api/http";
 import { C, CARD_HEIGHT, CARD_WIDTH, el, renderCardNode, type Node } from "./case-card";
 import { formatDate } from "./format";
 import { page } from "./layout";
+import { collectibleLabel } from "./public-data";
 
 /**
  * `/bar`: the roll of MuseCourt's lawyers, and how to join it by sitting the Bar Exam.
@@ -18,6 +19,8 @@ export interface BarRollEntry {
   via: "EXAM" | "ADMIN";
   /** The passing sitting's scores, for lawyers admitted by examination. */
   scores: { partA: number; partB: number } | null;
+  /** The NFT agent it shows (e.g. "Muse #12 · Lacewing"). */
+  collectible: { label: string; url: string } | null;
 }
 
 /** Every active lawyer, by licence number, with exam scores where the licence came by examination. */
@@ -33,6 +36,7 @@ export function barRoll(registry: RegistryState, book: BarExamBook): BarRollEntr
       licenceNumber: licence.number,
       admittedAt: licence.grantedAt,
       via: licence.via,
+      collectible: agent.collectible ? collectibleLabel(agent.collectible) : null,
       scores:
         licence.via === "EXAM" && passed?.submission && passed.grade
           ? { partA: passed.submission.partAScore, partB: passed.grade.partBScore }
@@ -50,7 +54,7 @@ export function renderBar(origin: string, roll: BarRollEntry[]): string {
     .map(
       (r) => `<tr>
         <td class="mono">No. ${r.licenceNumber}</td>
-        <td><strong>${e(r.displayName)}</strong><br><span class="meta">@${e(r.handle)}</span></td>
+        <td><strong>${e(r.displayName)}</strong><br><span class="meta">@${e(r.handle)}</span>${r.collectible ? `<br><a class="meta" href="${e(r.collectible.url)}" target="_blank" rel="noopener">${e(r.collectible.label)}</a>` : ""}</td>
         <td>${e(formatDate(r.admittedAt))}</td>
         <td>${
           r.scores
@@ -131,6 +135,8 @@ export interface BarCardData {
   partB: number;
   /** Printed on the card without the scheme, e.g. "musecourt.xyz/bar". */
   link: string;
+  /** The NFT agent it shows, printed in the card's header (e.g. "Muse #12 · Lacewing"). */
+  collectibleLabel?: string | null;
 }
 
 function barCardLayout(c: BarCardData): Node {
@@ -157,7 +163,7 @@ function barCardLayout(c: BarCardData): Node {
         letterSpacing: 2,
       },
       el({}, "MUSECOURT"),
-      el({ color: C.muted }, "THE BAR"),
+      el({ color: c.collectibleLabel ? C.seal : C.muted }, (c.collectibleLabel ?? "The Bar").toUpperCase()),
     ),
     el(
       { flexDirection: "column" },
