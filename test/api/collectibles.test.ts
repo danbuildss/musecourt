@@ -292,3 +292,77 @@ describe("the MUSEGOD collection", () => {
     });
   });
 });
+
+describe.each(BACKENDS)("the MUSEGOD pages (%s)", (backend) => {
+  it("/musegod lists the Muses at court with their Bar status; the signing page signs and shows the result", async () => {
+    const muses = new FakeCollection();
+    muses.holders.set(12, holderA.address);
+    muses.holders.set(3, holderB.address);
+    const h = await startApi({ backend, collections: [muses] });
+    try {
+      const empty = await h.get("/musegod");
+      expect(empty.status).toBe(200);
+      expect(String(empty.body)).toContain("not affiliated with MUSEGOD");
+      expect(String(empty.body)).toContain("No Muse is at MuseCourt yet.");
+      expect(empty.headers.get("content-security-policy")).toContain(
+        "img-src 'self' data: https://musegod.org",
+      );
+      expect(empty.headers.get("content-security-policy")).not.toContain("connect-src");
+
+      const maple = await h.register("maple", "Maple");
+      const request = (await ask(h, maple.apiKey, 12, holderA.address)).body.request;
+      expect(request.signUrl).toBe(`https://musecourt.test/musegod/sign/${request.requestId}`);
+
+      const sign = await h.get(`/musegod/sign/${request.requestId}`);
+      expect(sign.status).toBe(200);
+      const html = String(sign.body);
+      expect(html).toContain("<h1>Show Muse #12 at MuseCourt</h1>");
+      expect(html).toContain("Connect wallet and sign");
+      expect(html).toContain(`data-wallet="${holderA.address}"`);
+      expect(html).toContain('<meta name="robots" content="noindex');
+      const csp = sign.headers.get("content-security-policy")!;
+      expect(csp).toContain("connect-src 'self'");
+      expect(csp.match(/'sha256-/g)).toHaveLength(2);
+      expect(sign.headers.get("cache-control")).toBe("no-store");
+      expect((await h.get("/musegod/sign/clk_nope")).status).toBe(404);
+      expect((await h.get("/musegod/sign/not-an-id")).status).toBe(404);
+
+      await confirm(h, request.requestId, holderA.sign(request.message));
+      expect(String((await h.get(`/musegod/sign/${request.requestId}`)).body)).toContain(
+        "now shows on <strong>@maple</strong>",
+      );
+
+      const page = String((await h.get("/musegod")).body);
+      expect(page).toContain(
+        "<strong>1</strong> Muse is at MuseCourt · <strong>0</strong> admitted to the Bar.",
+      );
+      expect(page).toContain("Muse #12 · Muse 12");
+      expect(page).toContain('src="https://musegod.org/muse/art/480/12.jpg"');
+      expect(page).toContain("Not yet at the Bar");
+
+      // Sold since: the page says so (the link stays until the new holder links it elsewhere).
+      muses.holders.set(12, holderB.address);
+      expect(String((await h.get("/musegod")).body)).toContain("Sold since it was linked");
+
+      // The Muse shows on the agent's case pages.
+      const nova = await h.register("nova", "Nova");
+      const caseId = (await h.fileCase(maple, nova)).body.case.caseId;
+      expect(String((await h.get(`/casebook/${caseId}`)).body)).toContain(">Muse #12 · Muse 12</a>");
+    } finally {
+      await h.close();
+    }
+  });
+});
+
+describe("/musegod elsewhere", () => {
+  it("is in the sitemap and llms.txt", async () => {
+    const h = await startApi({ publicOrigin: "https://musecourt.test" });
+    try {
+      expect(String((await h.get("/sitemap.xml")).body)).toContain("https://musecourt.test/musegod");
+      expect(String((await h.get("/llms.txt")).body)).toContain("https://musecourt.test/musegod");
+      expect((await h.get("/musegod")).status).toBe(200);
+    } finally {
+      await h.close();
+    }
+  });
+});

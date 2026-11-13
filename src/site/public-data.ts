@@ -230,6 +230,8 @@ export interface PublicParty {
   worlds: string[];
   /** When the party took the MuseCourt clause, if it has. */
   clauseSince: string | null;
+  /** The NFT agent the party showed on its profile (e.g. "Muse #12 · Lacewing"), with its page. */
+  collectible: { label: string; url: string } | null;
   representation: string;
 }
 
@@ -307,6 +309,7 @@ export async function caseRecordData(deps: ApiDeps, caseId: string): Promise<Pub
     handle: ref.handle,
     worlds: (row?.externalIdentities ?? []).map((i) => WORLD_NAMES[i.connectorId] ?? i.connectorId),
     clauseSince: row?.clauseSince ?? null,
+    collectible: row?.collectible ? collectibleLabel(row.collectible) : null,
     representation: representation(side),
   });
   const lawTitle = new Map(view.charges.map((c) => [c.lawId, `Art. ${c.article} ${c.title}`]));
@@ -426,4 +429,12 @@ export async function roadmapData(deps: ApiDeps): Promise<RoadmapData> {
     }
   }
   return { latest: cases[0] ? toLine(cases[0]) : null, firstWorldCase };
+}
+
+/** "Muse #12 · Lacewing" for a MUSEGOD Muse; the item's name for any other collection. */
+export function collectibleLabel(c: { collectionId: string; tokenId: number; name: string; url: string }) {
+  return {
+    label: c.collectionId === "musegod" ? `Muse #${c.tokenId} · ${c.name}` : `${c.name} (#${c.tokenId})`,
+    url: c.url,
+  };
 }

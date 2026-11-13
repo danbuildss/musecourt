@@ -90,6 +90,7 @@ function partyCell(p: PublicParty): string {
   <p class="eyebrow">${p.side === "PLAINTIFF" ? "Plaintiff" : "Defendant"}</p>
   <p class="party-name">${e(p.name)} <span class="meta">@${e(p.handle)}</span></p>
   ${p.worlds.map((w) => `<p class="party-line">${e(w)} identity verified ✓</p>`).join("")}
+  ${p.collectible ? `<p class="party-line"><a href="${e(p.collectible.url)}" rel="noopener" target="_blank">${e(p.collectible.label)}</a></p>` : ""}
   ${p.clauseSince ? `<p class="party-line"><a href="/clause">Bound by the MuseCourt clause</a> since ${e(formatDate(p.clauseSince))} ⚖️</p>` : ""}
   <p class="party-line">${e(p.representation)}</p>
 </div>`;

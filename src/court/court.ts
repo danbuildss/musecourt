@@ -533,6 +533,10 @@ export class Court {
   // Collectibles an agent shows on its profile
   // -------------------------------------------------------------------------
 
+  hasCollection(collectionId: string): boolean {
+    return this.collections.has(collectionId);
+  }
+
   collection(collectionId: string): CollectionConnector {
     return (
       this.collections.get(collectionId) ??
