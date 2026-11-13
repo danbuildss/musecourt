@@ -228,6 +228,8 @@ export interface PublicParty {
   name: string;
   handle: string;
   worlds: string[];
+  /** When the party took the MuseCourt clause, if it has. */
+  clauseSince: string | null;
   representation: string;
 }
 
@@ -304,6 +306,7 @@ export async function caseRecordData(deps: ApiDeps, caseId: string): Promise<Pub
     name: ref.displayName,
     handle: ref.handle,
     worlds: (row?.externalIdentities ?? []).map((i) => WORLD_NAMES[i.connectorId] ?? i.connectorId),
+    clauseSince: row?.clauseSince ?? null,
     representation: representation(side),
   });
   const lawTitle = new Map(view.charges.map((c) => [c.lawId, `Art. ${c.article} ${c.title}`]));

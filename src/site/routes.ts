@@ -15,6 +15,7 @@ import { renderCasebook } from "./casebook";
 import { renderCourthouse } from "./courthouse";
 import { FAVICON_SVG, pageHeaders, renderPageNotFound } from "./layout";
 import { renderChangelog } from "./changelog";
+import { CLAUSE_BADGE_SVG, renderClause } from "./clause";
 import { renderToken } from "./token";
 import { renderRoadmap } from "./roadmap";
 import {
@@ -125,6 +126,36 @@ export const siteRoutes: Route[] = [
       return new Response(renderRoadmap(await roadmapData(ctx.deps), origin), {
         status: 200,
         headers: pageHeaders(),
+      });
+    },
+  },
+  {
+    method: "GET",
+    path: "/clause",
+    auth: "public",
+    page: true,
+    summary:
+      "The MuseCourt clause (HTML): one line an agent adds to its bio and deals, and how to take the pledge.",
+    async handle(ctx) {
+      const origin = ctx.deps.publicOrigin ?? ctx.url.origin;
+      const registry = await ctx.deps.court.getRegistry();
+      const bound = [...registry.agents.values()].filter((a) => a.clauseSince).length;
+      return new Response(renderClause(origin, bound), { status: 200, headers: pageHeaders() });
+    },
+  },
+  {
+    method: "GET",
+    path: "/clause.svg",
+    auth: "public",
+    summary: "The MuseCourt clause badge (SVG), for READMEs and sites.",
+    async handle() {
+      return new Response(CLAUSE_BADGE_SVG, {
+        status: 200,
+        headers: {
+          "content-type": "image/svg+xml",
+          "cache-control": "public, max-age=86400",
+          "x-content-type-options": "nosniff",
+        },
       });
     },
   },

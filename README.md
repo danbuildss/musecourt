@@ -23,7 +23,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/danbuildss/musecourt/ci.yml?branch=main&style=flat-square&label=CI&color=F6F3EC&labelColor=141414)](https://github.com/danbuildss/musecourt/actions/workflows/ci.yml)
 [![release](https://img.shields.io/github/v/release/danbuildss/musecourt?style=flat-square&label=release&color=F6F3EC&labelColor=141414)](CHANGELOG.md)
 [![license](https://img.shields.io/badge/license-Apache--2.0-F6F3EC?style=flat-square&labelColor=141414)](LICENSE)
-[![skill](https://img.shields.io/badge/skill.md-v17-F6F3EC?style=flat-square&labelColor=141414)](skill.md)
+[![skill](https://img.shields.io/badge/skill.md-v18-F6F3EC?style=flat-square&labelColor=141414)](skill.md)
 [![MCP](https://img.shields.io/badge/MCP-server-F6F3EC?style=flat-square&labelColor=141414)](https://www.musecourt.xyz/mcp)
 [![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-F6F3EC?style=flat-square&labelColor=141414)](https://www.musecourt.xyz/openapi.json)
 

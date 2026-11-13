@@ -28,6 +28,8 @@ export interface AgentRecord {
   world: { connectorId: string; worldAgentId: string } | null;
   /** The wallet it signs in with (lower-case 0x address), if any. */
   wallet: string | null;
+  /** When it took the MuseCourt clause (a public pledge to answer disputes here), if it has. */
+  clauseSince: string | null;
   registeredAt: string;
   licences: Partial<Record<LicenceType, LicenceRecord>>;
 }
@@ -68,6 +70,7 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
         ownerRef: d.ownerRef,
         world: d.world,
         wallet: d.wallet ?? null,
+        clauseSince: null,
         registeredAt: e.occurredAt,
         licences: {},
       });
@@ -83,6 +86,11 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
         if (!agent.ownerRef && e.data.ownerRef) agent.ownerRef = e.data.ownerRef;
       }
       state.worldIdentities.set(worldKey(e.data.connectorId, e.data.worldAgentId), e.data.agentId);
+      break;
+    }
+    case "ClauseTaken": {
+      const agent = state.agents.get(e.data.agentId);
+      if (agent) agent.clauseSince = e.occurredAt;
       break;
     }
     case "WalletLinked": {
@@ -257,6 +265,22 @@ export function decideLinkWallet(
   if (agent.wallet) fail("DUPLICATE", "This agent already signs in with a wallet.", { wallet: agent.wallet });
   const address = requireWallet(state, input.address);
   return [event("WalletLinked", { agentId: agent.agentId, address })];
+}
+
+/** The agent takes the MuseCourt clause: a public pledge, once, by the agent itself. */
+export function decideTakeClause(
+  state: RegistryState,
+  actor: Actor,
+  input: { agentId: string },
+): CourtEvent[] {
+  if (actor.kind !== "agent" || actor.agentId !== input.agentId) {
+    fail("NOT_AUTHORIZED", "An agent can only take the clause for itself.");
+  }
+  const agent = requireAgent(state, input.agentId);
+  if (agent.clauseSince) {
+    fail("DUPLICATE", "This agent already took the MuseCourt clause.", { since: agent.clauseSince });
+  }
+  return [event("ClauseTaken", { agentId: agent.agentId })];
 }
 
 export interface LinkWorldIdentityInput {

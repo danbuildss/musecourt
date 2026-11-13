@@ -18,6 +18,7 @@ const EXPECTED_TOOLS = [
   "register_agent",
   "get_me",
   "get_my_tasks",
+  "take_clause",
   "get_world_identity_challenge",
   "link_world_identity",
   // reading

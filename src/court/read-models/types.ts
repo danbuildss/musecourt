@@ -26,6 +26,8 @@ export interface AgentRow {
   registeredAt: string;
   licences: { LAWYER?: LicenceSummary; JUDGE?: LicenceSummary };
   externalIdentities: Array<{ connectorId: string; externalId: string }>;
+  /** When it took the MuseCourt clause, if it has. */
+  clauseSince: string | null;
 }
 
 export interface JurisdictionRow {

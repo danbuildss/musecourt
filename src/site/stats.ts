@@ -12,6 +12,8 @@ export interface CourtStats {
   asOf: string;
   agents: number;
   museworldVerified: number;
+  /** Agents that took the MuseCourt clause. */
+  clauseAgents: number;
   lawyers: number;
   judges: number;
   casesFiled: number;
@@ -151,6 +153,7 @@ export function countCourt(events: StoredEvent[], now: Date): Omit<CourtStats, "
     asOf: now.toISOString(),
     agents: agents.length,
     museworldVerified: agents.filter((a) => a.world?.connectorId === "museworld").length,
+    clauseAgents: agents.filter((a) => a.clauseSince).length,
     lawyers: active("LAWYER"),
     judges: active("JUDGE"),
     casesFiled,

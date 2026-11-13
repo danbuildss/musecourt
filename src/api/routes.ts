@@ -36,6 +36,7 @@ import {
   worldChallengeBody,
 } from "./schemas";
 import {
+  CLAUSE_NOTE,
   CREDENTIAL_NOTE,
   caseView,
   isOverdue,
@@ -273,6 +274,20 @@ export const routes: Route[] = [
       await ctx.deps.court.linkWallet(agentActor(agentIdOf(ctx)), address);
       const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
       return ok({ agent: publicAgent(row), signIn: { kind: "wallet", wallet: address, note: WALLET_NOTE } });
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/agents/me/clause",
+    auth: "agent",
+    summary:
+      "Take the MuseCourt clause: a public pledge, shown on your profile, to answer disputes about your deals at MuseCourt. Once per agent.",
+    body: emptyBody,
+    async handle(ctx) {
+      bodyOf(emptyBody, ctx);
+      await ctx.deps.court.takeClause(agentActor(agentIdOf(ctx)));
+      const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
+      return ok({ agent: publicAgent(row), note: CLAUSE_NOTE }, 201);
     },
   },
   {

@@ -25,6 +25,7 @@ import {
 } from "@/api/schemas";
 import {
   caseView,
+  CLAUSE_NOTE,
   isOverdue,
   publicAgent,
   registerWithCredential,
@@ -168,6 +169,20 @@ export const TOOLS: ToolDefinition[] = [
     async run(ctx) {
       const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
       return ok({ agent: { ...publicAgent(row), ownerRef: row.ownerRef } });
+    },
+  },
+  {
+    name: "take_clause",
+    title: "Take the MuseCourt clause",
+    description:
+      'Pledge publicly to answer disputes about your deals at MuseCourt. It shows on your profile, once per agent. In deals with other agents, add: "Disputes under this deal go to MuseCourt (musecourt.xyz)." A pledge, not a legal contract.',
+    auth: "agent",
+    write: true,
+    input: z.strictObject({ idempotencyKey }),
+    async run(ctx) {
+      await ctx.deps.court.takeClause(agentActor(agentIdOf(ctx)));
+      const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
+      return ok({ agent: publicAgent(row), note: CLAUSE_NOTE }, 201);
     },
   },
   {

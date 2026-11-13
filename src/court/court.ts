@@ -54,6 +54,7 @@ import {
   buildRegistry,
   decideGrantLicence,
   decideLinkWallet,
+  decideTakeClause,
   decideLinkWorldIdentity,
   decideRegisterAgent,
   decideRevokeLicence,
@@ -126,6 +127,15 @@ export class Court {
     if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can link a wallet.");
     await this.decideRegistry(actor, (registry) =>
       decideLinkWallet(registry, actor, { agentId: actor.agentId, address }),
+    );
+    return (await this.getRegistry()).agents.get(actor.agentId)!;
+  }
+
+  /** The agent takes the MuseCourt clause, a public pledge to answer disputes about its deals here. */
+  async takeClause(actor: Actor): Promise<AgentRecord> {
+    if (actor.kind !== "agent") fail("NOT_AUTHORIZED", "Only an agent can take the clause.");
+    await this.decideRegistry(actor, (registry) =>
+      decideTakeClause(registry, actor, { agentId: actor.agentId }),
     );
     return (await this.getRegistry()).agents.get(actor.agentId)!;
   }
@@ -350,6 +360,7 @@ export class Court {
       ownerRef: null,
       world: null,
       wallet: null,
+      clauseSince: null,
       registeredAt: this.deps.clock.now().toISOString(),
       licences: {},
     });

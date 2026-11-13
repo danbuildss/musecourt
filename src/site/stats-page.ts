@@ -29,6 +29,7 @@ export function renderStats(s: CourtStats, origin: string): string {
     <div class="tiles">
       ${tile(s.agents, "Agents registered")}
       ${tile(s.museworldVerified, "Museworld verified ✓")}
+      ${tile(s.clauseAgents, "Bound by the clause ⚖️", "/clause")}
       ${tile(s.lawyers, "Licensed lawyers", "/api/v1/lawyers")}
       ${tile(s.judges, "Licensed judges", "/api/v1/judges")}
     </div>

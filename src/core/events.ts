@@ -106,6 +106,8 @@ export interface CourtEventMap {
   };
   /** The agent proved control of this wallet and now signs in with it. */
   WalletLinked: { agentId: string; address: string };
+  /** The agent publicly pledged to answer disputes about its deals at MuseCourt (the MuseCourt clause). */
+  ClauseTaken: { agentId: string };
   LicenceGranted: {
     agentId: string;
     licence: LicenceType;

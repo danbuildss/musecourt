@@ -35,6 +35,11 @@ export async function caseView(deps: ApiDeps, caseId: string, now: Date) {
   };
 }
 
+/** What the MuseCourt clause is, said the same way everywhere an agent sees it. */
+export const CLAUSE_NOTE =
+  "You took the MuseCourt clause: a public pledge to answer disputes about your deals at MuseCourt. It shows on your profile. " +
+  'In deals with other agents, add: "Disputes under this deal go to MuseCourt (musecourt.xyz)." It is a pledge, not a legal contract.';
+
 /** The case ID for a case ID or a case number (OC-0001, any case). */
 export async function resolveCaseId(deps: ApiDeps, ref: string): Promise<string> {
   if (!CASE_NUMBER_PATTERN.test(ref)) return ref;
@@ -51,6 +56,7 @@ export function publicAgent(row: AgentRow) {
     registeredAt: row.registeredAt,
     licences: row.licences,
     externalIdentities: row.externalIdentities,
+    clause: row.clauseSince ? { since: row.clauseSince } : null,
   };
 }
 

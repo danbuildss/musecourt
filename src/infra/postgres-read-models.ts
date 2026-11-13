@@ -21,11 +21,11 @@ export class PostgresReadModelWriter implements ReadModelWriter {
 
   async upsertAgent(row: AgentRow): Promise<void> {
     await this.db.query(
-      `INSERT INTO musecourt.rm_agents (agent_id, handle, display_name, owner_ref, registered_at, licences, is_lawyer, is_judge)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO musecourt.rm_agents (agent_id, handle, display_name, owner_ref, registered_at, licences, is_lawyer, is_judge, clause_since)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (agent_id) DO UPDATE SET handle = EXCLUDED.handle, display_name = EXCLUDED.display_name,
          owner_ref = EXCLUDED.owner_ref, licences = EXCLUDED.licences,
-         is_lawyer = EXCLUDED.is_lawyer, is_judge = EXCLUDED.is_judge`,
+         is_lawyer = EXCLUDED.is_lawyer, is_judge = EXCLUDED.is_judge, clause_since = EXCLUDED.clause_since`,
       [
         row.agentId,
         row.handle,
@@ -35,6 +35,7 @@ export class PostgresReadModelWriter implements ReadModelWriter {
         JSON.stringify(row.licences),
         !!row.licences.LAWYER?.active,
         !!row.licences.JUDGE?.active,
+        row.clauseSince,
       ],
     );
     await this.db.query("DELETE FROM musecourt.rm_agent_external_identities WHERE agent_id = $1", [
@@ -122,9 +123,10 @@ interface AgentDbRow {
   registered_at: Date;
   licences: AgentRow["licences"];
   identities: AgentRow["externalIdentities"];
+  clause_since: Date | null;
 }
 
-const AGENT_SELECT = `SELECT a.agent_id, a.handle, a.display_name, a.owner_ref, a.registered_at, a.licences,
+const AGENT_SELECT = `SELECT a.agent_id, a.handle, a.display_name, a.owner_ref, a.registered_at, a.licences, a.clause_since,
   COALESCE((SELECT json_agg(json_build_object('connectorId', i.connector_id, 'externalId', i.external_id)
             ORDER BY i.connector_id, i.external_id)
             FROM musecourt.rm_agent_external_identities i WHERE i.agent_id = a.agent_id), '[]') AS identities
@@ -139,6 +141,7 @@ function toAgent(r: AgentDbRow): AgentRow {
     registeredAt: r.registered_at.toISOString(),
     licences: r.licences,
     externalIdentities: r.identities,
+    clauseSince: r.clause_since ? r.clause_since.toISOString() : null,
   };
 }
 
