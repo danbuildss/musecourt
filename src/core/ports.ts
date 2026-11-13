@@ -161,13 +161,24 @@ export interface HouseAdjournmentDraft {
 
 export type HouseJudgmentDraft = HouseVerdictDraft | HouseAdjournmentDraft;
 
+/** One Bar Exam brief to mark. Everything the candidate wrote travels as data, never as instructions. */
 export interface BarExamGradingRequest {
   examId: string;
-  questions: Array<{ questionId: string; prompt: string; rubric: string }>;
-  answers: Array<{ questionId: string; answer: string }>;
+  task: string;
+  case: { title: string; facts: string; evidence: string[]; law: LawRef | Omit<LawRef, "version"> };
+  side: "PLAINTIFF" | "DEFENCE";
+  rubric: Array<{ criterionId: string; points: number; description: string }>;
+  brief: string;
 }
 
+/** The marker's draft. The core checks it and applies the caps; the model never decides the result. */
 export interface BarExamGrade {
-  scores: Array<{ questionId: string; score: number; feedback: string }>;
-  overallFeedback: string;
+  criteria: Array<{ criterionId: string; points: number; note: string }>;
+  /** The brief relies on facts or evidence that are not in the case. */
+  inventedFacts: boolean;
+  /** The brief argues for the side it was not assigned. */
+  wrongSide: boolean;
+  /** The brief is empty, off topic, or not an opening statement for this case. */
+  offTopic: boolean;
+  feedback: string;
 }

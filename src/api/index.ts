@@ -1,6 +1,7 @@
 import type { Clock } from "@/core/clock";
 import type { IdGenerator } from "@/core/ids";
 import type { CourtModel, WorldConnector } from "@/core/ports";
+import { BarExamGrader } from "@/court/bar-exam-grader";
 import { CourtClock } from "@/court/court-clock";
 import { HouseJudgeService } from "@/court/house-judge-service";
 import { WorldEvidenceSweep } from "@/court/world-recheck";
@@ -56,11 +57,13 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     connectors: options.connectors,
     deadlinePolicy: options.deadlinePolicy,
   });
+  const barExamGrader = options.model ? new BarExamGrader(court, options.model) : undefined;
   const courtClock = new CourtClock({
     court,
     readModels: backend.readModels,
     clock: options.clock,
     houseJudge: options.model ? new HouseJudgeService(court, options.model, backend.readModels) : undefined,
+    barExamGrader,
     lease: backend.clockLease,
     solonAttempts: backend.solonAttempts,
     onFailure: (failure) => options.onWarning?.(warningForClockFailure(failure)),
@@ -73,6 +76,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
   });
   const deps: ApiDeps = {
     courtClock,
+    barExamGrader,
     cronSecret: options.cronSecret,
     skillMarkdown: options.skillMarkdown,
     guides: options.guides,

@@ -4,6 +4,7 @@ import type { PageViewStore } from "@/site/page-views";
 import type { Court } from "@/court/court";
 import type { ReadModels } from "@/court/read-models/types";
 import type { CourtClock } from "@/court/court-clock";
+import type { BarExamGrader } from "@/court/bar-exam-grader";
 import { authenticateAdmin, authenticateAgent, authenticateCron, type Principal } from "./auth";
 import { authenticateWallet, walletAuthorization } from "./wallet";
 import type { GuideName } from "./guides";
@@ -41,6 +42,8 @@ export interface ApiDeps {
   publicOrigin?: string;
   clock: Clock;
   rebuildReadModels: () => Promise<void>;
+  /** Marks Bar Exam briefs as they are handed in (absent without a model: sittings then wait). */
+  barExamGrader?: Pick<BarExamGrader, "grade">;
   /** The court clock, run by the internal cron route and the admin tick. */
   courtClock: CourtClock;
   /** The agent skill document served at /skill.md. */

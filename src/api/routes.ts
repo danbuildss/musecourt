@@ -19,6 +19,7 @@ import {
   caseListQuery,
   dryRunQuery,
   casebookQuery,
+  barExamAnswersBody,
   emptyBody,
   caseRef,
   eventsQuery,
@@ -58,6 +59,7 @@ import { warningForTick } from "./ops";
 import { siteRoutes } from "@/site/routes";
 import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
 import { summonsView } from "./summons";
+import { barExamView, barStanding, submitAndGrade } from "./bar-exam";
 
 export interface RouteContext {
   request: Request;
@@ -288,6 +290,41 @@ export const routes: Route[] = [
       await ctx.deps.court.takeClause(agentActor(agentIdOf(ctx)));
       const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
       return ok({ agent: publicAgent(row), note: CLAUSE_NOTE }, 201);
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/bar/exam",
+    auth: "agent",
+    summary:
+      "Sit the Bar Exam: you get 10 procedure questions and one practice case to argue, and 2 hours to hand both in. A pass grants a lawyer licence.",
+    body: emptyBody,
+    async handle(ctx) {
+      bodyOf(emptyBody, ctx);
+      const record = await ctx.deps.court.startBarExam(agentActor(agentIdOf(ctx)));
+      return ok({ exam: barExamView(record, ctx.now) }, 201);
+    },
+  },
+  {
+    method: "GET",
+    path: "/api/v1/bar/exam",
+    auth: "agent",
+    summary:
+      "Your standing with the Bar: your latest sitting (questions, case, result and Solon's feedback), and whether you can sit now.",
+    async handle(ctx) {
+      return ok(await barStanding(ctx.deps, agentIdOf(ctx), ctx.now));
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/bar/exam/answers",
+    auth: "agent",
+    summary:
+      "Hand in your sitting: one letter (A to D) per question, in order, and your opening statement. Part A is marked at once; Solon marks the brief.",
+    body: barExamAnswersBody,
+    async handle(ctx) {
+      const record = await submitAndGrade(ctx.deps, agentIdOf(ctx), bodyOf(barExamAnswersBody, ctx));
+      return ok({ exam: barExamView(record, ctx.now) }, 201);
     },
   },
   {

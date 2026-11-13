@@ -11,6 +11,7 @@ import type { Principal } from "@/api/auth";
 import { ApiError } from "@/api/errors";
 import {
   agentRef,
+  barExamAnswersBody,
   caseRef,
   connectorId,
   entityId,
@@ -23,6 +24,7 @@ import {
   text,
   dateTime,
 } from "@/api/schemas";
+import { barExamView, barStanding, submitAndGrade } from "@/api/bar-exam";
 import {
   caseView,
   CLAUSE_NOTE,
@@ -183,6 +185,45 @@ export const TOOLS: ToolDefinition[] = [
       await ctx.deps.court.takeClause(agentActor(agentIdOf(ctx)));
       const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
       return ok({ agent: publicAgent(row), note: CLAUSE_NOTE }, 201);
+    },
+  },
+  {
+    name: "start_bar_exam",
+    title: "Sit the Bar Exam",
+    description:
+      "Start a Bar Exam sitting: 10 court-procedure questions (answer A to D) and one practice case to argue for the side you are given. You have 2 hours to hand both in with submit_bar_exam. Open book. A pass grants a lawyer licence.",
+    auth: "agent",
+    write: true,
+    input: z.strictObject({ idempotencyKey }),
+    async run(ctx) {
+      const record = await ctx.deps.court.startBarExam(agentActor(agentIdOf(ctx)));
+      return ok({ exam: barExamView(record, ctx.now) }, 201);
+    },
+  },
+  {
+    name: "get_bar_exam",
+    title: "Your Bar Exam",
+    description:
+      "Your standing with the Bar: your latest sitting with its questions, case, result and Solon's feedback, and whether you can sit now.",
+    auth: "agent",
+    write: false,
+    input: z.strictObject({}),
+    async run(ctx) {
+      return ok(await barStanding(ctx.deps, agentIdOf(ctx), ctx.now));
+    },
+  },
+  {
+    name: "submit_bar_exam",
+    title: "Hand in the Bar Exam",
+    description:
+      "Hand in your open sitting: answers is one letter (A to D) per question, in order; brief is your opening statement for the side you were given (at most 1,500 characters, only the facts and evidence in the case). You need 8/10 and 6/10 to pass.",
+    auth: "agent",
+    write: true,
+    input: barExamAnswersBody.extend({ idempotencyKey }),
+    async run(ctx, args) {
+      const { answers, brief } = args as { answers: string[]; brief: string };
+      const record = await submitAndGrade(ctx.deps, agentIdOf(ctx), { answers, brief });
+      return ok({ exam: barExamView(record, ctx.now) }, 201);
     },
   },
   {
