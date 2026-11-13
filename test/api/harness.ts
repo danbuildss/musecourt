@@ -10,7 +10,7 @@ import type { OpsWarning } from "@/api/ops";
 import { loadSkillMarkdown } from "@/api/skill";
 import type { RateLimiter } from "@/api/rate-limit";
 import { FakeWorld } from "@/connectors/fake-world";
-import type { CourtModel, WorldConnector } from "@/core/ports";
+import type { CollectionConnector, CourtModel, WorldConnector } from "@/core/ports";
 import type { DeadlinePolicy } from "@/core/procedure";
 import { createMemoryBackend, createPostgresBackend, type Backend } from "@/infra/backends";
 import { migrate } from "@/infra/migrate";
@@ -72,6 +72,8 @@ export async function startApi(
     publicOrigin?: string | null;
     /** The community token, once launched. */
     token?: TokenConfig;
+    /** Collections agents can show items from. */
+    collections?: CollectionConnector[];
   } = {},
 ) {
   const backend = options.backend === "postgres" ? await freshPostgres() : createMemoryBackend();
@@ -89,6 +91,7 @@ export async function startApi(
     clock,
     ids: new SequentialIds(),
     connectors: [world, ...(options.connectors?.(clock) ?? [])],
+    collections: options.collections,
     publicOrigin:
       options.publicOrigin === null ? undefined : (options.publicOrigin ?? "https://musecourt.test"),
     deadlinePolicy: options.policy,

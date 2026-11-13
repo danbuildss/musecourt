@@ -20,7 +20,10 @@ import {
   dryRunQuery,
   casebookQuery,
   barExamAnswersBody,
+  collectibleConfirmBody,
+  collectibleLinkBody,
   emptyBody,
+  entityId,
   caseRef,
   eventsQuery,
   fileCaseBody,
@@ -60,6 +63,7 @@ import { siteRoutes } from "@/site/routes";
 import { issueWorldIdentityChallenge, linkWorldIdentity } from "./world-identity";
 import { summonsView } from "./summons";
 import { barExamView, barStanding, submitAndGrade } from "./bar-exam";
+import { confirmLink, linkRequestView, requestLink } from "./collectibles";
 
 export interface RouteContext {
   request: Request;
@@ -290,6 +294,32 @@ export const routes: Route[] = [
       await ctx.deps.court.takeClause(agentActor(agentIdOf(ctx)));
       const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
       return ok({ agent: publicAgent(row), note: CLAUSE_NOTE }, 201);
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/agents/me/collectible",
+    auth: "agent",
+    summary:
+      'Ask to show a collectible you are (a MUSEGOD Muse: collection "musegod") on your profile. The wallet holding it then signs the returned line to confirm.',
+    body: collectibleLinkBody,
+    async handle(ctx) {
+      const record = await requestLink(ctx.deps, agentIdOf(ctx), bodyOf(collectibleLinkBody, ctx));
+      return ok({ request: await linkRequestView(ctx.deps, record.requestId, ctx.now, originOf(ctx)) }, 201);
+    },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/collectible-links/:requestId",
+    auth: "public",
+    summary:
+      "Confirm a collectible link: the holding wallet's personal_sign signature over the request's line. Anyone may deliver it.",
+    body: collectibleConfirmBody,
+    async handle(ctx) {
+      const requestId = pathParam(entityId, ctx, "requestId");
+      const agent = await confirmLink(ctx.deps, requestId, bodyOf(collectibleConfirmBody, ctx).signature);
+      const row = (await ctx.deps.readModels.getAgent(agent.agentId))!;
+      return ok({ agent: publicAgent(row) }, 201);
     },
   },
   {

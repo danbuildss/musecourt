@@ -1,6 +1,6 @@
 import type { Clock } from "@/core/clock";
 import type { IdGenerator } from "@/core/ids";
-import type { CourtModel, WorldConnector } from "@/core/ports";
+import type { CollectionConnector, CourtModel, WorldConnector } from "@/core/ports";
 import { BarExamGrader } from "@/court/bar-exam-grader";
 import { CourtClock } from "@/court/court-clock";
 import { HouseJudgeService } from "@/court/house-judge-service";
@@ -18,6 +18,8 @@ export interface MuseCourtAppOptions {
   clock: Clock;
   ids: IdGenerator;
   connectors?: WorldConnector[];
+  /** Collections whose items agents can show on their profiles (MUSEGOD's Muses in production). */
+  collections?: CollectionConnector[];
   deadlinePolicy?: DeadlinePolicy;
   adminToken?: string;
   cronSecret?: string;
@@ -55,6 +57,7 @@ export function createMuseCourtApp(options: MuseCourtAppOptions): {
     clock: options.clock,
     ids: options.ids,
     connectors: options.connectors,
+    collections: options.collections,
     deadlinePolicy: options.deadlinePolicy,
   });
   const barExamGrader = options.model ? new BarExamGrader(court, options.model) : undefined;

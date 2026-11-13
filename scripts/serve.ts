@@ -10,6 +10,7 @@ import { tokenFromEnv } from "@/site/token";
 import { loadSkillMarkdown } from "@/api/skill";
 import { publicOriginFrom } from "@/api/world-identity";
 import { museworldConnectorFromEnv } from "@/connectors/museworld";
+import { MusegodCollection } from "@/connectors/musegod";
 import { FakeWorld } from "@/connectors/fake-world";
 import { courtModelFromEnv } from "@/model/llm-court-model";
 import { systemClock } from "@/core/clock";
@@ -39,6 +40,7 @@ const { court, api } = createMuseCourtApp({
   clock: systemClock,
   ids: randomIds,
   connectors: [new FakeWorld(), museworldConnectorFromEnv()],
+  collections: [new MusegodCollection()],
   model: courtModelFromEnv(),
   publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
   adminToken,

@@ -17,9 +17,18 @@ import {
   type BarExamBook,
   type BarExamRecord,
 } from "@/core/bar-exam";
-import type { BarExamGrade } from "@/core/ports";
+import type { BarExamGrade, CollectionConnector } from "@/core/ports";
+import {
+  buildLinkRequestBook,
+  collectibleLinkMessage,
+  decideConfirmCollectibleLink,
+  decideRequestCollectibleLink,
+  type LinkRequestBook,
+  type LinkRequestRecord,
+} from "@/core/collectibles";
 import {
   BAR_EXAMS_STREAM,
+  COLLECTIBLE_LINKS_STREAM,
   REGISTRY_STREAM,
   SUMMONSES_STREAM,
   caseStream,
@@ -80,6 +89,8 @@ export interface CourtDeps {
   clock: Clock;
   ids: IdGenerator;
   connectors?: WorldConnector[];
+  /** Collections whose items agents can show on their profiles (e.g. MUSEGOD's Muses). */
+  collections?: CollectionConnector[];
   /** Policy snapshotted onto newly filed cases. Existing cases keep theirs. */
   deadlinePolicy?: DeadlinePolicy;
 }
@@ -99,10 +110,12 @@ const backoffMs = (attempt: number) => Math.min(200, 5 * 2 ** attempt) * (0.5 + 
  */
 export class Court {
   private readonly connectors: Map<string, WorldConnector>;
+  private readonly collections: Map<string, CollectionConnector>;
   private readonly policy: DeadlinePolicy;
 
   constructor(private readonly deps: CourtDeps) {
     this.connectors = new Map((deps.connectors ?? []).map((c) => [c.id, c]));
+    this.collections = new Map((deps.collections ?? []).map((c) => [c.id, c]));
     this.policy = deps.deadlinePolicy ?? DEFAULT_DEADLINE_POLICY;
     validateDeadlinePolicy(this.policy);
   }
@@ -370,6 +383,7 @@ export class Court {
       ownerRef: null,
       world: null,
       wallet: null,
+      collectible: null,
       clauseSince: null,
       registeredAt: this.deps.clock.now().toISOString(),
       licences: {},
@@ -513,6 +527,96 @@ export class Court {
 
   private async getSummonsBook(): Promise<SummonsBook> {
     return buildSummonsBook(await this.deps.store.readStream(SUMMONSES_STREAM));
+  }
+
+  // -------------------------------------------------------------------------
+  // Collectibles an agent shows on its profile
+  // -------------------------------------------------------------------------
+
+  collection(collectionId: string): CollectionConnector {
+    return (
+      this.collections.get(collectionId) ??
+      fail("NOT_FOUND", `MuseCourt does not know the collection "${collectionId}".`)
+    );
+  }
+
+  /** The agent asks to show an item; the collection is asked who holds it. */
+  async requestCollectibleLink(
+    actor: Actor,
+    input: { collectionId: string; tokenId: number; holder: string },
+  ): Promise<LinkRequestRecord> {
+    const collection = this.collection(input.collectionId);
+    const item = await collection.lookup(input.tokenId);
+    const requestId = this.deps.ids.next("clk");
+    await this.retrying(async () => {
+      const book = await this.getLinkRequestBook();
+      const events = decideRequestCollectibleLink(
+        book,
+        { actor, now: this.deps.clock.now(), registry: await this.getRegistry() },
+        {
+          requestId,
+          collectionId: collection.id,
+          itemWord: collection.itemWord,
+          tokenId: input.tokenId,
+          holder: input.holder,
+          item,
+        },
+      );
+      await this.append(
+        [{ streamId: COLLECTIBLE_LINKS_STREAM, expectedVersion: book.version, events }],
+        actor,
+      );
+    });
+    return (await this.getLinkRequestBook()).byId.get(requestId)!;
+  }
+
+  /** A link request with the exact line its holder signs. */
+  async getLinkRequest(requestId: string): Promise<{
+    record: LinkRequestRecord;
+    message: string;
+    agentHandle: string;
+    collection: CollectionConnector;
+  }> {
+    const record =
+      (await this.getLinkRequestBook()).byId.get(requestId) ??
+      fail("NOT_FOUND", "No link request has that ID.");
+    const collection = this.collection(record.collectionId);
+    const agentHandle = (await this.getRegistry()).agents.get(record.agentId)?.handle ?? record.agentId;
+    const message = collectibleLinkMessage(record, {
+      collectionName: collection.name,
+      itemWord: collection.itemWord,
+      agentHandle,
+    });
+    return { record, message, agentHandle, collection };
+  }
+
+  /**
+   * The holder signed the request's line. `signer` is the wallet the API recovered from the
+   * signature. The collection is asked again who holds the item before anything is recorded.
+   */
+  async confirmCollectibleLink(requestId: string, signer: string | null): Promise<AgentRecord> {
+    const { record, collection } = await this.getLinkRequest(requestId);
+    const item = await collection.lookup(record.tokenId);
+    await this.retrying(async () => {
+      const [book, registry] = await Promise.all([this.getLinkRequestBook(), this.getRegistry()]);
+      const { requestEvents, registryEvents } = decideConfirmCollectibleLink(
+        book,
+        { now: this.deps.clock.now(), registry },
+        { requestId, signer, item, itemWord: collection.itemWord },
+      );
+      await this.append(
+        [
+          { streamId: COLLECTIBLE_LINKS_STREAM, expectedVersion: book.version, events: requestEvents },
+          { streamId: REGISTRY_STREAM, expectedVersion: registry.version, events: registryEvents },
+        ],
+        SYSTEM,
+      );
+    });
+    return (await this.getRegistry()).agents.get(record.agentId)!;
+  }
+
+  private async getLinkRequestBook(): Promise<LinkRequestBook> {
+    return buildLinkRequestBook(await this.deps.store.readStream(COLLECTIBLE_LINKS_STREAM));
   }
 
   // -------------------------------------------------------------------------

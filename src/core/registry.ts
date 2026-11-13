@@ -32,6 +32,18 @@ export interface AgentRecord {
   clauseSince: string | null;
   registeredAt: string;
   licences: Partial<Record<LicenceType, LicenceRecord>>;
+  /** The collectible it shows on its profile (e.g. the NFT agent it is), with the holder's consent. */
+  collectible: LinkedCollectible | null;
+}
+
+export interface LinkedCollectible {
+  collectionId: string;
+  tokenId: number;
+  name: string;
+  image: string | null;
+  url: string;
+  holder: string;
+  linkedAt: string;
 }
 
 export interface RegistryState {
@@ -43,6 +55,8 @@ export interface RegistryState {
   /** Lower-case wallet address → agentId. */
   wallets: Map<string, string>;
   lastLicenceNumber: Record<LicenceType, number>;
+  /** "collectionId:tokenId" → the agent showing it. */
+  collectibles: Map<string, string>;
 }
 
 export function emptyRegistry(): RegistryState {
@@ -53,8 +67,11 @@ export function emptyRegistry(): RegistryState {
     worldIdentities: new Map(),
     wallets: new Map(),
     lastLicenceNumber: { LAWYER: 0, JUDGE: 0 },
+    collectibles: new Map(),
   };
 }
+
+export const collectibleKey = (collectionId: string, tokenId: number) => `${collectionId}:${tokenId}`;
 
 const worldKey = (connectorId: string, worldAgentId: string) => `${connectorId}:${worldAgentId}`;
 
@@ -73,6 +90,7 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
         clauseSince: null,
         registeredAt: e.occurredAt,
         licences: {},
+        collectible: null,
       });
       state.handles.set(normalizeHandle(d.handle), d.agentId);
       if (d.wallet) state.wallets.set(d.wallet, d.agentId);
@@ -115,6 +133,33 @@ export function evolveRegistry(state: RegistryState, e: StoredEvent): RegistrySt
         state.lastLicenceNumber[e.data.licence],
         e.data.licenceNumber,
       );
+      break;
+    }
+    case "CollectibleLinked": {
+      const d = e.data;
+      const agent = state.agents.get(d.agentId);
+      if (agent) {
+        agent.collectible = {
+          collectionId: d.collectionId,
+          tokenId: d.tokenId,
+          name: d.name,
+          image: d.image,
+          url: d.url,
+          holder: d.holder,
+          linkedAt: e.occurredAt,
+        };
+      }
+      state.collectibles.set(collectibleKey(d.collectionId, d.tokenId), d.agentId);
+      break;
+    }
+    case "CollectibleUnlinked": {
+      const d = e.data;
+      const agent = state.agents.get(d.agentId);
+      if (agent?.collectible?.collectionId === d.collectionId && agent.collectible.tokenId === d.tokenId) {
+        agent.collectible = null;
+      }
+      const key = collectibleKey(d.collectionId, d.tokenId);
+      if (state.collectibles.get(key) === d.agentId) state.collectibles.delete(key);
       break;
     }
     case "LicenceRevoked": {

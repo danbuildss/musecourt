@@ -10,6 +10,7 @@ import { tokenFromEnv } from "@/site/token";
 import { loadSkillMarkdown } from "@/api/skill";
 import { publicOriginFrom } from "@/api/world-identity";
 import { museworldConnectorFromEnv } from "@/connectors/museworld";
+import { MusegodCollection } from "@/connectors/musegod";
 import { systemClock } from "@/core/clock";
 import { randomIds } from "@/core/ids";
 import { createPostgresBackend } from "@/infra/backends";
@@ -58,6 +59,7 @@ async function init(): Promise<Handler> {
     clock: systemClock,
     ids: randomIds,
     connectors: [museworldConnectorFromEnv()],
+    collections: [new MusegodCollection()],
     model: courtModelFromEnv(),
     publicOrigin: publicOriginFrom(process.env.MUSECOURT_ORIGIN),
     // Production only: preview deployments keep their own addresses for testing.

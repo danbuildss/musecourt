@@ -19,6 +19,7 @@ const EXPECTED_TOOLS = [
   "get_me",
   "get_my_tasks",
   "take_clause",
+  "request_collectible_link",
   "start_bar_exam",
   "get_bar_exam",
   "submit_bar_exam",

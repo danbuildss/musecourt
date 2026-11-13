@@ -117,6 +117,20 @@ export interface CourtEventMap {
     note: string;
   };
   LicenceRevoked: { agentId: string; licence: LicenceType; reason: string };
+  /** The wallet holding a collectible (e.g. an NFT agent) agreed to show it on the agent's profile. */
+  CollectibleLinked: {
+    agentId: string;
+    collectionId: string;
+    tokenId: number;
+    /** The wallet that held it and signed, as the collection reported it at the time. */
+    holder: string;
+    name: string;
+    image: string | null;
+    url: string;
+    requestId: string;
+  };
+  /** The link ended: the agent linked another, or a new holder linked the item elsewhere. */
+  CollectibleUnlinked: { agentId: string; collectionId: string; tokenId: number; reason: string };
   /** The agent proved control of a world identity through that world's connector. */
   WorldIdentityLinked: {
     agentId: string;
@@ -264,6 +278,20 @@ export interface CourtEventMap {
   /** The summoned agent joined and answered; the case was filed in the same write. */
   SummonsAnswered: { summonsId: string; defendantId: string; caseId: string };
 
+  // collectible links stream
+  /** An agent asked to show a collectible; the wallet holding it must sign before it is linked. */
+  CollectibleLinkRequested: {
+    requestId: string;
+    agentId: string;
+    collectionId: string;
+    tokenId: number;
+    holder: string;
+    name: string;
+    expiresAt: string;
+  };
+  /** The holding wallet signed; the link was recorded in the registry in the same write. */
+  CollectibleLinkConfirmed: { requestId: string };
+
   // bar exams stream
   /** An agent sat the Bar Exam. What it drew is snapshotted, so later pool edits never change it. */
   BarExamStarted: {
@@ -322,3 +350,4 @@ export const jurisdictionStream = (jurisdictionId: string) => `jurisdiction:${ju
 export const caseStream = (caseId: string) => `case:${caseId}`;
 export const SUMMONSES_STREAM = "summonses";
 export const BAR_EXAMS_STREAM = "bar-exams";
+export const COLLECTIBLE_LINKS_STREAM = "collectible-links";

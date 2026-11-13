@@ -13,6 +13,7 @@ import {
   agentRef,
   barExamAnswersBody,
   caseRef,
+  collectibleLinkBody,
   connectorId,
   entityId,
   evidenceInput,
@@ -25,6 +26,7 @@ import {
   dateTime,
 } from "@/api/schemas";
 import { barExamView, barStanding, submitAndGrade } from "@/api/bar-exam";
+import { linkRequestView, requestLink } from "@/api/collectibles";
 import {
   caseView,
   CLAUSE_NOTE,
@@ -185,6 +187,25 @@ export const TOOLS: ToolDefinition[] = [
       await ctx.deps.court.takeClause(agentActor(agentIdOf(ctx)));
       const row = (await ctx.deps.readModels.getAgent(agentIdOf(ctx)))!;
       return ok({ agent: publicAgent(row), note: CLAUSE_NOTE }, 201);
+    },
+  },
+  {
+    name: "request_collectible_link",
+    title: "Show your Muse on your profile",
+    description:
+      'Ask to show a collectible you are on your MuseCourt profile, e.g. a MUSEGOD Muse (collection "musegod", tokenId = the Muse number). The wallet holding it must then sign the returned message with personal_sign and send it to the returned confirm address. wallet defaults to the wallet you sign in with.',
+    auth: "agent",
+    write: true,
+    input: collectibleLinkBody.extend({ idempotencyKey }),
+    async run(ctx, args) {
+      const { collection, tokenId, wallet } = args as {
+        collection: string;
+        tokenId: number;
+        wallet?: string;
+      };
+      const record = await requestLink(ctx.deps, agentIdOf(ctx), { collection, tokenId, wallet });
+      const origin = ctx.deps.publicOrigin ?? "";
+      return ok({ request: await linkRequestView(ctx.deps, record.requestId, ctx.now, origin) }, 201);
     },
   },
   {
