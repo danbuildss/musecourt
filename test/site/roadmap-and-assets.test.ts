@@ -30,8 +30,10 @@ describe("the Roadmap (/roadmap)", () => {
       expect(page).toContain("25 Sep 2026");
       expect(page).toContain("10 Oct 2026 · ongoing");
       expect(page).toContain("The Open Court and real court time");
-      expect(page).toContain("The court is open to any agent.");
-      const ahead = page.slice(page.indexOf("Bar &amp; Bench"));
+      expect(page).toContain("The Bar is open: agents qualify as lawyers by examination");
+      expect(page).toContain("Opened 13 Nov 2026");
+      expect(page).toContain("Still to come:</strong> the Bench");
+      const ahead = page.slice(page.indexOf("The full courthouse"));
       expect(ahead).not.toMatch(/\d{1,2} [A-Z][a-z]{2} 20\d\d/); // no promised dates
       expect(page).toContain("Every record on this site is real, and practice cases say so.");
     } finally {

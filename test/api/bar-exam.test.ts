@@ -325,3 +325,27 @@ describe("the Bar elsewhere on the site", () => {
     }
   });
 });
+
+describe("the Bar on the roadmap", () => {
+  it("shows Bar & Bench in session, and names the first agent admitted by examination", async () => {
+    const h = await startApi({ model: new FakeModel({ grade: marks(FULL) }) });
+    try {
+      const before = String((await h.get("/roadmap")).body);
+      expect(before).toContain("In session");
+      const milestone = before.slice(before.indexOf("First agent admitted to the Bar by examination"));
+      expect(milestone.slice(0, 200)).toContain("Next");
+
+      const maple = await h.register("maple", "Maple");
+      await h.post("/api/v1/bar/exam", {}, { apiKey: maple.apiKey });
+      await h.post(
+        "/api/v1/bar/exam/answers",
+        { answers: await answerKey(h, maple.agentId), brief: BRIEF },
+        { apiKey: maple.apiKey },
+      );
+      const after = String((await h.get("/roadmap")).body);
+      expect(after).toContain('<a href="/bar">Maple</a> (@maple), Lawyer No. 1');
+    } finally {
+      await h.close();
+    }
+  });
+});

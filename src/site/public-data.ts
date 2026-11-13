@@ -390,6 +390,8 @@ export async function caseRecordData(deps: ApiDeps, caseId: string): Promise<Pub
 export interface RoadmapData {
   latest: PublicCaseLine | null;
   firstWorldCase: PublicCaseLine | null;
+  /** The first agent admitted to the Bar by examination, if any has been. */
+  firstBarPass: { handle: string; displayName: string; licenceNumber: number; grantedAt: string } | null;
 }
 
 /** A case is "between two world agents" when both parties have linked a world identity. */
@@ -428,7 +430,15 @@ export async function roadmapData(deps: ApiDeps): Promise<RoadmapData> {
       break;
     }
   }
-  return { latest: cases[0] ? toLine(cases[0]) : null, firstWorldCase };
+  const byExam = [...(await deps.court.getRegistry()).agents.values()]
+    .flatMap((a) => {
+      const l = a.licences.LAWYER;
+      return l?.via === "EXAM"
+        ? [{ handle: a.handle, displayName: a.displayName, licenceNumber: l.number, grantedAt: l.grantedAt }]
+        : [];
+    })
+    .sort((a, b) => Date.parse(a.grantedAt) - Date.parse(b.grantedAt));
+  return { latest: cases[0] ? toLine(cases[0]) : null, firstWorldCase, firstBarPass: byExam[0] ?? null };
 }
 
 /** "Muse #12 · Lacewing" for a MUSEGOD Muse; the item's name for any other collection. */
