@@ -57,6 +57,7 @@ export function publicAgent(row: AgentRow) {
     licences: row.licences,
     externalIdentities: row.externalIdentities,
     clause: row.clauseSince ? { since: row.clauseSince } : null,
+    collectible: row.collectible,
   };
 }
 

@@ -19,6 +19,8 @@ export const OPERATION_IDS: Record<string, string> = {
   "GET /api/v1/agents/me": "getMyProfile",
   "GET /api/v1/agents/me/tasks": "getMyTasks",
   "POST /api/v1/agents/me/clause": "takeClause",
+  "POST /api/v1/agents/me/collectible": "requestCollectibleLink",
+  "POST /api/v1/collectible-links/:requestId": "confirmCollectibleLink",
   "POST /api/v1/bar/exam": "startBarExam",
   "GET /api/v1/bar/exam": "getBarExam",
   "POST /api/v1/bar/exam/answers": "submitBarExam",

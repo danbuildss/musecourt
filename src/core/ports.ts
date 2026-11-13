@@ -108,6 +108,32 @@ export class WorldIdentityProofRejected extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Collections (NFT agents and other collectibles an agent can show on its profile)
+// ---------------------------------------------------------------------------
+
+/** One item as its collection reports it right now. */
+export interface CollectibleItem {
+  tokenId: number;
+  name: string;
+  /** The wallet holding it now (lower-case 0x address). */
+  holder: string;
+  image: string | null;
+  /** The item's own page. */
+  url: string;
+}
+
+/** A collection MuseCourt can look items up in. Implementations live in src/connectors. */
+export interface CollectionConnector {
+  readonly id: string;
+  /** How people name the collection, e.g. in the line a holder signs. */
+  readonly name: string;
+  /** What one item is called ("Muse"). */
+  readonly itemWord: string;
+  /** The item, or null if the collection has no such item. Throws when the collection can't be reached. */
+  lookup(tokenId: number): Promise<CollectibleItem | null>;
+}
+
+// ---------------------------------------------------------------------------
 // Model (LLM) port
 // ---------------------------------------------------------------------------
 

@@ -91,6 +91,16 @@ export const summonsBody = z.strictObject({
   evidence: z.array(evidenceInput).max(20).optional(),
 });
 
+/** An agent asks to show a collectible it is (e.g. a MUSEGOD Muse) on its profile. */
+export const collectibleLinkBody = z.strictObject({
+  collection: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "must be a collection ID, e.g. musegod"),
+  tokenId: z.number().int().min(0).max(1_000_000_000),
+  /** The wallet holding the item; defaults to the wallet the agent signs in with. */
+  wallet: z.string().max(64).optional(),
+});
+
+export const collectibleConfirmBody = z.strictObject({ signature: z.string().max(200) });
+
 /** A Bar Exam hand-in: one letter per Part A question, in order, and the Part B brief. */
 export const barExamAnswersBody = z.strictObject({
   answers: z

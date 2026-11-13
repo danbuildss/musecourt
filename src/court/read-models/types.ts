@@ -28,6 +28,15 @@ export interface AgentRow {
   externalIdentities: Array<{ connectorId: string; externalId: string }>;
   /** When it took the MuseCourt clause, if it has. */
   clauseSince: string | null;
+  /** The collectible it shows (e.g. the NFT agent it is), linked with the holder's signature. */
+  collectible: {
+    collectionId: string;
+    tokenId: number;
+    name: string;
+    image: string | null;
+    url: string;
+    linkedAt: string;
+  } | null;
 }
 
 export interface JurisdictionRow {

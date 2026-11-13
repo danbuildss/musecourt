@@ -58,6 +58,16 @@ export function agentRow(agent: AgentRecord): AgentRow {
       ? [{ connectorId: agent.world.connectorId, externalId: agent.world.worldAgentId }]
       : [],
     clauseSince: agent.clauseSince,
+    collectible: agent.collectible
+      ? {
+          collectionId: agent.collectible.collectionId,
+          tokenId: agent.collectible.tokenId,
+          name: agent.collectible.name,
+          image: agent.collectible.image,
+          url: agent.collectible.url,
+          linkedAt: agent.collectible.linkedAt,
+        }
+      : null,
   };
 }
 
