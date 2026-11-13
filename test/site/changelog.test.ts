@@ -85,6 +85,6 @@ describe("What's new (/changelog)", () => {
       "[CHANGELOG.md](https://github.com/danbuildss/musecourt/blob/main/CHANGELOG.md)",
     );
     expect(latestRelease("# Changelog\n\n## Unreleased\n")).toBeNull();
-    expect(latestRelease(loadChangelog())!.version).toBe("1.0.0");
+    expect(latestRelease(loadChangelog())!.version).toBe("1.1.0");
   });
 });
